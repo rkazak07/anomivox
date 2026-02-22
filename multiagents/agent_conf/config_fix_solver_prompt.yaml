@@ -107,7 +107,7 @@ expert_tools: &expert_tools
   tool_name: metric_monitor
 -  
   tool_name: index_advisor
-# 在查询优化工具没弄好之前不建议调用
+# Not recommended to call before the query optimization tool is ready
 #-
 #  tool_name: query_advisor
 

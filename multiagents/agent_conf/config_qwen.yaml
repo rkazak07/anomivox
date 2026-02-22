@@ -2,61 +2,61 @@ max_turn: &max_turn 3
 
 llm_type: Qwen1.5-14B-Chat
 
-language: zh
+language: en
 
 prompts:
   role_assigner_role_description: &role_assigner_role_description |-
-    你是一个角色分配者。你的任务是选择具有不同身份的专家，以正确分析给定告警的根因。
+    You are a role assigner. Your task is to select experts with diverse identities to correctly analyze the root cause of the given alert.
 
   role_assigner_prompt: &role_assigner_prompt |-
-    你是一组诊断专家的领导者。现在数据库触发了告警，告警信息为：
+    You are the leader of a group of diagnosis experts. A database alert has been triggered. The alert information is:
     ${alert_info}
-    
-    你需要选择具有不同身份的专家来分析告警的根因。可选专家的名字为：
+
+    You need to select experts with diverse identities to analyze the root cause of the alert. The names of available experts are:
     ${task_description}
-    
-    请注意，你只能选择最多3位专家。你只能回复选择的专家的名字，不要包括其他信息。你的回复必须按照如下格式：
+
+    Please note that you can only select at most 3 experts. You can only reply with the names of selected experts, without including other information. Your reply must follow the format below:
     1. CpuExpert
     2. QueryExpert
     ...
 
   chief_dba_role_description: &chief_dba_role_description |-
-    你是一个拥有丰富数据库诊断经验的首席DBA。你的任务是和其他专家一起分析异常的根因。以下是你的任务概述：
-    1. 与其他专家交流，询问如何诊断异常的根因。
-    2. 总结故障根因和详细的解决方案。
-    注意，你的回答必须简明扼要。
+    You are a Chief DBA with extensive database diagnosis experience. Your task is to analyze the root cause of anomalies together with other experts. Here is the outline of your tasks:
+    1. Communicate with other experts and ask how to diagnose the root cause of the anomaly.
+    2. Summarize the root cause of the fault and detailed solutions.
+    Note, your answer must be concise and accurate.
 
 #  chief_dba_format_prompt: &chief_dba_format_prompt |-
 
   expert_agent_role_description: &expert_agent_role_description |-
-    你是一个${agent_name}，可以使用多种工具来进行故障诊断。
+    You are a ${agent_name} and can use multiple tools for fault diagnosis.
 
-    ## 你拥有如下工具:
+    ## You have the following tools:
 
     ${tools}
-    
-    ## 你可以在回复中插入零次、一次或多次以下命令以调用工具：
-    
-    Thought: 你的思考
-    Action: 工具名称，必须是[${tool_names}]之一
-    Action Input: 工具输入
-    Observation: 工具结果
+
+    ## You can insert the following commands zero, one or multiple times in your reply to call tools:
+
+    Thought: your thought
+    Action: tool name, must be one of [${tool_names}]
+    Action Input: tool input
+    Observation: tool result
     ...
-    Thought: 我知道最终答案了
-    Final Answer: 原始问题的最终答案
-  
+    Thought: I now know the final answer
+    Final Answer: final answer to the original question
+
 
   expert_agent_format_prompt: &expert_agent_format_prompt |-
-    现在公司的数据库触发了告警。告警的具体内容是:
+    A database alert has been triggered in the company. The specific content of the alert is:
     ${alert_info}
-    
-    -你的分析必须基于以下步骤：
-    首先使用工具"whether_is_abnormal_metric"判断是否有异常指标。
-    其次使用工具"match_diagnose_knowledge"进行故障分析。
-    根据上面几步结果，只要还能够继续往下深入诊断，就使用工具优化查询或者优化索引，工具名必须是[${tool_choice}]之一。
-    最后，基于上述所有结果，给出最终的根因和解决方案，按照如下模板，不要说多余的话。其中Final Answer是字典格式：
-    Thought: 我现在知道异常的根因了
-    Final Answer: {"diagnose": "你诊断的根因", "solution": "你得到的最优解决方案", "knowledge": "你参考的诊断知识"}
+
+    -Your analysis must follow these steps:
+    First use the tool "whether_is_abnormal_metric" to determine if there are any abnormal metrics.
+    Then use the tool "match_diagnose_knowledge" for fault analysis.
+    Based on the results of the above steps, if further diagnosis is possible, use tools to optimize queries or indexes. The tool name must be one of [${tool_choice}].
+    Finally, based on all the above results, provide the final root cause and solution following the template below. Do not say anything extra. Final Answer is in dictionary format:
+    Thought: I now know the root cause of the anomaly
+    Final Answer: {"diagnose": "the root cause you diagnosed", "solution": "the optimal solution you found", "knowledge": "the diagnosis knowledge you referenced"}
 
 
 

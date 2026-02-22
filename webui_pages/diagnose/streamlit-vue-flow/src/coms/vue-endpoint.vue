@@ -38,7 +38,7 @@ export default {
           return this.findParent(self.$parent)
         }
       } else {
-        console.warn('锚点没有被node包裹上,请检查！');
+        console.warn('Anchor point is not wrapped by a node, please check!');
       }
     }
   },

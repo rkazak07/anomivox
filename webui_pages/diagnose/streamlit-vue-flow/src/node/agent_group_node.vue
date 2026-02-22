@@ -117,7 +117,7 @@ export default {
       handler(newVal, oldVal) {
         this.expertData = JSON.parse(JSON.stringify(this.defaultExpertData));
         if(newVal.userData.expertData) {
-          // 将expertData中的name和role提取出来，如果expertData中的name和expertData中的subTitle相同，则将role赋值给expertData中的role，且将isRuning设置为true, 否则设置为false
+          // Extract name and role from expertData; if the name matches subTitle, set role and mark isRuning as true, otherwise false
           this.expertData.forEach((item) => {
             newVal.userData.expertData.forEach((expertItem) => {
               if(item.subTitle === expertItem.name) {

@@ -91,14 +91,14 @@ export default {
   },
   mounted() {
     const target = document.getElementById(this.componentId + '-scroll-container')
-    // 创建MutationObserver对象
+    // Create MutationObserver object
     this.scrollObserver = new MutationObserver(function() {
-      // 处理高度变化操作
+      // Handle height change operations
       target.scrollTop = target.scrollHeight - target.clientHeight
     })
-    // 配置观察选项
+    // Configure observation options
     const config = { attributes: true, childList: true, subtree: true }
-    // 开始观察目标节点
+    // Start observing the target node
     this.scrollObserver.observe(target, config)
   },
   destroyed() {

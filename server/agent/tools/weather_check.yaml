@@ -5,6 +5,6 @@ parameters:
   properties:
     query:
       type: string
-      description: City name,include city and county,like "厦门市思明区"
+      description: City name, include city and county, like "San Francisco, CA"
 required:
   - query

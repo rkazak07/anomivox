@@ -78,7 +78,7 @@ export default {
     this.initCanvas();
 
     if (!this.canvas) {
-      console.warn("当前canvas为null，初始化存在问题");
+      console.warn("Canvas is null, initialization has an issue");
       return;
     }
 
@@ -128,11 +128,11 @@ export default {
     // window.canvas = this.canvas;
   },
   methods: {
-    // 初始化
+    // Initialize
     initCanvas() {
       const root = this.$refs["canvas-dag"];
       if (!root) {
-        console.warn("当前canvas没有绑定dom节点，无法渲染");
+        console.warn("Canvas has no bound DOM node, cannot render");
       } else {
         console.log('initCanvas***********');
         this.canvasConf.root = root;
@@ -140,12 +140,12 @@ export default {
 
         // setTimeout(() => {
         //   this.canvas.setGridMode(true, {
-        //     isAdsorb: false,         // 是否自动吸附,默认关闭
+        //     isAdsorb: false,         // auto adsorption, disabled by default
         //     theme: {
-        //       shapeType: 'circle',     // 展示的类型，支持line & circle
-        //       gap: 20,               // 网格间隙
-        //       background: 'rgba(0, 0, 0, 1)',     // 网格背景颜色
-        //       circleRadiu: 1.5,        // 圆点半径
+        //       shapeType: 'circle',     // display type, supports line & circle
+        //       gap: 20,               // grid gap
+        //       background: 'rgba(0, 0, 0, 1)',     // grid background color
+        //       circleRadiu: 1.5,        // circle radius
         //       circleColor: 'rgba(255, 255, 255, 1)'
         //     }
         //   })
@@ -154,10 +154,10 @@ export default {
       }
     },
 
-    // 更新画布信息
+    // Update canvas info
     updateCavans() {
       if (!this.canvas) {
-        console.warn("当前canvas为null，初始化存在问题");
+        console.warn("Canvas is null, initialization has an issue");
         return;
       }
 
@@ -171,10 +171,10 @@ export default {
 
     },
 
-    // 重新计算节点和边的位置
+    // Recalculate node and edge positions
     re() {
       if (!this.canvas) {
-        console.warn("当前canvas为null，初始化存在问题");
+        console.warn("Canvas is null, initialization has an issue");
         return;
       }
 
@@ -182,7 +182,7 @@ export default {
       relayout(this.canvas);
     },
 
-    // 重绘所有节点
+    // Redraw all nodes
     redraw() {
       const oldNodes = this.canvas.nodes;
       const oldEdges = this.canvas.edges;

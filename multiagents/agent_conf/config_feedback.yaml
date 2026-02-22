@@ -130,7 +130,7 @@ expert_tools: &expert_tools
   tool_name: metric_monitor
 -  
   tool_name: index_advisor
-# 在查询优化函数没确定好之前不建议调用
+# Not recommended to call before the query optimization function is finalized
 #-
 #  tool_name: query_advisor
 
@@ -189,7 +189,7 @@ agents:
       llm_type: gpt-3.5-turbo
       temperature: 0
       max_tokens: 256
-# 现在的output parser暂时还没适配
+# The output parser is not yet adapted
     output_parser:
       type: role_assigner
   -

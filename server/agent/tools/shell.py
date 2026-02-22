@@ -1,0 +1,8 @@
+from pydantic import BaseModel, Field
+from langchain.tools import ShellTool
+def shell(query: str):
+    tool = ShellTool()
+    return tool.run(tool_input=query)
+
+class ShellInput(BaseModel):
+    query: str = Field(description="A shell command that can run on the Linux command line")

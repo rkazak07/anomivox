@@ -1,0 +1,30 @@
+import logging
+import os
+import langchain
+import tempfile
+import shutil
+
+
+
+log_verbose = False
+langchain.verbose = False
+
+
+
+
+LOG_FORMAT = "%(asctime)s - %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s"
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logging.basicConfig(format=LOG_FORMAT)
+
+
+
+LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+if not os.path.exists(LOG_PATH):
+    os.mkdir(LOG_PATH)
+
+
+BASE_TEMP_DIR = os.path.join(tempfile.gettempdir(), "chatchat")
+if os.path.isdir(BASE_TEMP_DIR):
+    shutil.rmtree(BASE_TEMP_DIR)
+os.makedirs(BASE_TEMP_DIR, exist_ok=True)

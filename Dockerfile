@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # NLTK veri setlerini önceden indir
 RUN python -m nltk.downloader punkt stopwords averaged_perceptron_tagger
 
+# Embedding modelini önceden indir (runtime'da event loop bloklamaması için)
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
 # ── Node bağımlılıkları (layer cache için önce package.json + .npmrc) ──
 # .npmrc: strict-peer-dependencies=false, shamefully-hoist=true
 COPY webui/package.json webui/.npmrc ./webui/

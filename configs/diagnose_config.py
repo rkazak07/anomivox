@@ -19,11 +19,11 @@ IS_FEEDBACK_BY_UI = True
 
 
 POSTGRESQL_CONFIG = {
-  "host": "182.XX.XX.XXX",
+  "host": "127.0.0.1",
   "port": 5432,
-  "user": "XXXX",
-  "password": "XXXXX",
-  "dbname": "postgres"
+  "user": "postgres",
+  "password": "Test123_456",
+  "dbname": "anomivox"
 }
 
 MYSQL_CONFIG = {

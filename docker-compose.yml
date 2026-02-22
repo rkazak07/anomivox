@@ -16,6 +16,8 @@ services:
       PG_DB: ${POSTGRES_DB:-anomivox}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     ports:
       - "7861:7861"
     volumes:

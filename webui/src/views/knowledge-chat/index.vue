@@ -130,7 +130,7 @@ onMounted(() => {
 const getKnowledgeList = async () => {
   knowledgeListReq().then(res => {
     knowledgeBaseList.value = [...new Set<string>(res.data.map(item => item.kb_name))];
-    knowledgeBase.value = knowledgeBaseList.value[0]
+    knowledgeBase.value = knowledgeBaseList.value[0] || ''
   })
 }
 
@@ -232,6 +232,10 @@ const getLocalHistoryMessages = () => {
 const onSendClick = (value) => {
   if (value === '') {
     ElMessage.error('Please input something')
+    return
+  }
+  if (!knowledgeBase.value) {
+    ElMessage.warning('Please create and select a knowledge base first')
     return
   }
   const userInputValue = value

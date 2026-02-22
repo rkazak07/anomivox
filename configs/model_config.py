@@ -2,7 +2,7 @@ import os
 
 MODEL_ROOT_PATH = ""
 
-EMBEDDING_MODEL = "text-embedding-ada-002"  # m3e-base
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 EMBEDDING_DEVICE = "auto"
 
@@ -53,7 +53,7 @@ ONLINE_LLM_MODEL = {
 #           - text2vec-large-chinese
 MODEL_PATH = {
     "embed_model": {
-        "text-embedding-ada-002": "AIzaSyBc7xSaO50ygfJOcS0xM3RPgibahCVU1nM",
+        "all-MiniLM-L6-v2": "sentence-transformers/all-MiniLM-L6-v2",
     },
 
     "llm_model": {

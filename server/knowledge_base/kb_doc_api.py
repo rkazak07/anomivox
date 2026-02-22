@@ -427,11 +427,11 @@ def download_doc(
                 media_type="multipart/form-data",
                 content_disposition_type=content_disposition_type,
             )
-        except Exception as e:
-            msg = f"Failed to read file {kb_file.filename}, error: {e}"
-            logger.error(f'{e.__class__.__name__}: {msg}',
-                         exc_info=e if log_verbose else None)
-            return BaseResponse(code=500, msg=msg)
+    except Exception as e:
+        msg = f"Failed to read file {kb_file.filename}, error: {e}"
+        logger.error(f'{e.__class__.__name__}: {msg}',
+                     exc_info=e if log_verbose else None)
+        return BaseResponse(code=500, msg=msg)
 
     return BaseResponse(code=500, msg=f"Could not read file {kb_file.filename}")
 def recreate_vector_store(

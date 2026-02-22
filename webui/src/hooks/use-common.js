@@ -3,8 +3,8 @@ import { ElMessage } from 'element-plus'
 
 // i18n language  match title
 import { i18n } from '@/lang'
-// the keys using  zh file
-import langEn from '@/lang/zh'
+// the keys using  tr file
+import langTr from '@/lang/tr'
 import settings from '@/settings'
 
 export const sleepTimeout = (time) => {
@@ -31,7 +31,7 @@ export const langTitle = (title) => {
   if (!title) {
     return settings.title
   }
-  for (const key of Object.keys(langEn)) {
+  for (const key of Object.keys(langTr)) {
     if (te(`${key}.${title}`) && t(`${key}.${title}`)) {
       return t(`${key}.${title}`)
     }

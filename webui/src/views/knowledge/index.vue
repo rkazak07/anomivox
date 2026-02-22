@@ -38,6 +38,9 @@
         </el-form-item>
         <el-form-item label="Embedding Model" prop="model" :rules="[{required: true, message: 'Please Select a Embedding Model', trigger: 'blur, change'}]">
           <el-select v-model="createForm.model" placeholder="Please select a Embedding Model" style="width: 100%">
+            <template #empty>
+              <div class="el-select__empty">Veri yok</div>
+            </template>
             <el-option v-for="item in embedList.value" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>

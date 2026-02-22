@@ -28,6 +28,7 @@ RUN python -m nltk.downloader punkt stopwords averaged_perceptron_tagger
 # ── Node bağımlılıkları (layer cache için önce package.json + .npmrc) ──
 # .npmrc: strict-peer-dependencies=false, shamefully-hoist=true
 COPY webui/package.json webui/.npmrc ./webui/
+COPY webui_pages/reports/reports_ui/package.json ./webui_pages/reports/reports_ui/
 RUN cd webui && pnpm install
 
 # ── Uygulama kodunu kopyala ──────────────────────────────────
@@ -35,7 +36,7 @@ COPY . .
 
 # ── reports_ui Vue bileşenini derle ──────────────────────────
 RUN cd webui_pages/reports/reports_ui && \
-    npm install && \
+    npm ci && \
     NODE_OPTIONS=--openssl-legacy-provider npm run build
 
 # entrypoint

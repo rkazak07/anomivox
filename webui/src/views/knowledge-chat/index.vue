@@ -10,6 +10,9 @@
             size="default"
             style="width: 120px"
         >
+          <template #empty>
+            <div class="el-select__empty">Veri yok</div>
+          </template>
           <el-option
               v-for="item in modelList"
               :key="item"
@@ -28,6 +31,9 @@
             size="default"
             style="width: 120px"
         >
+          <template #empty>
+            <div class="el-select__empty">Veri yok</div>
+          </template>
           <el-option
               v-for="item in knowledgeBaseList"
               :key="item"

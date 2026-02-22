@@ -11,6 +11,9 @@
             placeholder="Please select"
             multiple
             style="width: calc(100% - 40px); font-size: 14px;">
+          <template #empty>
+            <div class="el-select__empty">Veri yok</div>
+          </template>
           <el-option
               v-for="selectItem in editData?.selectList"
               :key="selectItem"

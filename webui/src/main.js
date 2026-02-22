@@ -32,6 +32,7 @@ import '@vue-flow/core/dist/theme-default.css';
 
 //import element-plus
 import 'element-plus/dist/index.css'
+
 const app = createApp(App)
 
 //import element-plus svg icon
@@ -47,6 +48,7 @@ app.use(pinia)
 
 //i18n
 app.use(setupI18n)
+
 app.component('SvgIcon', svgIcon)
 directive(app)
 

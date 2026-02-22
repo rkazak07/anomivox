@@ -34,13 +34,13 @@ export default defineConfig(({ command, mode }) => {
       host: true,
       https: false,
       //https://cn.vitejs.dev/config/server-options.html#server-proxy
-      proxy: {
+      proxy: env.VITE_PROXY_BASE_URL && env.VITE_PROXY_URL ? {
         [env.VITE_PROXY_BASE_URL]: {
-          target: env.VITE_PROXY_URL,
+          target: env.VITE_PROXY_URL.replace(/\/$/, ''),
           changeOrigin: true,
           rewrite: (path) => path.replace(new RegExp(`^${env.VITE_PROXY_BASE_URL}`), '')
         }
-      }
+      } : {}
     },
     preview: {
       port: 5006,

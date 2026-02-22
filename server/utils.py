@@ -43,7 +43,7 @@ def get_ChatOpenAI(
         **kwargs: Any,
 ) -> ChatOpenAI:
     config = get_model_worker_config(model_name)
-    if model_name == "openai-api":
+    if config.get("online_api") and config.get("model_name"):
         model_name = config.get("model_name")
     model = ChatOpenAI(
         streaming=streaming,
@@ -70,7 +70,7 @@ def get_OpenAI(
         **kwargs: Any,
 ) -> OpenAI:
     config = get_model_worker_config(model_name)
-    if model_name == "openai-api":
+    if config.get("online_api") and config.get("model_name"):
         model_name = config.get("model_name")
     model = OpenAI(
         streaming=streaming,

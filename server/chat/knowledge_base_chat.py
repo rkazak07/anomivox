@@ -20,10 +20,10 @@ from urllib.parse import urlencode
 from server.knowledge_base.kb_doc_api import search_docs
 
 
-async def knowledge_base_chat(query: str = Body(..., description="Kullanıcı girdisi", examples=["merhaba"]),
+async def knowledge_base_chat(query: str = Body(..., description="User input", examples=["hello"]),
                               ignore_cache: bool = Body(True, description="Ignore cache"),
                               answer_cache: bool = Body(False, description="Cache search results"),
-                              knowledge_base_name: str = Body(..., description="Bilgi tabanı adı", examples=["samples"]),
+                              knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
                               top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Number of matching vectors"),
                               score_threshold: float = Body(
                                   SCORE_THRESHOLD,
@@ -39,8 +39,8 @@ async def knowledge_base_chat(query: str = Body(..., description="Kullanıcı gi
                                       {"role": "assistant",
                                        "content": "Tigerly brave"}]]
 ),
-    stream: bool = Body(False, description="Akış çıktısı"),
-    model_name: str = Body(LLM_MODELS[0], description="LLM model adı。"),
+    stream: bool = Body(False, description="Stream output"),
+    model_name: str = Body(LLM_MODELS[0], description="LLM model name"),
     temperature: float = Body(TEMPERATURE, description="LLM sampling temperature", ge=0.0, le=1.0),
     max_tokens: Optional[int] = Body(
                                   None,

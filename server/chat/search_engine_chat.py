@@ -112,8 +112,8 @@ async def lookup_search_engine(
     return docs
 
 
-async def search_engine_chat(query: str = Body(..., description="Kullanıcı girdisi", examples=["merhaba"]),
-                            search_engine_name: str = Body(..., description="Arama motoru adı", examples=["duckduckgo"]),
+async def search_engine_chat(query: str = Body(..., description="User input", examples=["hello"]),
+                            search_engine_name: str = Body(..., description="Search engine name", examples=["duckduckgo"]),
                             top_k: int = Body(SEARCH_ENGINE_TOP_K, description="Number of search results"),
                             history: List[History] = Body([],
                                                             description="Conversation history",
@@ -122,8 +122,8 @@ async def search_engine_chat(query: str = Body(..., description="Kullanıcı gir
                                                                 {"role": "assistant",
                                                                 "content": "Tigerly brave"}]]
                                                             ),
-                            stream: bool = Body(False, description="Akış çıktısı"),
-                            model_name: str = Body(LLM_MODELS[0], description="LLM model adı。"),
+                            stream: bool = Body(False, description="Stream output"),
+                            model_name: str = Body(LLM_MODELS[0], description="LLM model name"),
                             temperature: float = Body(TEMPERATURE, description="LLM sampling temperature", ge=0.0, le=1.0),
                             max_tokens: Optional[int] = Body(None, description="Limit LLM generated token count, None defaults to model maximum"),
                             prompt_name: str = Body("default", description="Prompt template name used (configured in configs/prompt_config.py)"),

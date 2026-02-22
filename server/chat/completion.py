@@ -11,10 +11,10 @@ from langchain.prompts import PromptTemplate
 from server.utils import get_prompt_template
 
 
-async def completion(query: str = Body(..., description="Kullanıcı girdisi", examples=["merhaba"]),
-                     stream: bool = Body(False, description="Akış çıktısı"),
+async def completion(query: str = Body(..., description="User input", examples=["hello"]),
+                     stream: bool = Body(False, description="Stream output"),
                      echo: bool = Body(False, description="Echo the input in addition to the output"),
-                     model_name: str = Body(LLM_MODELS[0], description="LLM model adı。"),
+                     model_name: str = Body(LLM_MODELS[0], description="LLM model name"),
                      temperature: float = Body(TEMPERATURE, description="LLM sampling temperature", ge=0.0, le=1.0),
                      max_tokens: Optional[int] = Body(1024, description="Limit LLM generated token count, None defaults to model maximum"),
                      prompt_name: str = Body("default",

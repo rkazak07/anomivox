@@ -66,7 +66,7 @@ class FeedbackQwenChat(QwenVllmChat):
             add_feedback_message(cur_task, role, eval_placeholder, refined_reply, get_time())
             eval_ = user_input(eval_placeholder + '\n')
             finish_feedback_message()
-            if "no" in eval_.lower() or "hayir" in eval_.lower() or "hayır" in eval_.lower():
+            if "no" in eval_.lower() or "no" in eval_.lower() or "no" in eval_.lower():
                 refine_placeholder = 'Please enter in detail what you think the correct answer is.'
                 add_edit_message(cur_task, role, refine_placeholder, res['content'], get_time())
                 refined_reply = user_input(refine_placeholder + '\n')

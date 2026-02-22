@@ -17,17 +17,17 @@ from server.db.repository import add_message_to_db
 from server.callback_handler.conversation_callback_handler import ConversationCallbackHandler
 
 
-async def chat(query: str = Body(..., description="Kullanıcı girdisi", examples=["merhaba"]),
+async def chat(query: str = Body(..., description="User input", examples=["hello"]),
                conversation_id: str = Body("", description="Conversation ID"),
                history_len: int = Body(-1, description="Number of history messages to retrieve from database"),
                history: Union[int, List[History]] = Body([],
-                                                         description="Konuşma geçmişi; integer değer verilirse veritabanından okunur",
+                                                         description="Conversation history; if integer value is given, read from database",
                                                          examples=[[
                                                              {"role": "user", "content": "Hello"},
                                                              {"role": "assistant", "content": "Tigerly brave"}]]
                                                          ),
-               stream: bool = Body(False, description="Akış çıktısı"),
-               model_name: str = Body(LLM_MODELS[0], description="LLM model adı。"),
+               stream: bool = Body(False, description="Stream output"),
+               model_name: str = Body(LLM_MODELS[0], description="LLM model name"),
                temperature: float = Body(TEMPERATURE, description="LLM sampling temperature", ge=0.0, le=1.0),
                max_tokens: Optional[int] = Body(None, description="Limit LLM generated token count, None defaults to model maximum"),
                prompt_name: str = Body("default", description="Prompt template name used (configured in configs/prompt_config.py)"),

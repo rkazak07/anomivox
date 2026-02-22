@@ -485,7 +485,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                 st.error("Please upload files before starting a conversation")
                 st.stop()
             chat_box.ai_say([
-                f"İşleniyorSorguDosya `{st.session_state['file_chat_id']}` ...",
+                f"Processing Query File `{st.session_state['file_chat_id']}` ...",
                 Markdown("...", in_expander=True, title="File Match Results", state="complete"),
             ])
             text = ""

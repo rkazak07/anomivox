@@ -6,9 +6,9 @@ from typing import List, Tuple, Dict, Union
 
 class History(BaseModel):
     """
-    Konuşma geçmişi
-    h = History(**{"role":"user","content":"merhaba"})
-    h.to_msy_tuple = ("human", "merhaba")
+    Conversation history
+    h = History(**{"role":"user","content":"hello"})
+    h.to_msy_tuple = ("human", "hello")
     """
     role: str = Field(...)
     content: str = Field(...)

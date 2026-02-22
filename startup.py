@@ -59,20 +59,20 @@ def create_controller_app(
 
 def create_model_worker_app(log_level: str = "INFO", **kwargs) -> FastAPI:
     """
-    Fonksiyon parametreleri:
+    Function parameters:
     host:
     port:
     model_names:[`model_name`]
     controller_address:
     worker_address:
 
-    LangChain destekli modeller için:
+    For LangChain-compatible models:
         langchain_model:True
-        FastChat kullanılmaz
-    Online API için:
+        FastChat is not used
+    For Online API:
         online_api:True
         worker_class: `provider`
-    Çevrimdışı modeller için:
+    For offline models:
         model_path: HuggingFace repo-id veya yerel yol
         device:`LLM_DEVICE`
     """
@@ -85,7 +85,7 @@ def create_model_worker_app(log_level: str = "INFO", **kwargs) -> FastAPI:
 
     for k, v in kwargs.items():
         setattr(args, k, v)
-    if worker_class := kwargs.get("langchain_model"): #LangChain modeli için ek işlem gerekmez
+    if worker_class := kwargs.get("langchain_model"): #No additional processing required for LangChain models
         from fastchat.serve.base_model_worker import app
         worker = ""
     elif worker_class := kwargs.get("worker_class"):
@@ -104,7 +104,7 @@ def create_model_worker_app(log_level: str = "INFO", **kwargs) -> FastAPI:
             from vllm import AsyncLLMEngine
             from vllm.engine.arg_utils import AsyncEngineArgs,EngineArgs
 
-            args.tokenizer = args.model_path # tokenizer ile model_path farklıysa buraya ekle
+            args.tokenizer = args.model_path # Add eache if tokenizer and model_path are different
             args.tokenizer_mode = 'auto'
             args.trust_remote_code= True
             args.download_dir= None
@@ -117,13 +117,13 @@ def create_model_worker_app(log_level: str = "INFO", **kwargs) -> FastAPI:
             args.block_size = 16
             args.swap_space = 4  # GiB
             args.gpu_memory_utilization = 0.90
-            args.max_num_batched_tokens = None # Batch başına maksimum token sayısı (GPU belleğine göre ayarlayın)
+            args.max_num_batched_tokens = None # Maximum token count per batch (adjust according to GPU memory)
             args.max_num_seqs = 256
             args.disable_log_stats = False
             args.conv_template = None
             args.limit_worker_concurrency = 5
             args.no_register = False
-            args.num_gpus = 4 # vLLM tensor paralel GPU sayısı
+            args.num_gpus = 4 # Number of GPUs for vLLM tensor parallel
             args.engine_use_ray = False
             args.disable_log_requests = False
 
@@ -164,9 +164,9 @@ def create_model_worker_app(log_level: str = "INFO", **kwargs) -> FastAPI:
         else:
             from fastchat.serve.model_worker import app, GptqConfig, AWQConfig, ModelWorker, worker_id
 
-            args.gpus = "0" # GPU numarası (çoklu GPU için: "0,1,2,3")
+            args.gpus = "0" # GPU number (for multiple GPUs: "0,1,2,3")
             args.max_gpu_memory = "22GiB"
-            args.num_gpus = 1  # Model worker için GPU sayısı
+            args.num_gpus = 1  # Number of GPUs for model worker
 
             args.load_8bit = False
             args.cpu_offloading = None
@@ -289,18 +289,18 @@ def run_controller(log_level: str = "INFO", started_event: mp.Event = None):
     # add interface to release and load model worker
     @app.post("/release_worker")
     def release_worker(
-            model_name: str = Body(..., description="Serbest bırakılacak modelin adı", samples=["chatglm-6b"]),
-            new_model_name: str = Body(None, description="Serbest bıraktıktan sonra bu modeli yükle"),
-            keep_origin: bool = Body(False, description="Orijinal modeli serbest bırakmadan yeni modeli yükle")
+            model_name: str = Body(..., description="Name of model to release", samples=["chatglm-6b"]),
+            new_model_name: str = Body(None, description="Load this model after releasing"),
+            keep_origin: bool = Body(False, description="Load new model without releasing the original")
     ) -> Dict:
         available_models = app._controller.list_models()
         if new_model_name in available_models:
-            msg = f"Geçiş yapılacak LLM modeli {new_model_name} zaten mevcut"
+            msg = f"LLM model to switch to {new_model_name} already exists"
             logger.info(msg)
             return {"code": 500, "msg": msg}
 
         if new_model_name:
-            logger.info(f"LLM modeli değiştiriliyor: {model_name} → {new_model_name}")
+            logger.info(f"LLM model is being changed: {model_name} → {new_model_name}")
         else:
             logger.info(f"LLM modeli durduruluyor: {model_name}")
 
@@ -385,8 +385,8 @@ def run_model_worker(
     # add interface to release and load model
     @app.post("/release")
     def release_model(
-        new_model_name: str = Body(None, description="Serbest bıraktıktan sonra bu modeli yükle"),
-        keep_origin: bool = Body(False, description="Orijinal modeli serbest bırakmadan yeni modeli yükle")
+        new_model_name: str = Body(None, description="Load this model after releasing"),
+        keep_origin: bool = Body(False, description="Load new model without releasing the original")
     ) -> Dict:
         if keep_origin:
             if new_model_name:
@@ -537,14 +537,14 @@ def parse_args() -> argparse.ArgumentParser:
         "-q",
         "--quiet",
         action="store_true",
-        help="FastChat servis log çıktısını azalt",
+        help="Reduce FastChat service log output",
         dest="quiet",
     )
     parser.add_argument(
         "-i",
         "--lite",
         action="store_true",
-        help="Lite modda çalıştır: sadece online API ve arama motoru desteği",
+        help="Run in Lite mode: online API and search engine support only",
         dest="lite",
     )
     args = parser.parse_args()
@@ -558,34 +558,34 @@ def dump_server_info(after_start=False, args=None):
     from server.utils import api_address, webui_address
 
     print("\n")
-    print("=" * 30 + "Uygulama Yapılandırması" + "=" * 30)
-    print(f"İşletim Sistemi: {platform.platform()}.")
-    print(f"Python Sürümü: {sys.version}")
-    print(f"Proje Sürümü: {VERSION}")
-    print(f"LangChain Sürümü: {langchain.__version__}. FastChat Sürümü: {fastchat.__version__}")
+    print("=" * 30 + "Application Configuration" + "=" * 30)
+    print(f"Operating System: {platform.platform()}.")
+    print(f"Python Version: {sys.version}")
+    print(f"Project Version: {VERSION}")
+    print(f"LangChain Version: {langchain.__version__}. FastChat Version: {fastchat.__version__}")
     print("\n")
 
     models = LLM_MODELS
     if args and args.model_name:
         models = args.model_name
 
-    print(f"Kullanılan metin bölücü: {TEXT_SPLITTER_NAME}")
-    print(f"Başlatılan LLM modeli: {models} @ {llm_device()}")
+    print(f"Used text splitter: {TEXT_SPLITTER_NAME}")
+    print(f"Started LLM model: {models} @ {llm_device()}")
 
     for model in models:
         pprint(get_model_worker_config(model))
-    print(f"Kullanılan Embeddings modeli: {EMBEDDING_MODEL} @ {embedding_device()}")
+    print(f"Used Embeddings model: {EMBEDDING_MODEL} @ {embedding_device()}")
 
     if after_start:
         print("\n")
-        print(f"Sunucu Çalışma Bilgisi:")
+        print(f"Server Running Information:")
         if args.openai_api:
             print(f"    OpenAI API Sunucusu: {fschat_openai_api_address()}")
         if args.api:
             print(f"    Anomivox API Sunucusu: {api_address()}")
         if args.webui:
             print(f"    Anomivox WebUI Sunucusu: {webui_address()}")
-    print("=" * 30 + "Anomivox Yapılandırması" + "=" * 30)
+    print("=" * 30 + "Anomivox Configuration" + "=" * 30)
     print("\n")
 
 
@@ -602,7 +602,7 @@ async def start_main_server():
             raise KeyboardInterrupt(f"{signalname} received")
         return f
 
-    # This will be inherited by the child process if it is forked (not spawned)
+    # This will be ineachited by the child process if it is forked (not spawned)
     signal.signal(signal.SIGINT, handler("SIGINT"))
     signal.signal(signal.SIGTERM, handler("SIGTERM"))
 
@@ -641,8 +641,8 @@ async def start_main_server():
     dump_server_info(args=args)
 
     if len(sys.argv) > 1:
-        logger.info(f"Servisler başlatılıyor:")
-        logger.info(f"LLM API günlükleri için bkz: {LOG_PATH}")
+        logger.info(f"Servisler starttılıyor:")
+        logger.info(f"See LLM API logs at: {LOG_PATH}")
 
     processes = {"online_api": {}, "model_worker": {}}
 
@@ -737,7 +737,7 @@ async def start_main_server():
             if p:= processes.get("controller"):
                 p.start()
                 p.name = f"{p.name} ({p.pid})"
-                controller_started.wait() # Controller başlaması bekleniyor
+                controller_started.wait() # Controller waiting to start
 
             if p:= processes.get("openai_api"):
                 p.start()
@@ -757,12 +757,12 @@ async def start_main_server():
             if p:= processes.get("api"):
                 p.start()
                 p.name = f"{p.name} ({p.pid})"
-                api_started.wait() # api.py başlaması bekleniyor
+                api_started.wait() # api.py waiting to start
 
             if p:= processes.get("webui"):
                 p.start()
                 p.name = f"{p.name} ({p.pid})"
-                webui_started.wait() # webui.py başlaması bekleniyor
+                webui_started.wait() # webui.py waiting to start
 
             dump_server_info(after_start=True, args=args)
 
@@ -845,8 +845,8 @@ async def start_main_server():
 
             for p in processes.values():
                 logger.warning("Sending SIGKILL to %s", p)
-                # Queues and other inter-process communication primitives can break when
-                # process is killed, but we don't care here
+                # Queues and oteach inter-process communication primitives can break when
+                # process is killed, but we don't care eache
 
                 if isinstance(p, dict):
                     for process in p.values():

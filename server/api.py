@@ -44,7 +44,7 @@ def create_app(run_mode: str = None):
     )
     MakeFastAPIOffline(app)
     # Add CORS middleware to allow all origins
-    # CORS ayarları için configs/server_config.py dosyasına bakın
+    # For CORS settings, see configs/server_config.py
     # set OPEN_DOMAIN=True in config.py to allow cross-domain
     if OPEN_CROSS_DOMAIN:
         app.add_middleware(
@@ -61,27 +61,27 @@ def create_app(run_mode: str = None):
 def mount_app_routes(app: FastAPI, run_mode: str = None):
     app.get("/",
             response_model=BaseResponse,
-            summary="Swagger Dokümantasyonu")(document)
+            summary="Swagger Documentation")(document)
 
     # Tag: Chat
     app.post("/chat/fastchat",
              tags=["Chat"],
-             summary="LLM modeli ile sohbet (FastChat API üzerinden)",
+             summary="Chat with LLM model (via FastChat API)",
              )(openai_chat)
 
     app.post("/chat/chat",
              tags=["Chat"],
-             summary="LLM modeli ile sohbet (LLMChain üzerinden)",
+             summary="Chat with LLM model (via LLMChain)",
              )(chat)
 
     app.post("/chat/search_engine_chat",
              tags=["Chat"],
-             summary="Arama motoru ile sohbet",
+             summary="Arama motoru ile chat",
              )(search_engine_chat)
 
     app.post("/chat/feedback",
              tags=["Chat"],
-             summary="LLM modeli yanıt puanını döndür",
+             summary="Return LLM model response score",
              )(chat_feedback)
 
     mount_knowledge_routes(app)
@@ -94,28 +94,28 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     app.get("/llm_model/list_models",
             response_model=BaseResponse,
             tags=["LLM Model Management"],
-            summary="Yapılandırılmış tüm LLM modellerini listele",
+            summary="List all configured LLM models",
             )(llm_model)
 
     app.get("/llm_model/embed_models",
             response_model=BaseResponse,
             tags=["LLM Model Management"],
-            summary="Tüm Embedding modellerini listele",
+            summary="List all embedding models",
             )(all_embed_models)
 
     app.post("/llm_model/list_running_models",
              tags=["LLM Model Management"],
-             summary="Yüklü modelleri listele",
+             summary="List loaded models",
              )(list_running_models)
 
     app.post("/llm_model/list_config_models",
              tags=["LLM Model Management"],
-             summary="Yapılandırılmış modelleri listele",
+             summary="List configured models",
              )(list_config_models)
 
     app.post("/llm_model/get_model_config",
              tags=["LLM Model Management"],
-             summary="Model yapılandırmasını getir",
+             summary="Get model configuration",
              )(get_model_config)
 
     app.post("/llm_model/stop",
@@ -125,33 +125,33 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
 
     app.post("/llm_model/change",
              tags=["LLM Model Management"],
-             summary="Belirtilen LLM modelini değiştir (Model Worker)",
+             summary="Switch specified LLM model (Model Worker)",
              )(change_llm_model)
 
     app.post("/server/configs",
              tags=["Server State"],
-             summary="Sunucu yapılandırma bilgisini getir",
+             summary="Get server configuration information",
              )(get_server_configs)
 
     app.post("/server/list_search_engines",
              tags=["Server State"],
-             summary="Desteklenen arama motorlarını getir",
+             summary="Get supported search engines",
              )(list_search_engines)
 
     @app.post("/server/get_prompt_template",
               tags=["Server State"],
-              summary="Yapılandırılmış prompt şablonlarını getir")
+              summary="Get configured prompt templates")
     def get_server_prompt_template(type: Literal["llm_chat", "structured_data_chat", "knowledge_base_chat", "search_engine_chat", "agent_chat"] = Body(
-            "llm_chat", description="Şablon türü: llm_chat, knowledge_base_chat, search_engine_chat, agent_chat"), name: str = Body("default", description="Şablon adı"), ) -> str:
+            "llm_chat", description="Template type: llm_chat, knowledge_base_chat, search_engine_chat, agent_chat"), name: str = Body("default", description="Template name"), ) -> str:
         return get_prompt_template(type=type, name=name)
 
-    app.post("/other/completion",
-             tags=["Other"],
+    app.post("/oteach/completion",
+             tags=["Oteach"],
              summary="LLM tamamlama isteği (LLMChain)",
              )(completion)
 
-    app.post("/other/embed_texts",
-             tags=["Other"],
+    app.post("/oteach/embed_texts",
+             tags=["Oteach"],
              summary="Metni vektörleştir (yerel ve online model desteği)",
              )(embed_texts_endpoint)
 
@@ -163,7 +163,7 @@ def mount_diagnose_routes(app: FastAPI):
     app.post("/diagnose/save_diagnose_file",
              tags=["Diagnose"],
              response_model=BaseResponse,
-             summary="Tanı anomali dosyasını yükle")(save_diagnose_file)
+             summary="Tanı anomali filenı load")(save_diagnose_file)
 
     app.get("/diagnose/diagnose_status",
             tags=["Diagnose"],
@@ -173,7 +173,7 @@ def mount_diagnose_routes(app: FastAPI):
     app.post("/diagnose/run_diagnose",
              tags=["Diagnose"],
              response_model=BaseResponse,
-             summary="Anomali dosyasını tanı")(run_diagnose)
+             summary="Diagnose anomaly file")(run_diagnose)
 
     app.get("/diagnose/terminal_output",
             tags=["Diagnose"],
@@ -183,12 +183,12 @@ def mount_diagnose_routes(app: FastAPI):
     app.get("/diagnose/serialization_output",
             tags=["Diagnose"],
             response_model=BaseResponse,
-            summary="Tanı biçimlendirilmiş çıktısını getir")(get_diagnose_serialization_output)
+            summary="Tanı formatlendirilmiş çıktısını getir")(get_diagnose_serialization_output)
 
     app.post("/diagnose/stop_diagnose",
              tags=["Diagnose"],
              response_model=BaseResponse,
-             summary="Anomali tanısını sonlandır")(stop_diagnose)
+             summary="Stop anomaly diagnosis")(stop_diagnose)
 
     app.post("/diagnose/user_feedback",
              tags=["Diagnose"],
@@ -202,17 +202,17 @@ def mount_alert_routes(app: FastAPI):
     app.post("/report/histories",
              tags=["Alert"],
              response_model=BaseResponse,
-             summary="Tüm anomali tanı dosyalarını listele")(histories)
+             summary="Tüm anomali diagnosis dosyalarını list")(histories)
 
     app.post("/report/history_detail",
              tags=["Alert"],
              response_model=BaseResponse,
-             summary="Anomali tanı dosyası detayını getir")(history_detail)
+             summary="Get anomaly diagnosis file details")(history_detail)
 
     app.post("/report/diagnose_llm_model_list",
              tags=["Alert"],
              response_model=BaseResponse,
-             summary="Anomali tanı model listesini getir")(diagnose_llm_model_list)
+             summary="Get anomaly diagnosis model list")(diagnose_llm_model_list)
 
 
 def mount_knowledge_routes(app: FastAPI):
@@ -234,7 +234,7 @@ def mount_knowledge_routes(app: FastAPI):
 
     app.post("/chat/knowledge_base_chat",
              tags=["Chat"],
-             summary="Bilgi tabanı ile sohbet")(knowledge_base_chat)
+             summary="Knowledge base ile chat")(knowledge_base_chat)
 
     app.post("/chat/file_chat",
              tags=["Knowledge Base Management"],
@@ -243,78 +243,78 @@ def mount_knowledge_routes(app: FastAPI):
 
     app.post("/chat/agent_chat",
              tags=["Chat"],
-             summary="Agent ile sohbet")(agent_chat)
+             summary="Agent ile chat")(agent_chat)
 
     app.get("/knowledge_base/kb_file_details",
             tags=["Knowledge Base Management"],
             response_model=BaseResponse,
-            summary="Bilgi tabanı dosyasını getir")(kb_file_details)
+            summary="Knowledge base filenı getir")(kb_file_details)
 
     app.get("/knowledge_base/list_knowledge_bases",
             tags=["Knowledge Base Management"],
             response_model=BaseResponse,
-            summary="Bilgi tabanı listesini getir")(list_kbs)
+            summary="Knowledge base list ofni getir")(list_kbs)
 
     app.post("/knowledge_base/create_knowledge_base",
              tags=["Knowledge Base Management"],
              response_model=BaseResponse,
-             summary="Bilgi tabanı oluştur"
+             summary="Create knowledge base"
              )(create_kb)
 
     app.post("/knowledge_base/delete_knowledge_base",
              tags=["Knowledge Base Management"],
              response_model=BaseResponse,
-             summary="Bilgi tabanını sil"
+             summary="Knowledge basenı delete"
              )(delete_kb)
 
     app.get("/knowledge_base/detail",
             tags=["Knowledge Base Management"],
             response_model=BaseResponse,
-            summary="Bilgi tabanı detayı"
+            summary="Knowledge base detayı"
             )(kb_detail)
 
     app.get("/knowledge_base/list_files",
             tags=["Knowledge Base Management"],
             response_model=ListResponse,
-            summary="Bilgi tabanındaki dosya listesini getir"
+            summary="Knowledge basendaki dosya list ofni getir"
             )(list_files)
 
     app.post("/knowledge_base/search_docs",
              tags=["Knowledge Base Management"],
              response_model=BaseResponse,
-             summary="Bilgi tabanında arama yap"
+             summary="Knowledge basenda search yap"
              )(api_search_docs)
 
     app.post("/knowledge_base/upload_docs",
              tags=["Knowledge Base Management"],
              response_model=BaseResponse,
-             summary="Dosyayı bilgi tabanına yükle ve/veya vektörleştir"
+             summary="Load file to knowledge base and/or vectorize"
              )(upload_docs)
 
     app.post("/knowledge_base/delete_docs",
              tags=["Knowledge Base Management"],
              response_model=BaseResponse,
-             summary="Bilgi tabanındaki belirtilen dosyayı sil"
+             summary="Knowledge basendaki belirtilen dosyayı delete"
              )(delete_docs)
 
     app.post("/knowledge_base/update_info",
              tags=["Knowledge Base Management"],
              response_model=BaseResponse,
-             summary="Bilgi tabanı açıklamasını güncelle"
+             summary="Update knowledge base description"
              )(update_info)
     app.post("/knowledge_base/update_docs",
              tags=["Knowledge Base Management"],
              response_model=BaseResponse,
-             summary="Mevcut dosyaları bilgi tabanında güncelle"
+             summary="Mevcut dosyaları bilgi tabanında update"
              )(update_docs)
 
     app.get("/knowledge_base/download_doc",
             tags=["Knowledge Base Management"],
-            summary="İlgili bilgi dosyasını indir")(download_doc)
+            summary="İlgili bilgi filenı download")(download_doc)
 
     app.post("/knowledge_base/docs_text_split_content",
              tags=["Knowledge Base Management"],
-             summary="İlgili bilgi dosyasının dilim içeriğini indir")(docs_text_split_content)
+             summary="İlgili bilgi filenın dilim içeriğini download")(docs_text_split_content)
 
     app.post("/knowledge_base/recreate_vector_store",
              tags=["Knowledge Base Management"],
@@ -323,7 +323,7 @@ def mount_knowledge_routes(app: FastAPI):
 
     app.post("/knowledge_base/upload_temp_docs",
              tags=["Knowledge Base Management"],
-             summary="Dosyayı geçici dizine yükle, Dosya Sohbeti için kullan."
+             summary="Load file to temporary directory, Use for File Chat"
              )(upload_temp_docs)
 
 

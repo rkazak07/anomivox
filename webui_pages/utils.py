@@ -30,7 +30,7 @@ set_httpx_config()
 
 class ApiRequest:
     '''
-    api.py çağrılarının senkron mod sarmalayıcısı
+    Synchronous mode wrapper for api.py calls
     '''
     def __init__(
         self,
@@ -119,7 +119,7 @@ class ApiRequest:
         as_json: bool = False,
     ):
         '''
-        httpx.stream GeneratorContextManager'ı normal generator'a dönüştür
+        Convert httpx.stream GeneratorContextManager to normal generator
         '''
         async def ret_async(response, as_json):
             try:
@@ -133,7 +133,7 @@ class ApiRequest:
                                 # pprint(data, depth=1)
                                 yield data
                             except Exception as e:
-                                msg = f"API JSON hatası： ‘{chunk}’。Hata: {e}。"
+                                msg = f"API JSON error： ‘{chunk}’。Hata: {e}。"
                                 logger.error(f'{e.__class__.__name__}: {msg}',
                                             exc_info=e if log_verbose else None)
                         else:
@@ -144,7 +144,7 @@ class ApiRequest:
                 logger.error(msg)
                 yield {"code": 500, "msg": msg}
             except httpx.ReadTimeout as e:
-                msg = f"API iletişim zaman aşımı. FastChat ve API servisinin başlatıldığından emin olunWeb UI'）。（{e}）"
+                msg = f"API iletişim zaman aşımı. FastChat ve API servisinin starttıldığından emin olunWeb UI'）。（{e}）"
                 logger.error(msg)
                 yield {"code": 500, "msg": msg}
             except Exception as e:
@@ -165,7 +165,7 @@ class ApiRequest:
                                 # pprint(data, depth=1)
                                 yield data
                             except Exception as e:
-                                msg = f"API JSON hatası： ‘{chunk}’。Hata: {e}。"
+                                msg = f"API JSON error： ‘{chunk}’。Hata: {e}。"
                                 logger.error(f'{e.__class__.__name__}: {msg}',
                                             exc_info=e if log_verbose else None)
                         else:
@@ -176,7 +176,7 @@ class ApiRequest:
                 logger.error(msg)
                 yield {"code": 500, "msg": msg}
             except httpx.ReadTimeout as e:
-                msg = f"API iletişim zaman aşımı. FastChat ve API servisinin başlatıldığından emin olunWeb UI'）。（{e}）"
+                msg = f"API iletişim zaman aşımı. FastChat ve API servisinin starttıldığından emin olunWeb UI'）。（{e}）"
                 logger.error(msg)
                 yield {"code": 500, "msg": msg}
             except Exception as e:
@@ -198,7 +198,7 @@ class ApiRequest:
         value_func: Callable = None,
     ):
         '''
-        Senkron veya asenkron istek yanıtını dönüştür
+        Senkron veya asenkron istek yanıtını convert
         `as_json`: JSON döndür
         `value_func`: Yanıt değerini özelleştirmek için fonksiyon
         '''
@@ -346,7 +346,7 @@ class ApiRequest:
 
     def diagnose_file(self, file_name: str, file_content: Union[bytes]):
         '''
-        Anomali dosyasını tanıla
+        Diagnose anomaly filela
         '''
         response = self.post(
             "/diagnose/run_diagnose",
@@ -388,7 +388,7 @@ class ApiRequest:
 
     def diagnose_diagnose_llm_model_list(self):
         '''
-        Tanı geçmişini listele
+        Tanı geçmişini list
         '''
         data = {}
         response = self.post(
@@ -400,7 +400,7 @@ class ApiRequest:
 
     def diagnose_histories(self, start: str = None, end: str = None, model: str = "GPT4-0613"):
         '''
-        Tanı geçmişini listele
+        Tanı geçmişini list
         '''
         data = {
             "start": start,
@@ -416,7 +416,7 @@ class ApiRequest:
 
     def diagnose_history_detail(self, file_name: str, model: str = "GPT4-0613"):
         '''
-        Tanı geçmiş detayını getir
+        Tanı geçmiş details of getir
         '''
         data = {
             "file_name": file_name,
@@ -835,7 +835,7 @@ class ApiRequest:
         controller_address: str = None,
     ):
         '''
-        FastChat'te çalışan modelleri listele
+        FastChat'te çalışan modelleri list
         '''
         data = {
             "controller_address": controller_address,
@@ -909,7 +909,7 @@ class ApiRequest:
         types: List[str] = ["local", "online"],
     ) -> Dict[str, Dict]:
         '''
-        Sunucu yapılandırmasındaki model listesini getir: {"type": {model_name: config}, ...}
+        Sunucu yapılandırmasındaki model list ofni getir: {"type": {model_name: config}, ...}
         '''
         data = {
             "types": types,
@@ -938,7 +938,7 @@ class ApiRequest:
 
     def list_search_engines(self) -> List[str]:
         '''
-        Desteklenen arama motorlarını getir
+        Get supported search engines
         '''
         response = self.post(
             "/server/list_search_engines",
@@ -977,7 +977,7 @@ class ApiRequest:
         if not model_name or not new_model_name:
             return {
                 "code": 500,
-                "msg": f"Model adı belirtilmedi"
+                "msg": f"Model name belirtilmedi"
             }
 
         def ret_sync():
@@ -1066,7 +1066,7 @@ class ApiRequest:
             "to_query": to_query,
         }
         resp = self.post(
-            "/other/embed_texts",
+            "/oteach/embed_texts",
             json=data,
         )
         return self._get_response_value(resp, as_json=True, value_func=lambda r: r.get("data"))

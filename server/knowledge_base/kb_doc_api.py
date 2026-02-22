@@ -22,22 +22,22 @@ class DocumentWithScore(Document):
     score: float = None
 
 def api_search_docs(
-        query: str = Body(..., description="Kullanıcı girdisi", examples=["Hello"]),
-        knowledge_base_name: str = Body(..., description="Bilgi tabanı adı", examples=["samples"]),
-        top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Eşleşen vektör sayısı"),
+        query: str = Body(..., description="User input", examples=["Hello"]),
+        knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
+        top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Number of matching vectors"),
         score_threshold: float = Body(SCORE_THRESHOLD,
-                                      description="Eşleşme eşiği, 0-1 arası. SCORE küçüldükçe ilgililik artar. 1 eşdeğeri filtre yok, 0.5 civarı önerilir",
+                                      description="Match threshold, 0-1. Lower SCORE means higher relevance. 1 means no filter, 0.5 is recommended",
                                       ge=0, le=1),
 ) -> List[DocumentWithScore]:
     data = search_docs(query, knowledge_base_name, top_k, score_threshold)
     return BaseResponse(code=200, msg="Success", data=data)
 
 def search_docs(
-        query: str = Body(..., description="Kullanıcı girdisi", examples=["Hello"]),
-        knowledge_base_name: str = Body(..., description="Bilgi tabanı adı", examples=["samples"]),
-        top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Eşleşen vektör sayısı"),
+        query: str = Body(..., description="User input", examples=["Hello"]),
+        knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
+        top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Number of matching vectors"),
         score_threshold: float = Body(SCORE_THRESHOLD,
-                                      description="Eşleşme eşiği, 0-1 arası. SCORE küçüldükçe ilgililik artar. 1 eşdeğeri filtre yok, 0.5 civarı önerilir",
+                                      description="Match threshold, 0-1. Lower SCORE means higher relevance. 1 means no filter, 0.5 is recommended",
                                       ge=0, le=1),
 ) -> List[DocumentWithScore]:
     # kb = KBServiceFactory.get_service_by_name(knowledge_base_name)
@@ -81,7 +81,7 @@ def search_docs(
 
         data.extend([DocumentWithScore(page_content=x[0].page_content, metadata=x[0].dict()['metadata'], score=x[1]) for x in no_replicate_docs])
 
-        print(f"Bilgi tabanından kullanılan belge sayısı: {len(no_replicate_docs)}")
+        print(f"Number of documents used from knowledge base: {len(no_replicate_docs)}")
         # print no_replicate_docs separated by \n
         for doc in no_replicate_docs:
             print(doc[0].metadata)
@@ -101,9 +101,9 @@ def kb_file_details(
     details = get_kb_file_details(knowledge_base_name)
 
     if not details:
-        return BaseResponse(code=404, msg=f"Bilgi tabanı bulunamadı: {knowledge_base_name} için dosya", data=[])
+        return BaseResponse(code=404, msg=f"Knowledge base not found: file for {knowledge_base_name}", data=[])
     else:
-        return BaseResponse(code=200, msg=f"Bilgi tabanı {knowledge_base_name} için dosya sorgulama başarılı", data=details)
+        return BaseResponse(code=200, msg=f"Successfully queried files for knowledge base {knowledge_base_name}", data=details)
 
 
 def list_files(
@@ -120,7 +120,7 @@ def list_files(
             all_doc_names.extend(kb.list_files())
 
     if not all_doc_names:
-        return ListResponse(code=404, msg=f"Bilgi tabanı bulunamadı: {knowledge_base_name} için dosya", data=[])
+        return ListResponse(code=404, msg=f"Knowledge base not found: files for {knowledge_base_name}", data=[])
     else:
         return ListResponse(data=list(set(all_doc_names)))
 
@@ -129,13 +129,13 @@ def _save_files_in_thread(files: List[UploadFile],
                           knowledge_base_name: str,
                           override: bool):
     """
-    Yüklenen dosyaları çok iş parçacıklı olarak ilgili bilgi tabanı dizinine kaydeder.
-    Üretici kayıt sonuçlarını döndürür: {"code":200, "msg": "xxx", "data": {"knowledge_base_name":"xxx", "file_name": "xxx"}}
+    Save uploaded files to the corresponding knowledge base directory in multi-threaded mode.
+    Producer returns save results: {"code":200, "msg": "xxx", "data": {"knowledge_base_name":"xxx", "file_name": "xxx"}}
     """
 
     def save_file(file: UploadFile, knowledge_base_name: str, override: bool) -> dict:
         '''
-        Tek dosyayı kaydeder.
+        Save a single file.
         '''
         try:
             filename = file.filename
@@ -147,7 +147,7 @@ def _save_files_in_thread(files: List[UploadFile],
                     and not override
                     and os.path.getsize(file_path) == len(file_content)
             ):
-                file_status = f"Dosya {filename} zaten mevcut."
+                file_status = f"File {filename} already exists."
                 logger.warn(file_status)
                 return dict(code=404, msg=file_status, data=data)
 
@@ -155,9 +155,9 @@ def _save_files_in_thread(files: List[UploadFile],
                 os.makedirs(os.path.dirname(file_path))
             with open(file_path, "wb") as f:
                 f.write(file_content)
-            return dict(code=200, msg=f"Dosya başarıyla yüklendi {filename}", data=data)
+            return dict(code=200, msg=f"File {filename} uploaded successfully", data=data)
         except Exception as e:
-            msg = f"{filename} dosya yükleme başarısız, hata: {e}"
+            msg = f"Failed to upload file {filename}, error: {e}"
             logger.error(f'{e.__class__.__name__}: {msg}',
                          exc_info=e if log_verbose else None)
             return dict(code=500, msg=msg, data=data)
@@ -167,7 +167,7 @@ def _save_files_in_thread(files: List[UploadFile],
         yield result
 
 
-#                 knowledge_base_name: str = Form(..., description="Bilgi tabanı adı", examples=["samples"]),
+#                 knowledge_base_name: str = Form(..., description="Knowledge base name", examples=["samples"]),
 #     '''
 #     '''
 #     def generate(files, knowledge_base_name, override):
@@ -177,7 +177,7 @@ def _save_files_in_thread(files: List[UploadFile],
 #     return StreamingResponse(generate(files, knowledge_base_name=knowledge_base_name, override=override), media_type="text/event-stream")
 
 
-#                 knowledge_base_name: str = Form(..., description="Bilgi tabanı adı", examples=["samples"]),
+#                 knowledge_base_name: str = Form(..., description="Knowledge base name", examples=["samples"]),
 #     def save_files(files, knowledge_base_name, override):
 #         for result in _save_files_in_thread(files, knowledge_base_name=knowledge_base_name, override=override):
 #             yield json.dumps(result, ensure_ascii=False)
@@ -188,19 +188,19 @@ def _save_files_in_thread(files: List[UploadFile],
 
 
 def upload_docs(
-        files: List[UploadFile] = File(..., description="Dosya yükle, çoklu dosya desteklenir"),
-        knowledge_base_name: str = Form(..., description="Bilgi tabanı adı", examples=["samples"]),
-        override: bool = Form(False, description="Mevcut dosyanın üzerine yaz"),
-        to_vector_store: bool = Form(True, description="Dosya yüklendikten sonra vektörleştirme yapılsın mı"),
-        chunk_size: int = Form(CHUNK_SIZE, description="Bilgi tabanındaki tek metin segmentinin maksimum uzunluğu"),
-        chunk_overlap: int = Form(OVERLAP_SIZE, description="Komşu metin örtüşme uzunluğu"),
-        zh_title_enhance: bool = Form(ZH_TITLE_ENHANCE, description="Çince başlık güçlendirmesi etkinleştirilsin mi"),
-        docs: Json = Form({}, description="Özel docs, JSON string'e dönüştürülmesi gerekir",
+        files: List[UploadFile] = File(..., description="Upload files, multiple files supported"),
+        knowledge_base_name: str = Form(..., description="Knowledge base name", examples=["samples"]),
+        override: bool = Form(False, description="Overwrite existing files"),
+        to_vector_store: bool = Form(True, description="Vectorize files after upload"),
+        chunk_size: int = Form(CHUNK_SIZE, description="Maximum length of a single text segment in knowledge base"),
+        chunk_overlap: int = Form(OVERLAP_SIZE, description="Overlapping length of neighboring text"),
+        zh_title_enhance: bool = Form(ZH_TITLE_ENHANCE, description="Enable title enhancement"),
+        docs: Json = Form({}, description="Custom docs, must be converted to JSON string",
                           examples=[{"test.txt": [Document(page_content="custom doc")]}]),
-        not_refresh_vs_cache: bool = Form(False, description="Vektör deposunu henüz kaydetme (FAISS için)"),
+        not_refresh_vs_cache: bool = Form(False, description="Do not save vector store yet (for FAISS)"),
 ) -> BaseResponse:
     """
-    API: Dosya yükle ve/veya vektörleştir
+    API: Upload files and/or vectorize
     """
     if not validate_kb_name(knowledge_base_name):
         return BaseResponse(code=403, msg="Don't attack me")
@@ -236,14 +236,14 @@ def upload_docs(
             if not not_refresh_vs_cache:
                 kb.save_vector_store()
 
-    return BaseResponse(code=200, msg="Dosya yükleme ve vektörleştirme tamamlandı", data={"failed_files": failed_files})
+    return BaseResponse(code=200, msg="File upload and vectorization completed", data={"failed_files": failed_files})
 
 
 def delete_docs(
         knowledge_base_name: str = Body(..., examples=["samples"]),
         file_names: List[str] = Body(..., examples=[["file_name.md", "test.txt"]]),
         delete_content: bool = Body(False),
-        not_refresh_vs_cache: bool = Body(False, description="Vektör deposunu henüz kaydetme (FAISS için)"),
+        not_refresh_vs_cache: bool = Body(False, description="Do not save vector store yet (for FAISS)"),
 ) -> BaseResponse:
     if not validate_kb_name(knowledge_base_name):
         return BaseResponse(code=403, msg="Don't attack me")
@@ -258,14 +258,14 @@ def delete_docs(
 
         for file_name in file_names:
             if not kb.exist_doc(file_name):
-                failed_files[file_name] = f"Dosya bulunamadı: {file_name}"
+                failed_files[file_name] = f"File not found: {file_name}"
 
             try:
                 kb_file = KnowledgeFile(filename=file_name,
                                         knowledge_base_name=knowledge_base_name)
                 kb.delete_doc(kb_file, delete_content, not_refresh_vs_cache=True)
             except Exception as e:
-                msg = f"{file_name} dosya silme başarısız, hata: {e}"
+                msg = f"Failed to delete file {file_name}, error: {e}"
                 logger.error(f'{e.__class__.__name__}: {msg}',
                              exc_info=e if log_verbose else None)
                 failed_files[file_name] = msg
@@ -273,12 +273,12 @@ def delete_docs(
         if not not_refresh_vs_cache:
             kb.save_vector_store()
 
-    return BaseResponse(code=200, msg=f"Dosya silme tamamlandı", data={"failed_files": failed_files})
+    return BaseResponse(code=200, msg=f"File deletion completed", data={"failed_files": failed_files})
 
 
 def update_info(
-        knowledge_base_name: str = Body(..., description="Bilgi tabanı adı", examples=["samples"]),
-        kb_info: str = Body(..., description="Bilgi tabanı açıklaması", examples=["Bu bir bilgi tabanıdır"]),
+        knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
+        kb_info: str = Body(..., description="Knowledge base description", examples=["This is a knowledge base"]),
 ):
     if not validate_kb_name(knowledge_base_name):
         return BaseResponse(code=403, msg="Don't attack me")
@@ -290,19 +290,19 @@ def update_info(
 
         kb.update_info(kb_info)
 
-    return BaseResponse(code=200, msg=f"Bilgi tabanı açıklaması güncellendi", data={"kb_info": kb_info})
+    return BaseResponse(code=200, msg=f"Knowledge base description updated", data={"kb_info": kb_info})
 
 
 def update_docs(
-        knowledge_base_name: str = Body(..., description="Bilgi tabanı adı", examples=["samples"]),
-        file_names: List[str] = Body(..., description="Dosya adı, çoklu dosya desteklenir", examples=[["file_name1", "text.txt"]]),
-        chunk_size: int = Body(CHUNK_SIZE, description="Bilgi tabanındaki tek metin segmentinin maksimum uzunluğu"),
-        chunk_overlap: int = Body(OVERLAP_SIZE, description="Komşu metin örtüşme uzunluğu"),
-        zh_title_enhance: bool = Body(ZH_TITLE_ENHANCE, description="Çince başlık güçlendirmesi etkinleştirilsin mi"),
-        override_custom_docs: bool = Body(False, description="Önceki özel docs üzerine yazılsın mı"),
-        docs: Json = Body({}, description="Özel docs, JSON string'e dönüştürülmesi gerekir",
+        knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
+        file_names: List[str] = Body(..., description="File names, multiple files supported", examples=[["file_name1", "text.txt"]]),
+        chunk_size: int = Body(CHUNK_SIZE, description="Maximum length of a single text segment in knowledge base"),
+        chunk_overlap: int = Body(OVERLAP_SIZE, description="Overlapping length of neighboring text"),
+        zh_title_enhance: bool = Body(ZH_TITLE_ENHANCE, description="Enable title enhancement"),
+        override_custom_docs: bool = Body(False, description="Override previous custom docs"),
+        docs: Json = Body({}, description="Custom docs, must be converted to JSON string",
                           examples=[{"test.txt": [Document(page_content="custom doc")]}]),
-        not_refresh_vs_cache: bool = Body(False, description="Vektör deposunu henüz kaydetme (FAISS için)"),
+        not_refresh_vs_cache: bool = Body(False, description="Do not save vector store yet (for FAISS)"),
 ) -> BaseResponse:
     """
     """
@@ -320,7 +320,7 @@ def update_docs(
             try:
                 kb_files.append(KnowledgeFile(filename=file_name, knowledge_base_name=knowledge_base_name))
             except Exception as e:
-                msg = f"{file_name} belgesi yüklenirken hata: {e}"
+                msg = f"Error loading document {file_name}: {e}"
                 logger.error(f'{e.__class__.__name__}: {msg}',
                              exc_info=e if log_verbose else None)
                 failed_files[file_name] = msg
@@ -350,7 +350,7 @@ def update_docs(
                 kb_file = KnowledgeFile(filename=file_name, knowledge_base_name=knowledge_base_name)
                 kb.update_doc(kb_file, docs=v, not_refresh_vs_cache=True)
             except Exception as e:
-                msg = f"{file_name} için özel docs eklenirken hata: {e}"
+                msg = f"{file_name} Error adding custom docs for: {e}"
                 logger.error(f'{e.__class__.__name__}: {msg}',
                              exc_info=e if log_verbose else None)
                 failed_files[file_name] = msg
@@ -358,12 +358,12 @@ def update_docs(
         if not not_refresh_vs_cache:
             kb.save_vector_store()
 
-    return BaseResponse(code=200, msg=f"Belge güncelleme tamamlandı", data={"failed_files": failed_files})
+    return BaseResponse(code=200, msg=f"Document update completed", data={"failed_files": failed_files})
 
 
 def docs_text_split_content(
-        knowledge_base_name: str = Body(..., description="Bilgi tabanı adı", examples=["samples"]),
-        file_names: List[str] = Body(..., description="Dosya adı, çoklu dosya desteklenir", examples=[["file_name1", "text.txt"]]),
+        knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
+        file_names: List[str] = Body(..., description="File names, multiple files supported", examples=[["file_name1", "text.txt"]]),
 ):
     """
     """
@@ -389,18 +389,18 @@ def docs_text_split_content(
                     splited_doc_page_contents.append(doc.page_content)
                 kb_results.append({"file_name": kb_file.filename, "contents": splited_doc_page_contents})
         except Exception as e:
-            msg = f"{kb_file.filename} dosya okuma başarısız, hata: {e}"
+            msg = f"Failed to read file {kb_file.filename}, error: {e}"
             logger.error(f'{e.__class__.__name__}: {msg}',
                          exc_info=e if log_verbose else None)
             return BaseResponse(code=500, msg=msg)
         results.append({"vs_type": vs_type, "data": kb_results})
-    return BaseResponse(code=200, msg=f"Belge dilim içeriği başarıyla alındı", data=results)
+    return BaseResponse(code=200, msg=f"Successfully retrieved document split content", data=results)
 
 
 def download_doc(
-        knowledge_base_name: str = Query(..., description="Bilgi tabanı adı", examples=["samples"]),
-        file_name: str = Query(..., description="Dosya adı", examples=["test.txt"]),
-        preview: bool = Query(False, description="True: tarayıcıda önizle; False: indir"),
+        knowledge_base_name: str = Query(..., description="Knowledge base name", examples=["samples"]),
+        file_name: str = Query(..., description="File name", examples=["test.txt"]),
+        preview: bool = Query(False, description="True: preview in browser; False: download"),
 ):
     """
     """
@@ -409,7 +409,7 @@ def download_doc(
 
     kb = KBServiceFactory.get_service(knowledge_base_name, DEFAULT_VS_TYPES[0])
     if kb is None:
-        return BaseResponse(code=404, msg=f"Bilgi tabanı bulunamadı: {knowledge_base_name}")
+        return BaseResponse(code=404, msg=f"Knowledge base not found: {knowledge_base_name}")
 
     if preview:
         content_disposition_type = "inline"
@@ -427,23 +427,21 @@ def download_doc(
                 media_type="multipart/form-data",
                 content_disposition_type=content_disposition_type,
             )
-    except Exception as e:
-        msg = f"{kb_file.filename} dosya okuma başarısız, hata: {e}"
-        logger.error(f'{e.__class__.__name__}: {msg}',
-                     exc_info=e if log_verbose else None)
-        return BaseResponse(code=500, msg=msg)
+        except Exception as e:
+            msg = f"Failed to read file {kb_file.filename}, error: {e}"
+            logger.error(f'{e.__class__.__name__}: {msg}',
+                         exc_info=e if log_verbose else None)
+            return BaseResponse(code=500, msg=msg)
 
-    return BaseResponse(code=500, msg=f"{kb_file.filename} dosya okunamadı")
-
-
+    return BaseResponse(code=500, msg=f"Could not read file {kb_file.filename}")
 def recreate_vector_store(
         knowledge_base_name: str = Body(..., examples=["samples"]),
         allow_empty_kb: bool = Body(True),
         embed_model: str = Body(EMBEDDING_MODEL),
-        chunk_size: int = Body(CHUNK_SIZE, description="Bilgi tabanındaki tek metin segmentinin maksimum uzunluğu"),
-        chunk_overlap: int = Body(OVERLAP_SIZE, description="Komşu metin örtüşme uzunluğu"),
-        zh_title_enhance: bool = Body(ZH_TITLE_ENHANCE, description="Çince başlık güçlendirmesi etkinleştirilsin mi"),
-        not_refresh_vs_cache: bool = Body(False, description="Vektör deposunu henüz kaydetme (FAISS için)"),
+        chunk_size: int = Body(CHUNK_SIZE, description="Maximum length of a single text segment in knowledge base"),
+        chunk_overlap: int = Body(OVERLAP_SIZE, description="Overlapping length of neighboring text"),
+        zh_title_enhance: bool = Body(ZH_TITLE_ENHANCE, description="Enable title enhancement"),
+        not_refresh_vs_cache: bool = Body(False, description="Do not save vector store yet (for FAISS)"),
 ):
     """
     recreate vector store from the content.
@@ -482,7 +480,7 @@ def recreate_vector_store(
                     kb.add_doc(kb_file, not_refresh_vs_cache=True)
                 else:
                     kb_name, file_name, error = result
-                    msg = f"’{file_name}’ dosyası ‘{knowledge_base_name}’ bilgi tabanına eklenirken hata: {error}. Atlanıyor."
+                    msg = f"Error adding file '{file_name}' to knowledge base '{knowledge_base_name}': {error}. Skipping."
                     logger.error(msg)
                     yield json.dumps({
                         "code": 500,

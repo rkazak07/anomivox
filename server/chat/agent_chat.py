@@ -19,20 +19,20 @@ from server.agent import model_container
 from server.knowledge_base.kb_service.base import get_kb_details
 
 
-async def agent_chat(query: str = Body(..., description="Kullanıcı girdisi", examples=["merhaba"]),
+async def agent_chat(query: str = Body(..., description="User input", examples=["hello"]),
                      history: List[History] = Body([],
-                                                   description="Geçmiş konuşmalar",
+                                                   description="Conversation history",
                                                    examples=[[
-                                                       {"role": "user", "content": "Bilgi tabanı aracını kullanarak bugün Pekin hava durumunu sorgula"},
+                                                       {"role": "user", "content": "Query weather information for Beijing today using knowledge base tool"},
                                                        {"role": "assistant",
-                                                        "content": "Hava durumu sorgu aracı bugün Pekin'de bulutlu, 10-14 derece, kuzeydoğu rüzgarı 2 derece, soğuk algınlığı riski yüksek olduğunu bildirdi"}]]
+                                                        "content": "Weather query tool shows Beijing today: cloudy, 10-14 degrees, northeast wind 2 degrees, high risk of cold"}]]
                                                    ),
-                     stream: bool = Body(False, description="Akış çıktısı"),
-                     model_name: str = Body(LLM_MODELS[0], description="LLM model adı。"),
-                     temperature: float = Body(TEMPERATURE, description="LLM örnekleme sıcaklığı", ge=0.0, le=1.0),
-                     max_tokens: Optional[int] = Body(None, description="LLM'nin ürettiği token sayısını sınırla, None varsayılan olarak modelin maksimum değeridir"),
+                     stream: bool = Body(False, description="Stream output"),
+                     model_name: str = Body(LLM_MODELS[0], description="LLM model name"),
+                     temperature: float = Body(TEMPERATURE, description="LLM sampling temperature", ge=0.0, le=1.0),
+                     max_tokens: Optional[int] = Body(None, description="Limit LLM generated token count, None defaults to model maximum"),
                      prompt_name: str = Body("default",
-                                             description="Kullanılan prompt şablon adı (configs/prompt_config.py'de yapılandırılır)"),
+                                             description="Name of prompt template used (configured in configs/prompt_config.py)"),
                      ):
     history = [History.from_data(h) for h in history]
 

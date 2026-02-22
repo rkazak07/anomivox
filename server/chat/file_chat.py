@@ -86,7 +86,7 @@ def upload_temp_docs(
     return BaseResponse(data={"id": id, "failed_files": failed_files})
 
 
-async def file_chat(query: str = Body(..., description="Kullanıcı girdisi", examples=["merhaba"]),
+async def file_chat(query: str = Body(..., description="User input", examples=["hello"]),
                     knowledge_id: str = Body(..., description="Temporary knowledge base ID"),
                     top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Number of matching vectors"),
                     score_threshold: float = Body(SCORE_THRESHOLD, description="Knowledge base match threshold (0-1). Lower SCORE = higher relevance. 1 means no filtering, 0.5 recommended", ge=0, le=2),
@@ -98,8 +98,8 @@ async def file_chat(query: str = Body(..., description="Kullanıcı girdisi", ex
                                                     {"role": "assistant",
                                                     "content": "Tigerly brave"}]]
                                                 ),
-                    stream: bool = Body(False, description="Akış çıktısı"),
-                    model_name: str = Body(LLM_MODELS[0], description="LLM model adı。"),
+                    stream: bool = Body(False, description="Stream output"),
+                    model_name: str = Body(LLM_MODELS[0], description="LLM model name"),
                     temperature: float = Body(TEMPERATURE, description="LLM sampling temperature", ge=0.0, le=1.0),
                     max_tokens: Optional[int] = Body(None, description="Limit LLM generated token count, None defaults to model maximum"),
                     prompt_name: str = Body("default", description="Prompt template name used (configured in configs/prompt_config.py)"),

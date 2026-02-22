@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     curl \
     libmagic1 \
+    libgl1 \
+    libglib2.0-0 \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -23,7 +25,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # NLTK veri setlerini önceden indir
-RUN python -m nltk.downloader punkt stopwords averaged_perceptron_tagger
+RUN python -m nltk.downloader punkt punkt_tab stopwords averaged_perceptron_tagger averaged_perceptron_tagger_eng
 
 # Embedding modelini önceden indir (runtime'da event loop bloklamaması için)
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"

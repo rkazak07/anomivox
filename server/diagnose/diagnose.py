@@ -131,7 +131,7 @@ def get_diagnose_terminal_output():
 def get_diagnose_serialization_output():
     file_path = DIAGNOSE_RUN_DATA_PATH
     if not os.path.exists(file_path):
-        return BaseResponse(code=404, msg="No corresponding diagnosis file")
+        return BaseResponse(code=200, msg="Success", data={})
     if file_path.endswith(".json") or file_path.endswith(".jsonl"):
         with open(file_path, "r") as file:
             json_data = json.load(file)

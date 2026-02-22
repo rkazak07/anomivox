@@ -38,6 +38,9 @@ async def document():
 
 
 def create_app(run_mode: str = None):
+    from server.knowledge_base.migrate import create_tables
+    create_tables()
+
     app = FastAPI(
         title="Datachat API Server",
         version=VERSION

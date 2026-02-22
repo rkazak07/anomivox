@@ -28,7 +28,7 @@
           <div class="relative content columnSS">
             <div v-html="item.markdownContent"/>
             <div v-if="item.edit" class="footer">
-              <el-button type="primary" plain @click="onEditClick(item)">{{ item.type === 'select' ?
+              <el-button type="primary" plain @click="onEditClick(item)">{{ item.type === 'select' ? 'Select' : 'Edit' }}</el-button>
             </div>
           </div>
         </div>

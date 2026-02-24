@@ -12,6 +12,8 @@ import os
 import time
 
 
+from webui_pages.translations import get_text
+
 # SENTENCE_SIZE = 100
 
 cell_renderer = JsCode("""function(params) {if(params.value==true){return '✓'}else{return '×'}}""")
@@ -54,6 +56,7 @@ def file_exists(kb: str, selected_rows: List) -> Tuple[str, str]:
 
 
 def knowledge_base_page(api: ApiRequest, is_lite: bool = None):
+    lang = st.session_state.get("language", "en")
     try:
         kb_list = {x["kb_name"]: x for x in get_kb_details()}
     except Exception as e:
@@ -81,23 +84,23 @@ def knowledge_base_page(api: ApiRequest, is_lite: bool = None):
             return kb_name
 
     selected_kb = st.selectbox(
-        "Please select or create a new knowledge base:",
-        kb_names + ["Create Knowledge Base"],
+        get_text(lang, "select_or_create_kb"),
+        kb_names + [get_text(lang, "create_kb")],
         format_func=format_selected_kb,
         index=selected_kb_index
     )
 
-    if selected_kb == "Create Knowledge Base":
-        with st.form("Create Knowledge Base"):
+    if selected_kb == get_text(lang, "create_kb"):
+        with st.form(get_text(lang, "create_kb")):
 
             kb_name = st.text_input(
-                "New KnowledgeBase Name",
-                placeholder="New knowledge base name, Chinese naming is not supported",
+                get_text(lang, "new_kb_name"),
+                placeholder=get_text(lang, "new_kb_name_placeholder"),
                 key="kb_name",
             )
             kb_info = st.text_input(
-                "Knowledge base introduction",
-                placeholder="Introduction to knowledge base to facilitate Agent search",
+                get_text(lang, "kb_intro"),
+                placeholder=get_text(lang, "kb_intro_placeholder"),
                 key="kb_info",
             )
 
@@ -109,14 +112,14 @@ def knowledge_base_page(api: ApiRequest, is_lite: bool = None):
                 embed_models = list_embed_models() + list_online_embed_models()
 
             embed_model = cols[0].selectbox(
-                "Embedding Model",
+                get_text(lang, "embed_model"),
                 embed_models,
                 index=embed_models.index(EMBEDDING_MODEL),
                 key="embed_model",
             )
 
             submit_create_kb = st.form_submit_button(
-                "Create",
+                get_text(lang, "create"),
                 # disabled=not bool(kb_name),
                 use_container_width=True,
             )

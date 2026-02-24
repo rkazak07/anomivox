@@ -127,9 +127,12 @@ import DiagnosisInputContainer from "@/components/DiagnosisInputContainer.vue";
 import DiagnosisOneChat from '@/components/DiagnosisOneChat.vue'
 import marked from '@/utils/markdownConfig.js'
 import {ElMessage, ElMessageBox} from "element-plus";
-import {ref} from 'vue'
+import {ref, watch, nextTick, onMounted, computed} from 'vue'
+import {useRouter} from 'vue-router'
+import {useI18n} from 'vue-i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 
 const tasks = [
   {"value": "roleAssignment", "title": "RoleAssignment"},
@@ -237,7 +240,7 @@ const uploadFile = (files) => {
   runDiagnoseReq(files.file).then(() => {
     ElMessage({
       type: 'success',
-      message: 'Upload successful. Start diagnosis!',
+      message: t('uploadSuccessful'),
     })
     activeIndex.value = 'roleAssignment'
     getDiagnoseStatus()
@@ -252,7 +255,7 @@ const onEditClick = (value) => {
 
 const onSendClick = (value) => {
   if (value === '') {
-    ElMessage.error('Please input something')
+    ElMessage.error(t('pleaseInputSomething'))
     return
   }
   editData.value = null
@@ -260,7 +263,7 @@ const onSendClick = (value) => {
   diagnoseUserFeedbackReq(value).then(() => {
     ElMessage({
       type: 'success',
-      message: 'Feedback successful, please continue to wait.',
+      message: t('feedbackSuccessful'),
     })
     editData.value = null
   }).finally(() => {
@@ -270,11 +273,11 @@ const onSendClick = (value) => {
 const onStopDiagnoseClick = () => {
 
   ElMessageBox.confirm(
-      'Will stop diagnose. Continue?',
-      'Warning',
+      t('willStopDiagnose'),
+      t('warning'),
       {
-        confirmButtonText: 'Stop',
-        cancelButtonText: 'Cancel',
+        confirmButtonText: t('stop'),
+        cancelButtonText: t('cancel'),
         type: 'warning',
       }
   )
@@ -282,7 +285,7 @@ const onStopDiagnoseClick = () => {
         diagnoseStopDiagnoseReq().then(() => {
           ElMessage({
             type: 'success',
-            message: 'Stop Successfully!',
+            message: t('stopSuccessfully'),
           })
         }).finally(() => {
           getDiagnoseStatus()
@@ -324,26 +327,30 @@ const onStopDiagnoseClick = () => {
 
 .step-menu-item {
   width: 100%;
-  margin-bottom: 10px;
-  padding: 10px 10px;
-  border-radius: 10px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
   cursor: pointer;
-  border: 1px solid var(--el-color-primary);
-  color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
+  border: 1px solid transparent;
+  color: #475569;
+  background: #f8fafc;
+  transition: all 0.3s ease;
+  font-weight: 500;
 
   .el-icon {
     margin-right: 10px;
   }
 
   &:hover {
-    background: var(--el-color-primary);
-    color: white;
+    background: #f1f5f9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   }
 
   &.active {
     background: var(--el-color-primary);
     color: white;
+    box-shadow: 0 4px 12px rgba(var(--el-color-primary-rgb), 0.3);
   }
 }
 

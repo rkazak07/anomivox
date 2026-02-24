@@ -7,187 +7,192 @@ from streamlit.components.v1 import declare_component
 import os
 from webui_pages.utils import *
 from server.knowledge_base.utils import DIAGNOSE_FILE_DICT
+from webui_pages.translations import get_text
 
-NODE_DATA = {
-    'nodes': [
-        {
-            'id': 'A',
-            'userData': {
-                'title': 'Initialize Expert Role',
-                'content': '',
-                'messages': [],
-                'isCompleted': False,
-                'isRuning': False
-            },
-            'render': 'titleContentNode',
-            'top': 20,
-            'left': 120,
-            'endpoints': [
-                {
-                    'id': 'bottom',
-                    'orientation': [0, 1]
-                }
-            ]
-        },
-        {
-            'id': 'B',
-            'userData': {
-                'title': 'Initialize Diagnosis Report',
-                'content': '',
-                'messages': [],
-                'isCompleted': False,
-                'isRuning': False
-            },
-            'render': 'titleContentNode',
-            'top': 150,
-            'left': 120,
-            'endpoints': [
-                {
-                    'id': 'top',
-                    'orientation': [0, -1]
+def get_node_data(lang):
+    return {
+        'nodes': [
+            {
+                'id': 'A',
+                'userData': {
+                    'title': get_text(lang, 'init_expert_role'),
+                    'content': '',
+                    'messages': [],
+                    'isCompleted': False,
+                    'isRuning': False
                 },
-                {
-                    'id': 'bottom',
-                    'orientation': [0, 1]
-                }
-            ]
-        },
-        {
-            'id': 'C',
-            'userData': {
-                'title': 'Assign Diagnosis Experts Based on Anomaly',
-                'content': '',
-                'messages': [],
-                'isCompleted': False,
-                'isRuning': False
+                'render': 'titleContentNode',
+                'top': 20,
+                'left': 120,
+                'endpoints': [
+                    {
+                        'id': 'bottom',
+                        'orientation': [0, 1]
+                    }
+                ]
             },
-            'render': 'titleContentNode',
-            'top': 280,
-            'left': 120,
-            'endpoints': [
-                {
-                    'id': 'top',
-                    'orientation': [0, -1]
+            {
+                'id': 'B',
+                'userData': {
+                    'title': get_text(lang, 'init_diagnosis_report'),
+                    'content': '',
+                    'messages': [],
+                    'isCompleted': False,
+                    'isRuning': False
                 },
-                {
-                    'id': 'bottom',
-                    'orientation': [0, 1]
-                }
-            ]
-        },
-        {
-            'id': 'D',
-            'userData': {
-                'title': 'Expert Diagnosis',
-                'content': '',
-                'isCompleted': False,
-                'isRuning': False,
-                'expertData': []
+                'render': 'titleContentNode',
+                'top': 150,
+                'left': 120,
+                'endpoints': [
+                    {
+                        'id': 'top',
+                        'orientation': [0, -1]
+                    },
+                    {
+                        'id': 'bottom',
+                        'orientation': [0, 1]
+                    }
+                ]
             },
-            'render': 'agentGroupNode',
-            'top': 410,
-            'left': 40,
-            'endpoints': [
-                {
-                    'id': 'top',
-                    'orientation': [0, -1]
+            {
+                'id': 'C',
+                'userData': {
+                    'title': get_text(lang, 'assign_experts'),
+                    'content': '',
+                    'messages': [],
+                    'isCompleted': False,
+                    'isRuning': False
                 },
-                {
-                    'id': 'bottom',
-                    'orientation': [0, 1]
-                }
-            ]
-        },
-        {
-            'id': 'E',
-            'userData': {
-                'title': 'Roundtable Discussion',
-                'content': '',
-                'messages': [],
-                'isCompleted': False,
-                'isRuning': False,
-                'expertData': []
+                'render': 'titleContentNode',
+                'top': 280,
+                'left': 120,
+                'endpoints': [
+                    {
+                        'id': 'top',
+                        'orientation': [0, -1]
+                    },
+                    {
+                        'id': 'bottom',
+                        'orientation': [0, 1]
+                    }
+                ]
             },
-            'render': 'titleContentNode',
-            'top': 620,
-            'left': 120,
-            'endpoints': [
-                {
-                    'id': 'top',
-                    'orientation': [0, -1]
+            {
+                'id': 'D',
+                'userData': {
+                    'title': get_text(lang, 'expert_diagnosis'),
+                    'content': '',
+                    'isCompleted': False,
+                    'isRuning': False,
+                    'expertData': []
                 },
-                {
-                    'id': 'bottom',
-                    'orientation': [0, 1]
-                }
-            ]
-        },
-        {
-            'id': 'F',
-            'userData': {
-                'title': 'Report Generation',
-                'content': '',
-                'messages': '',
-                'isCompleted': False,
-                'isRuning': False
+                'render': 'agentGroupNode',
+                'top': 410,
+                'left': 40,
+                'endpoints': [
+                    {
+                        'id': 'top',
+                        'orientation': [0, -1]
+                    },
+                    {
+                        'id': 'bottom',
+                        'orientation': [0, 1]
+                    }
+                ]
             },
-            'render': 'titleContentNode',
-            'top': 750,
-            'left': 120,
-            'endpoints': [
-                {
-                    'id': 'top',
-                    'orientation': [0, -1]
-                }
-            ]
-        }
-    ],
-    'edges': [
-        {
-            'id': '1',
-            'source': 'bottom',
-            'target': 'top',
-            'sourceNode': 'A',
-            'targetNode': 'B',
-            'type': 'endpoint'
-        },
-        {
-            'id': '2',
-            'source': 'bottom',
-            'target': 'top',
-            'sourceNode': 'B',
-            'targetNode': 'C',
-            'type': 'endpoint'
-        },
-        {
-            'id': '3',
-            'source': 'bottom',
-            'target': 'top',
-            'sourceNode': 'C',
-            'targetNode': 'D',
-            'type': 'endpoint'
-        },
-        {
-            'id': '4',
-            'source': 'bottom',
-            'target': 'top',
-            'sourceNode': 'D',
-            'targetNode': 'E',
-            'type': 'endpoint'
-        },
-        {
-            'id': '5',
-            'source': 'bottom',
-            'target': 'top',
-            'sourceNode': 'E',
-            'targetNode': 'F',
-            'type': 'endpoint'
-        }
-    ],
-    'isDiagnosing': False
-}
+            {
+                'id': 'E',
+                'userData': {
+                    'title': get_text(lang, 'roundtable_discussion'),
+                    'content': '',
+                    'messages': [],
+                    'isCompleted': False,
+                    'isRuning': False,
+                    'expertData': []
+                },
+                'render': 'titleContentNode',
+                'top': 620,
+                'left': 120,
+                'endpoints': [
+                    {
+                        'id': 'top',
+                        'orientation': [0, -1]
+                    },
+                    {
+                        'id': 'bottom',
+                        'orientation': [0, 1]
+                    }
+                ]
+            },
+            {
+                'id': 'F',
+                'userData': {
+                    'title': get_text(lang, 'report_generation'),
+                    'content': '',
+                    'messages': '',
+                    'isCompleted': False,
+                    'isRuning': False
+                },
+                'render': 'titleContentNode',
+                'top': 750,
+                'left': 120,
+                'endpoints': [
+                    {
+                        'id': 'top',
+                        'orientation': [0, -1]
+                    }
+                ]
+            }
+        ],
+        'edges': [
+            {
+                'id': '1',
+                'source': 'bottom',
+                'target': 'top',
+                'sourceNode': 'A',
+                'targetNode': 'B',
+                'type': 'endpoint'
+            },
+            {
+                'id': '2',
+                'source': 'bottom',
+                'target': 'top',
+                'sourceNode': 'B',
+                'targetNode': 'C',
+                'type': 'endpoint'
+            },
+            {
+                'id': '3',
+                'source': 'bottom',
+                'target': 'top',
+                'sourceNode': 'C',
+                'targetNode': 'D',
+                'type': 'endpoint'
+            },
+            {
+                'id': '4',
+                'source': 'bottom',
+                'target': 'top',
+                'sourceNode': 'D',
+                'targetNode': 'E',
+                'type': 'endpoint'
+            },
+            {
+                'id': '5',
+                'source': 'bottom',
+                'target': 'top',
+                'sourceNode': 'E',
+                'targetNode': 'F',
+                'type': 'endpoint'
+            }
+        ],
+        'isDiagnosing': False
+    }
 
 def diagnose_page(api: ApiRequest, is_lite: bool = None):
+    lang = st.session_state.get("language", "en")
+    NODE_DATA = get_node_data(lang)
+    
     if 'diagnosing' not in st.session_state:
         st.session_state['diagnosing'] = False
 
@@ -219,9 +224,9 @@ def diagnose_page(api: ApiRequest, is_lite: bool = None):
 
     with col2:
 
-        st.session_state['diagnose_file'] = st.file_uploader('Upload Anomaly File：', [i for ls in DIAGNOSE_FILE_DICT.values() for i in ls], accept_multiple_files=False, disabled=st.session_state['diagnosing'])
+        st.session_state['diagnose_file'] = st.file_uploader(get_text(lang, 'upload_anomaly_file'), [i for ls in DIAGNOSE_FILE_DICT.values() for i in ls], accept_multiple_files=False, disabled=st.session_state['diagnosing'])
         if st.session_state['diagnose_file']:
-            with st.status(label='Anomaly File Content', expanded=False):
+            with st.status(label=get_text(lang, 'anomaly_file_content'), expanded=False):
                 with st.container(height=400):
                     content_container = st.empty()
                     file_bytes_data = st.session_state['diagnose_file'].read()
@@ -230,11 +235,11 @@ def diagnose_page(api: ApiRequest, is_lite: bool = None):
                         json_data = json.loads(file_str_data)
                         content_container.code(json.dumps(json_data, indent=4), language='json')
                     except ValueError:
-                        content_container.warning('Invalid JSON file.')
+                        content_container.warning(get_text(lang, 'invalid_json'))
 
         if st.session_state['diagnosing']:
             if st.session_state['diagnosing']:
-                if st.button('Stop Diagnosis'):
+                if st.button(get_text(lang, 'stop_diagnosis')):
                     resp = api.stop_diagnose()
                     if msg := check_error_msg(resp):
                         st.error(msg)
@@ -242,7 +247,7 @@ def diagnose_page(api: ApiRequest, is_lite: bool = None):
                         st.session_state['diagnosing'] = False
         else:
             if st.session_state['diagnose_file']:
-                if st.button('Upload and Diagnosis'):
+                if st.button(get_text(lang, 'upload_and_diagnosis')):
                     filename = st.session_state['diagnose_file'].name
                     st.session_state['diagnose_file'].seek(0)
                     file_content = st.session_state['diagnose_file'].read()
@@ -250,10 +255,10 @@ def diagnose_page(api: ApiRequest, is_lite: bool = None):
                     if msg := check_error_msg(resp):
                         st.error(msg)
                     st.session_state['diagnosing'] = True
-                    deal_node_data()
+                    deal_node_data(NODE_DATA)
 
 
-        diagnose_process(api)
+        diagnose_process(api, NODE_DATA)
 
 def extract_flows(log_text):
     pattern = r'<flow>(.*?)</flow>'
@@ -281,7 +286,7 @@ def remove_duplicates(flows):
     unique_flows = list(temp_dict.values())
     return unique_flows
 
-def deal_node_data():
+def deal_node_data(NODE_DATA):
     text = st.session_state['task_output']
     flows = extract_flows(text)
     flows = remove_duplicates(flows)
@@ -298,14 +303,14 @@ def deal_node_data():
                     node['userData'] = flow
                     # print(node['userData'].get('messages', []))
                     new_node_data['nodes'][index] = node
-                    continue
-        new_node_data['isDiagnosing'] = st.session_state['diagnosing']
+        
         if st.session_state['node_data'] != new_node_data:
-            st.session_state['node_data'] = copy.deepcopy(new_node_data)
+            st.session_state['node_data'] = new_node_data
             st.rerun()
 
-def diagnose_process(r_api):
-    with (st.status(label='Diagnosing...', expanded=True) as status):
+def diagnose_process(r_api, NODE_DATA):
+    lang = st.session_state.get("language", "en")
+    with (st.status(label=get_text(lang, 'diagnosing'), expanded=True) as status):
         with st.container(height=500):
             code_placeholder = st.empty()
             while True:
@@ -314,7 +319,7 @@ def diagnose_process(r_api):
                     st.error(msg)
                 if not status_response['is_alive']:
                     st.session_state['diagnosing'] = False
-                    status.update(label='No diagnosis task is running...', expanded=True, state='complete')
+                    status.update(label=get_text(lang, 'no_diagnosis_task'), expanded=True, state='complete')
                 else:
                     st.session_state['diagnosing'] = True
 
@@ -323,7 +328,7 @@ def diagnose_process(r_api):
                     st.error(msg)
                 st.session_state['task_output'] = str(response['output'])
                 code_placeholder.code(st.session_state['task_output'], language='powershell')
-                deal_node_data()
+                deal_node_data(NODE_DATA)
 
                 if not st.session_state['diagnosing']:
                     break

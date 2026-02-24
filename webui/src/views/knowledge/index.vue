@@ -28,18 +28,18 @@
       </div>
     </div>
 
-    <el-dialog v-model="dialogCreateFormVisible" title="Creating a knowledge Base" width="800" destroy-on-close>
+    <el-dialog v-model="dialogCreateFormVisible" :title="$t('createKnowledgeBase')" width="800" destroy-on-close>
       <el-form ref="ruleFormRef" :model="createForm" label-width="160">
-        <el-form-item label="Name" prop="kb_name" :rules="[{required: true, message: 'Please Input Name', trigger: 'blur'}]">
+        <el-form-item :label="$t('name')" prop="kb_name" :rules="[{required: true, message: $t('pleaseInputName'), trigger: 'blur'}]">
           <el-input v-model="createForm.kb_name" />
         </el-form-item>
-        <el-form-item label="Brief Introduction" prop="kb_info" :rules="[{required: true, message: 'Please Input Brief Introduction', trigger: 'blur'}]">
+        <el-form-item :label="$t('briefIntroduction')" prop="kb_info" :rules="[{required: true, message: $t('pleaseInputBriefIntroduction'), trigger: 'blur'}]">
           <el-input v-model="createForm.kb_info" :rows="2" type="textarea"/>
         </el-form-item>
-        <el-form-item label="Embedding Model" prop="model" :rules="[{required: true, message: 'Please Select a Embedding Model', trigger: 'blur, change'}]">
-          <el-select v-model="createForm.model" placeholder="Please select a Embedding Model" style="width: 100%">
+        <el-form-item :label="$t('embeddingModel')" prop="model" :rules="[{required: true, message: $t('pleaseSelectEmbeddingModel'), trigger: 'blur, change'}]">
+          <el-select v-model="createForm.model" :placeholder="$t('pleaseSelectEmbeddingModel')" style="width: 100%">
             <template #empty>
-              <div class="el-select__empty">Veri yok</div>
+              <div class="el-select__empty">{{ $t('noData') }}</div>
             </template>
             <el-option v-for="item in embedList.value" :key="item" :label="item" :value="item" />
           </el-select>
@@ -47,9 +47,9 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogCreateFormVisible = false">Cancel</el-button>
+          <el-button @click="dialogCreateFormVisible = false">{{ $t('cancel') }}</el-button>
           <el-button type="primary" @click="onCreateClick()">
-            Create
+            {{ $t('create') }}
           </el-button>
         </div>
       </template>
@@ -62,9 +62,12 @@
 
 import {knowledgeListReq, llmModelEmbedModelsReq, createKnowledgeBaseReq} from "@/api/knowledge";
 import {ElMessage} from "element-plus";
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
+import {useRouter} from 'vue-router'
+import {useI18n} from 'vue-i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 
 const knowledge: Ref<Array<object>>  =  reactive({list: []});
 
@@ -134,7 +137,7 @@ const onCreateClick = () => {
         dialogCreateFormVisible.value = false
         ElMessage({
           type: 'success',
-          message: 'Create Successfully',
+          message: t('createSuccessfully'),
         })
         getKnowledgeList()
       })

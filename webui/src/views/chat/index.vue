@@ -2,7 +2,7 @@
   <div class="relative columnSC chat-container">
     <div class="header">
       <div class="header-item">
-        <span style="color: #333333;">LLM Model:</span>
+        <span style="color: #333333;">{{ $t('llmModel') }}</span>
         <el-select
             v-model="llmModel"
             class="llm-select"
@@ -11,7 +11,7 @@
             style="width: 120px"
         >
           <template #empty>
-            <div class="el-select__empty">Veri yok</div>
+            <div class="el-select__empty">{{ $t('noData') }}</div>
           </template>
           <el-option
               v-for="item in modelList"
@@ -22,7 +22,7 @@
         </el-select>
       </div>
       <div class="header-item">
-        <span style="color: #333333;">Historical Session Rounds：</span>
+        <span style="color: #333333;">{{ $t('historicalSessionRounds') }}</span>
         <el-input-number v-model="historyLength" size="default" :min="1" :max="5"/>
       </div>
     </div>
@@ -31,7 +31,7 @@
       <chat-item v-for="(item, index) in messageList" :key="index" class="infinite-list-item" :message="item"/>
     </div>
 
-    <BottomInputContainer style="width: calc(100% - 20px)" placeholder="Ask anything" @send-click="onSendClick"/>
+    <BottomInputContainer style="width: calc(100% - 20px)" :placeholder="$t('askAnything')" @send-click="onSendClick"/>
   </div>
 </template>
 
@@ -42,7 +42,9 @@ import BottomInputContainer from "@/components/BottomInputContainer.vue";
 import ChatItem from "@/components/ChatItem.vue";
 import {ElMessage} from "element-plus";
 import moment from "moment-mini";
-import {ref} from 'vue'
+import {ref, watch, nextTick, onMounted} from 'vue'
+import {useRouter} from 'vue-router'
+import {useI18n} from 'vue-i18n'
 
 interface Message {
   role: string;
@@ -54,6 +56,7 @@ interface Message {
 const CHAT_HISTORY_KEY = 'anomivox-chat-history'
 
 const router = useRouter()
+const { t } = useI18n()
 
 const llmModel: Ref<string> = ref('')
 
@@ -151,7 +154,7 @@ const getLocalHistoryMessages = () => {
 
 const onSendClick = (value) => {
   if (value === '') {
-    ElMessage.error('Please input something')
+    ElMessage.error(t('pleaseInputSomething'))
     return
   }
   const userInputValue = value

@@ -1,71 +1,68 @@
 html.base-theme {
   /*element-plus section */
-  --el-menu-active-color: #409eff;
-  --el-menu-text-color: #bfcbd9;
-  --el-menu-hover-text-color: var(--el-color-primary);
-  --el-menu-bg-color: #304156;
-  --el-menu-hover-bg-color: #263445;
+  --el-menu-active-color: #ffffff;
+  --el-menu-text-color: #a3b1c6;
+  --el-menu-hover-text-color: #ffffff;
+  --el-menu-bg-color: #1e293b;
+  --el-menu-hover-bg-color: #334155;
   --el-menu-item-height: 56px;
   --el-menu-border-color: none;
   /*layout section*/
   //layout
-  --layout-border-left-color: #ddd;
+  --layout-border-left-color: #e2e8f0;
   //Breadcrumb
-  --breadcrumb-no-redirect: #97a8be;
+  --breadcrumb-no-redirect: #64748b;
   //Hamburger
-  --hamburger-color: #2b2f3a;
+  --hamburger-color: #1e293b;
   --hamburger-width: 20px;
   --hamburger-height: 20px;
   //Sidebar
   --sidebar-el-icon-size: 20px;
-  --sidebar-logo-background: #2b2f3a;
-  --sidebar-logo-color: #ff9901;
+  --sidebar-logo-background: #1e293b;
+  --sidebar-logo-color: #38bdf8;
   --sidebar-logo-width: 32px;
   --sidebar-logo-height: 32px;
-  --sidebar-logo-title-color: #fff;
-  --side-bar-width: 210px;
-  --side-bar-border-right-color: #eee;
+  --sidebar-logo-title-color: #ffffff;
+  --side-bar-width: 240px;
+  --side-bar-border-right-color: #e2e8f0;
   //TagsView
-  --tags-view-background: #fff;
-  --tags-view-border-bottom: #eee;
-  --tags-view-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 0 3px 0 rgba(0, 0, 0, 0.04);
-  --tags-view-item-background: #fff;
-  --tags-view-item-border-color: #d8dce5;
-  --tags-view-item-color: #495060;
-  --tag-view-height: 32px;
-  --tags-view-item-active-background: #42b983;
-  --tags-view-item-active-color: #fff;
-  --tags-view-item-active-border-color: #42b983;
-  --tags-view-contextmenu-background: #fff;
-  --tags-view-contextmenu-color: #333;
-  --tags-view-contextmenu-box-shadow: 2px 2px 3px 0 rgba(0, 0, 0, 0.3);
-  --tags-view-contextmenu-hover-background: #eee;
+  --tags-view-background: #ffffff;
+  --tags-view-border-bottom: #e2e8f0;
+  --tags-view-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 0 3px 0 rgba(0, 0, 0, 0.02);
+  --tags-view-item-background: #ffffff;
+  --tags-view-item-border-color: #cbd5e1;
+  --tags-view-item-color: #475569;
+  --tag-view-height: 36px;
+  --tags-view-item-active-background: #3b82f6;
+  --tags-view-item-active-color: #ffffff;
+  --tags-view-item-active-border-color: #3b82f6;
+  --tags-view-contextmenu-background: #ffffff;
+  --tags-view-contextmenu-color: #1e293b;
+  --tags-view-contextmenu-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --tags-view-contextmenu-hover-background: #f1f5f9;
   //close-icon
-  --tags-view-close-icon-hover-background: #b4bccc;
-  --tags-view-close-icon-hover-color: #fff;
+  --tags-view-close-icon-hover-background: #94a3b8;
+  --tags-view-close-icon-hover-color: #ffffff;
   //AppMain.vue
-  --app-main-padding: 10px;
-  --app-main-background: #fBFBfC;
+  --app-main-padding: 16px;
+  --app-main-background: #f8fafc;
   //Navbar.vue
-  --nav-bar-height: 50px;
-  --nav-bar-background: #fff;
-  --nav-bar-box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-  --nav-bar-right-menu-background: #fff;
+  --nav-bar-height: 60px;
+  --nav-bar-background: #ffffff;
+  --nav-bar-box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --nav-bar-right-menu-background: #ffffff;
 
-  //transition 动画
-  //侧边栏切换动画时长
-  --sideBar-switch-duration: 0.2s;
-  //logo切换动画时长
-  --logo-switch-duration: 1s;
-  //页面动画时长
-  --page-transform-duration: 0.2s;
-  //面包屑导航动画时长
-  --breadcrumb-change-duration: 0.2s;
+  //transition
+  --sideBar-switch-duration: 0.3s;
+  //logo
+  --logo-switch-duration: 0.3s;
+  --page-transform-duration: 0.3s;
 
-  //进度条颜色
-  --pregress-bar-color: #409eff;
-  //背景
-  --body-background: #f2F2f2;
-  //border颜色
-  --border-color: #e4e7ed;
+  --breadcrumb-change-duration: 0.3s;
+
+  --pregress-bar-color: #3b82f6;
+
+  --body-background: #f1f5f9;
+
+  --border-color: #e2e8f0;
 }

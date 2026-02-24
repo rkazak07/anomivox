@@ -91,3 +91,5 @@ text_splitter_dict = {
 TEXT_SPLITTER_NAME = "RecursiveCharacterTextSplitter"
 
 EMBEDDING_KEYWORD_FILE = "embedding_keywords.txt"
+
+ZH_TITLE_ENHANCE = False

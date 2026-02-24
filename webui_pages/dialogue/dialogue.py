@@ -18,6 +18,7 @@ from configs import (
 from server.knowledge_base.utils import LOADER_DICT
 import uuid
 from typing import List, Dict
+from webui_pages.translations import get_text
 
 chat_box = ChatBox(
     assistant_avatar=os.path.join(
@@ -132,27 +133,29 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
             st.write("\n\n".join(cmds))
 
     with st.sidebar:
+        lang = st.session_state.get("language", "en")
         conversation_name = 'default'
         chat_box.use_chat_name(conversation_name)
         conversation_id = st.session_state["conversation_ids"][conversation_name]
 
         def on_mode_change():
             mode = st.session_state.dialogue_mode
-            text = f"Switch to {mode} mode"
+            text = f"{get_text(lang, 'switch_to')} {get_text(lang, mode)} mode"
             if mode == "knowledge_base_chat":
                 cur_kb = st.session_state.get("selected_kb")
                 if cur_kb:
-                    text = f"{text} Current Knowledge base： `{cur_kb}`。"
+                    text = f"{text} {get_text(lang, 'current_kb')}： `{cur_kb}`。"
             st.toast(text)
 
         dialogue_modes = ["llm_chat",
                           "knowledge_base_chat"
                           ]
-        dialogue_mode = st.selectbox("Please select chat mode：",
+        dialogue_mode = st.selectbox(get_text(lang, "dialogue_mode"),
                                      dialogue_modes,
                                      index=0,
                                      on_change=on_mode_change,
                                      key="dialogue_mode",
+                                     format_func=lambda x: get_text(lang, x)
                                      )
 
         def on_llm_change():
@@ -186,7 +189,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
             index = llm_models.index(cur_llm_model)
         else:
             index = 0
-        llm_model = st.selectbox("Choose LLM Model：",
+        llm_model = st.selectbox(get_text(lang, "select_model"),
                                  llm_models,
                                  index,
                                  format_func=llm_model_format_func,
@@ -233,13 +236,13 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
             st.toast(f"Loaded Knowledge bases： {st.session_state.selected_kb}")
 
         if dialogue_mode == "knowledge_base_chat":
-            with st.expander("knowledge_base_setting", True):
+            with st.expander(get_text(lang, "knowledge_base"), True):
                 kb_list = api.list_knowledge_bases()
                 index = 0
                 if DEFAULT_KNOWLEDGE_BASE in kb_list:
                     index = kb_list.index(DEFAULT_KNOWLEDGE_BASE)
                 selected_kb = st.selectbox(
-                    "Please choose knowledge base：",
+                    get_text(lang, "select_kb"),
                     kb_list,
                     index=index,
                     on_change=on_kb_change,
@@ -284,7 +287,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
     # Display chat messages from history on app rerun
     chat_box.output_messages()
 
-    chat_input_placeholder = "Please enter the conversation content and use Shift+Enter for line breaks. Enter /help to view custom commands "
+    chat_input_placeholder = get_text(lang, "enter_prompt")
 
     def on_feedback(
             feedback,

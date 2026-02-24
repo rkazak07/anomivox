@@ -1,8 +1,8 @@
 <template>
   <div class="relative columnSC chat-container">
-    <div class="header">
+        <div class="header">
       <div class="header-item">
-        <span style="color: #333333;">LLM Model:</span>
+        <span style="color: #333333;">{{ $t('llmModel') }}</span>
         <el-select
             v-model="llmModel"
             class="llm-select"
@@ -11,7 +11,7 @@
             style="width: 120px"
         >
           <template #empty>
-            <div class="el-select__empty">Veri yok</div>
+            <div class="el-select__empty">{{ $t('noData') }}</div>
           </template>
           <el-option
               v-for="item in modelList"
@@ -23,7 +23,7 @@
       </div>
 
       <div class="header-item">
-        <span style="color: #333333;">Knowledge Base:</span>
+        <span style="color: #333333;">{{ $t('knowledgeBase') }}</span>
         <el-select
             v-model="knowledgeBase"
             class="llm-select"
@@ -32,7 +32,7 @@
             style="width: 120px"
         >
           <template #empty>
-            <div class="el-select__empty">Veri yok</div>
+            <div class="el-select__empty">{{ $t('noData') }}</div>
           </template>
           <el-option
               v-for="item in knowledgeBaseList"
@@ -44,12 +44,12 @@
       </div>
 
       <div class="header-item">
-        <span style="color: #333333;">Historical Session Rounds：</span>
+        <span style="color: #333333;">{{ $t('historicalSessionRounds') }}</span>
         <el-input-number v-model="historyLength" size="default" :min="1" :max="5"/>
       </div>
 
       <div class="header-item">
-        <span style="color: #333333;">Use Cache：</span>
+        <span style="color: #333333;">{{ $t('useCache') }}</span>
         <el-switch v-model="userCache" size="default"/>
       </div>
 
@@ -61,7 +61,7 @@
           :is-last="index === messageList.length - 1" @ignore-message-cache="ignoreMessageCache"/>
     </div>
 
-    <BottomInputContainer style="width: calc(100% - 20px)" placeholder="Ask anything" @send-click="onSendClick" />
+    <BottomInputContainer style="width: calc(100% - 20px)" :placeholder="$t('askAnything')" @send-click="onSendClick" />
   </div>
 </template>
 
@@ -72,7 +72,9 @@ import KnowledgeChatItem from "@/components/KnowledgeChatItem.vue";
 import BottomInputContainer from "@/components/BottomInputContainer.vue";
 import {ElMessage} from "element-plus";
 import moment from "moment-mini";
-import {ref} from 'vue'
+import {ref, watch, nextTick, onMounted} from 'vue'
+import {useRouter} from 'vue-router'
+import {useI18n} from 'vue-i18n'
 
 interface KnowledgeMessage {
   role: string;
@@ -90,6 +92,7 @@ const KNOWLEDGE_CHAT_HISTORY_KEY = 'anomivox-knowledge-chat-history'
 const KNOWLEDGE_CHAT_USR_CACHE_KEY = 'anomivox-knowledge-chat-use-cache'
 
 const router = useRouter()
+const { t } = useI18n()
 
 const llmModel: Ref<string> = ref('')
 
@@ -231,11 +234,11 @@ const getLocalHistoryMessages = () => {
 
 const onSendClick = (value) => {
   if (value === '') {
-    ElMessage.error('Please input something')
+    ElMessage.error(t('pleaseInputSomething'))
     return
   }
   if (!knowledgeBase.value) {
-    ElMessage.warning('Please create and select a knowledge base first')
+    ElMessage.warning(t('pleaseCreateAndSelectKnowledgeBase'))
     return
   }
   const userInputValue = value

@@ -3,7 +3,7 @@
     <template v-if="showSidebarItem(item.children, item)">
       <Link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild.path)">
         <div :class="`sidebar-item ${isActived ? ' sidebar-item-active': ''}`">
-          <el-icon style="margin: 10px 0" :color="isActived ? 'var(--el-color-primary)' : '#333333' " size="24">
+          <el-icon style="margin: 10px 0" :color="isActived ? 'var(--el-menu-active-color)' : 'var(--el-menu-text-color)' " size="24">
             <component :is="onlyOneChild.meta?.elSvgIcon" />
           </el-icon>
           <span>{{ langTitle(onlyOneChild.meta?.title) }}</span>
@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { resolve } from 'path-browserify'
 import Link from './Link.vue'
 import type { RouteRawConfig } from '~/basic'
@@ -75,25 +75,41 @@ const isActived = computed(() => {
   align-items: center;
   cursor: pointer;
   flex-direction: column;
-  transition: all 0.3s;
-  margin-bottom: 20px;
-  width: 60px;
-  height: 70px;
-  border-radius: 10px;
+  transition: all 0.3s ease;
+  margin-bottom: 16px;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  background-color: transparent;
+  
   &:hover {
-    background-color: white;
+    background-color: var(--el-menu-hover-bg-color);
+    transform: translateY(-2px);
+    
+    span {
+      color: var(--el-menu-hover-text-color);
+    }
+    .el-icon {
+      color: var(--el-menu-hover-text-color) !important;
+    }
   }
+  
   span {
     font-size: 12px;
-    color: #666666;
+    color: var(--el-menu-text-color);
     text-align: center;
+    font-weight: 500;
+    transition: color 0.3s ease;
+    margin-top: -4px;
   }
 }
 .sidebar-item-active {
-  background-color: white !important;
-  box-shadow: 0 0 5px 5px rgba(0, 0, 0, 0.04);
+  background-color: var(--el-menu-hover-bg-color) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  
   span {
-    color: var(--el-color-primary);
+    color: var(--el-menu-active-color);
+    font-weight: 600;
   }
 }
 </style>

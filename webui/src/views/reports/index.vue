@@ -10,7 +10,7 @@
           <span style="font-size: 14px; margin-right: 10px">{{ $t('modelTip') + ':' }}</span>
           <el-select v-model="model" style="width: 120px" placeholder="">
             <template #empty>
-              <div class="el-select__empty">Veri yok</div>
+              <div class="el-select__empty">{{ $t('noData') }}</div>
             </template>
             <el-option
                 v-for="item in modelList"

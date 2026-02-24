@@ -5,10 +5,10 @@ import VueGroup from '../coms/vue-group.vue';
 import VueNode from '../coms/vue-node.vue';
 
 /**
- * 渲染render
- * @param {Object} item 渲染对象（就是mockdata中的每一项）
- * @param {String} type 渲染类型
- * @param {Array} canvasNodes 渲染节点对应的渲染类型
+ * Render component
+ * @param {Object} item Component data (each item from mockdata)
+ * @param {String} type Component rendering type
+ * @param {Array} canvasNodes Canvas nodes for rendering
  */
 const render = (item, type, parent = null, canvasNodes = null) => {
 
@@ -33,7 +33,7 @@ const render = (item, type, parent = null, canvasNodes = null) => {
         break;
 
       default:
-        throw Error(`${type}存在render属性，应该为string或者object类型，现在是${typeof render}`);
+        throw Error(`${type} render property should be string or object type, now is ${typeof render}`);
     }
   } else {
     switch (type) {
@@ -61,7 +61,7 @@ const render = (item, type, parent = null, canvasNodes = null) => {
     })
   
     if (canvasNodeIndex === -1) {
-      console.warn(`canvas.addNodes方法出错`);
+      console.warn(`Error in canvas.addNodes method`);
       return null;
     }
   
@@ -76,9 +76,9 @@ const render = (item, type, parent = null, canvasNodes = null) => {
     nodeCon.$butterfly = {
       type: type
     }
-    // 暂时不用指向parent 节点的emit支持
+    // Temporarily not used for parent node emit support
     // nodeCon.$parent = parent
-    // 打通组件的$emit事件传输
+    // Enable component $emit event transmission
     nodeCon._events = parent._events;
     nodeCon.$mount();
     
@@ -88,9 +88,9 @@ const render = (item, type, parent = null, canvasNodes = null) => {
     const Con = new vueCon({
       propsData
     })
-    // 暂时不用指向parent  edge和group的emit支持
+    // Temporarily not used for parent edge and group emit support
     // Con.$parent = parent
-    // 打通组件的$emit事件传输
+    // Enable component $emit event transmission
     Con._events = parent._events;
     Con.$mount();
     
@@ -108,7 +108,7 @@ const addGroupsCom = (canvasRoot, groups, parent) => {
   groups.map((item,index) => {
     const id = item.id;
     if (!id) {
-      console.warn(`groups的${index}不含ID属性，请检查格式`);
+      console.warn(`groups index ${index} does not contain ID property, please check format`);
       return;
     }
 
@@ -132,7 +132,7 @@ const addNodesCom = (canvasRoot, canvasNodes, nodes, parent) => {
     }
     const id = item.id;
     if (!id) {
-      console.warn(`nodes的${index}不含ID属性，请检查格式`);
+      console.warn(`nodes index ${index} does not contain ID property, please check format`);
       return;
     }
 
@@ -146,13 +146,13 @@ const addNodesCom = (canvasRoot, canvasNodes, nodes, parent) => {
 
     dom.append(nodeCon.$el);
 
-    // 需要先挂载锚点才可以添加锚点
+    // Need to mount anchor points first before adding anchor points
     let canvasNodeIndex = canvasNodes.findIndex((node)=>{
       return node.id === item.id;
     })
   
     if (canvasNodeIndex === -1) {
-      console.warn(`canvas.addNodes方法出错`);
+      console.warn(`Error in canvas.addNodes method`);
       return null;
     }
   })
@@ -162,7 +162,7 @@ const addEdgesCom = (canvasRoot, edges, parent) => {
   edges.map((item,index) => {
     const id = item.id;
     if (!id) {
-      console.warn(`edges的${index}不含ID属性，请检查格式`);
+      console.warn(`edges index ${index} does not contain ID property, please check format`);
       return;
     }
 

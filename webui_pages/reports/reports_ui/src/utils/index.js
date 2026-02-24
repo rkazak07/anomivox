@@ -116,12 +116,12 @@ export function param2Obj(url) {
   return obj
 }
 
-// 秒转时间
+// Convert seconds to time format
 export function formatSeconds(value) {
-  var theTime = parseInt(value)// 需要转换的时间秒
-  var theTime1 = 0// 分
-  var theTime2 = 0// 小时
-  var theTime3 = 0// 天
+  var theTime = parseInt(value) // time in seconds
+  var theTime1 = 0 // minutes
+  var theTime2 = 0 // hours
+  var theTime3 = 0 // days
 
   if (theTime > 60) {
     theTime1 = parseInt(theTime / 60)
@@ -130,7 +130,7 @@ export function formatSeconds(value) {
       theTime2 = parseInt(theTime1 / 60)
       theTime1 = parseInt(theTime1 % 60)
       if (theTime2 > 24) {
-        // 大于24小时
+        // more than 24 hours
         theTime3 = parseInt(theTime2 / 24)
         theTime2 = parseInt(theTime2 % 24)
       }
@@ -152,7 +152,7 @@ export function formatSeconds(value) {
   return result
 }
 
-// 字节转大小
+// Convert bytes to size format
 export function bytesToSize(bytes) {
   if (parseInt(bytes) === 0) {
     return '0 B'
@@ -189,7 +189,7 @@ export function bytesToSizeSecondsRate(bytes) {
   return (minus ? '-' : '') + parseFloat(num.toPrecision(3)) + ' ' + sizes[i]
 }
 
-// 转百分数
+// Convert to percentage
 export function stringToPercent(point) {
   point = parseFloat(point)
   if (point === 0) {

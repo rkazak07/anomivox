@@ -3,10 +3,10 @@ const adapterArray = (value) => {
 };
 
 /**
- * 判断新旧的版本
+ * Compare new and old versions
  * @param {Array} news
  * @param {Array} olds
- * @param {String} key 对比用的key
+ * @param {String} key Key for comparison
  */
 const diff = (news = [], olds = [], key = 'id') => {
   news = adapterArray(news);

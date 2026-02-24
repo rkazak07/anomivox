@@ -1,10 +1,7 @@
 
-
-
-
-
 PROMPT_TEMPLATES = {
     "llm_chat": {
+        # --- English ---
         "default":
             '{{ input }}',
 
@@ -19,10 +16,24 @@ PROMPT_TEMPLATES = {
 
         "py":
             '{{ input }}',
+
+        # --- Turkish ---
+        "tr":
+            '{{ input }}',
+
+        "with_history_tr":
+            'Aşağıdaki, bir insan ile bir yapay zeka arasındaki samimi bir konuşmadır. '
+            'Yapay zeka konuşkan olup bağlamından çok sayıda spesifik ayrıntı sağlar. '
+            'Yapay zeka bir sorunun cevabını bilmiyorsa, bunu dürüstçe söyler.\n\n'
+            'Mevcut konuşma:\n'
+            '{history}\n'
+            'İnsan: {input}\n'
+            'YZ:',
     },
 
 
     "knowledge_base_chat": {
+        # --- English ---
         "default":
             '<known-information>{{ context }}</known-information>\n'
             '<question>{{ question }}</question>\n',
@@ -33,10 +44,19 @@ PROMPT_TEMPLATES = {
 
         "empty":
             '{{ question }}\n\n',
+
+        # --- Turkish ---
+        "tr":
+            '<bilinen-bilgi>{{ context }}</bilinen-bilgi>\n'
+            '<soru>{{ question }}</soru>\n',
+
+        "empty_tr":
+            '{{ question }}\n\n',
     },
 
 
     "search_engine_chat": {
+        # --- English ---
         "default":
             '<known-information>{{ context }}</known-information>\n'
             '<question>{{ question }}</question>\n',
@@ -44,16 +64,22 @@ PROMPT_TEMPLATES = {
         "search":
             '<known-information>{{ context }}</known-information>\n'
             '<question>{{ question }}</question>\n',
+
+        # --- Turkish ---
+        "tr":
+            '<bilinen-bilgi>{{ context }}</bilinen-bilgi>\n'
+            '<soru>{{ question }}</soru>\n',
     },
 
 
     "agent_chat": {
+        # --- English ---
         "default":
             'Answer the following questions as best you can. If it is in order, you can use some tools appropriately. '
             'You have access to the following tools:\n\n'
             '{tools}\n\n'
             'Use the following format:\n'
-            'Question: the input question you must answer1\n'
+            'Question: the input question you must answer\n'
             'Thought: you should always think about what to do and what tools to use.\n'
             'Action: the action to take, should be one of [{tool_names}]\n'
             'Action Input: the input to the action\n'
@@ -66,41 +92,23 @@ PROMPT_TEMPLATES = {
             'Question: {input}\n\n'
             'Thought: {agent_scratchpad}\n',
 
-        "ChatGLM3":
-            'You can answer using the tools, or answer directly using your knowledge without using the tools. '
-            'Respond to the human as helpfully and accurately as possible.\n'
-            'You have access to the following tools:\n'
-            '{tools}\n'
-            'Use a json blob to specify a tool by providing an action key (tool name) '
-            'and an action_input key (tool input).\n'
-            'Valid "action" values: "Final Answer" or  [{tool_names}]'
-            'Provide only ONE action per $JSON_BLOB, as shown:\n\n'
-            '```\n'
-            '{{{{\n'
-            '  "action": $TOOL_NAME,\n'
-            '  "action_input": $INPUT\n'
-            '}}}}\n'
-            '```\n\n'
-            'Follow this format:\n\n'
-            'Question: input question to answer\n'
-            'Thought: consider previous and subsequent steps\n'
-            'Action:\n'
-            '```\n'
-            '$JSON_BLOB\n'
-            '```\n'
-            'Observation: action result\n'
-            '... (repeat Thought/Action/Observation N times)\n'
-            'Thought: I know what to respond\n'
-            'Action:\n'
-            '```\n'
-            '{{{{\n'
-            '  "action": "Final Answer",\n'
-            '  "action_input": "Final response to human"\n'
-            '}}}}\n'
-            'Begin! Reminder to ALWAYS respond with a valid json blob of a single action. Use tools if necessary. '
-            'Respond directly if appropriate. Format is Action:```$JSON_BLOB```then Observation:.\n'
-            'history: {history}\n\n'
-            'Question: {input}\n\n'
-            'Thought: {agent_scratchpad}',
+        # --- Turkish ---
+        "tr":
+            'Aşağıdaki soruları elinizden geldiğince yanıtlayın. Uygunsa bazı araçları kullanabilirsiniz. '
+            'Aşağıdaki araçlara erişiminiz var:\n\n'
+            '{tools}\n\n'
+            'Aşağıdaki formatı kullanın:\n'
+            'Soru: yanıtlamanız gereken giriş sorusu\n'
+            'Düşünce: her zaman ne yapacağınızı ve hangi araçları kullanacağınızı düşünmelisiniz.\n'
+            'Eylem: yapılacak eylem, [{tool_names}] arasından biri olmalıdır\n'
+            'Eylem Girdisi: eylemin girdisi\n'
+            'Gözlem: eylemin sonucu\n'
+            '... (bu Düşünce/Eylem/Eylem Girdisi/Gözlem sıfır veya daha fazla kez tekrarlanabilir)\n'
+            'Düşünce: Artık son cevabı biliyorum\n'
+            'Son Cevap: orijinal giriş sorusuna verilen son cevap\n'
+            'Başla!\n\n'
+            'geçmiş: {history}\n\n'
+            'Soru: {input}\n\n'
+            'Düşünce: {agent_scratchpad}\n',
     }
 }

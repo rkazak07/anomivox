@@ -29,7 +29,7 @@ class DagreCanvas extends Canvas {
           target: item.targetNode.id
         }))
       }});
-    // 布局计算完位置后left和top赋值给node节点
+    // After layout calculation, assign left and top to node
     nodes.forEach((item, index) => {
       const currentNodeNewLeft = addResultNodes[index].left;
       const currentNodeNewTop = addResultNodes[index].top;

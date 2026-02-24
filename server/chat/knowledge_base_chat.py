@@ -112,8 +112,9 @@ async def knowledge_base_chat(query: str = Body(..., description="User input", e
         context = "\n".join([doc.page_content for doc in docs])
 
         if len(docs) == 0:
+            empty_key = "empty_tr" if prompt_name == "tr" else "empty"
             prompt_template = get_prompt_template(
-                "knowledge_base_chat", "empty")
+                "knowledge_base_chat", empty_key)
         else:
             prompt_template = get_prompt_template(
                 "knowledge_base_chat", prompt_name)

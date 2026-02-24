@@ -48,26 +48,19 @@ ONLINE_LLM_MODEL = {
     }
 }
 
-#           - text2vec
-#           - GanymedeNil/text2vec-large-chinese
-#           - text2vec-large-chinese
 MODEL_PATH = {
     "embed_model": {
         "all-MiniLM-L6-v2": "sentence-transformers/all-MiniLM-L6-v2",
     },
 
-    "llm_model": {
-        "chatglm2-6b": "THUDM/chatglm2-6b"
-    },
+    "llm_model": {},
 }
 
 
 
 NLTK_DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "nltk_data")
 
-VLLM_MODEL_DICT = {
-    "chatglm2-6b": "THUDM/chatglm2-6b"
-}
+VLLM_MODEL_DICT = {}
 
 
 SUPPORT_AGENT_MODEL = []

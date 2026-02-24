@@ -2,7 +2,7 @@ import os
 
 DIAGNOSTIC_RESULTS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alert_results")
 
-DIAGNOSE_LLM_MODEL_LIST = ["GPT4-0613", "Llama2-13b", "CodeLlama2-13b", "BaiChuan-13b", "Qwen1.5-14B-Chat"]
+DIAGNOSE_LLM_MODEL_LIST = ["GPT4-0613", "Llama2-13b", "CodeLlama2-13b"]
 
 DIAGNOSTIC_FILES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "diagnostic_files")
 if not os.path.exists(DIAGNOSTIC_FILES_PATH):

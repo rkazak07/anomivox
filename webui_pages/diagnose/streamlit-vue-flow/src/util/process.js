@@ -7,7 +7,7 @@ import diff from './diff';
 import relayout from './re-layout';
 import {addNodesCom , addEdgesCom , addGroupsCom} from './add-com';
 
-// treeNode还没有使用起来。待解决
+// TreeNode is not yet in use. To be resolved
 const process = ({ nodes = [], edges = [], groups = [] , canvas = {}}) => {
   let BaseNode = Node;
   if (canvas.constructor === TreeCanvas) {
@@ -39,15 +39,15 @@ const process = ({ nodes = [], edges = [], groups = [] , canvas = {}}) => {
 /**
  * 
  * @param {Canvas} canvas 
- * @param {Array} nodes 新节点
- * @param {Array} oldNodes 老节点
+ * @param {Array} nodes New nodes
+ * @param {Array} oldNodes Old nodes
  * @param {Object} parent butterfly-vue
  */
 const processNodes = (canvas, nodes, oldNodes, parent) => {
   
-  // 判断是TreeCanvas
+  // Check if it's a TreeCanvas
   if (canvas.constructor === TreeCanvas) {
-    // 对nodes进行拆解
+    // Decompose nodes
     if(canvas.layout && canvas.previousIsFlatNode) {
       nodes = canvas._handleTreeNodes(nodes || [], _.get({}, 'isFlatNode', false))
     }

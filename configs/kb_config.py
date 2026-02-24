@@ -36,9 +36,6 @@ BING_SUBSCRIPTION_KEY = ""
 METAPHOR_API_KEY = ""
 
 
-ZH_TITLE_ENHANCE = False
-
-
 KB_INFO = {
     "samples": "Answers to issues about this project",
 }
@@ -71,10 +68,6 @@ kbs_config = {
 }
 
 text_splitter_dict = {
-    "ChineseRecursiveTextSplitter": {
-        "source": "huggingface",
-        "tokenizer_name_or_path": "",
-    },
     "SpacyTextSplitter": {
         "source": "huggingface",
         "tokenizer_name_or_path": "gpt2",
@@ -95,6 +88,6 @@ text_splitter_dict = {
     },
 }
 
-TEXT_SPLITTER_NAME = "ChineseRecursiveTextSplitter"
+TEXT_SPLITTER_NAME = "RecursiveCharacterTextSplitter"
 
 EMBEDDING_KEYWORD_FILE = "embedding_keywords.txt"

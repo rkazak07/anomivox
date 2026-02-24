@@ -65,7 +65,8 @@ async def chat(query: str = Body(..., description="User input", examples=["hello
             chat_prompt = ChatPromptTemplate.from_messages(
                 [i.to_msg_template() for i in history] + [input_msg])
         elif conversation_id and history_len > 0:
-            prompt = get_prompt_template("llm_chat", "with_history")
+            history_key = "with_history_tr" if prompt_name == "tr" else "with_history"
+            prompt = get_prompt_template("llm_chat", history_key)
             chat_prompt = PromptTemplate.from_template(prompt)
             memory = ConversationBufferDBMemory(conversation_id=conversation_id,
                                                 llm=model,

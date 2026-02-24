@@ -1,13 +1,3 @@
-/*
- * 声明.d.ts文件规范
- * 导出的类型以大写开头
- * 对象：config
- * 数组：options
- * 枚举：emu
- * 函数：Fn
- * 属性：props
- * 实例：instance
- * */
 
 /*router*/
 import type { RouteRecordRaw } from 'vue-router'

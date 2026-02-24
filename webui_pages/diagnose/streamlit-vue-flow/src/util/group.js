@@ -18,7 +18,7 @@ class BaseGroup extends Group {
 
     group.append(this._container);
 
-    // 添加文字
+    // Add text
     if (_.get(obj, 'options.text')) {
       group.append(`<span class="text">${obj.options.text}</span>`);
     }

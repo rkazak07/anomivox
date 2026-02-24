@@ -6,7 +6,7 @@ const install = (Vue)=>{
   Vue.component(ButterflyVueEndpoint.name, ButterflyVueEndpoint);
 }
 
-// 默认导出组件
+// Default export component
 export default {
   install,
   ButterflyVue,

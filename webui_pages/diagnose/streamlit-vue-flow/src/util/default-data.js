@@ -1,9 +1,9 @@
 const defaultOptions = {
-  disLinkable: false, // 可删除连线
-  linkable: false,    // 可连线
-  draggable: false,   // 可拖动
-  zoomable: false,    // 可放大
-  moveable: true,    // 可平移
+  disLinkable: false, // Can delete connections
+  linkable: false,    // Can create connections
+  draggable: false,   // Can drag
+  zoomable: false,    // Can zoom
+  moveable: true,    // Can move
   theme: {
     edge: {
       shapeType: 'AdvancedBezier'

@@ -10,9 +10,9 @@ export default (canvas, nodes = null) => {
 
     canvas.relayout = function (nodes) {
       if (nodes) {
-        // 自动布局
+        // Auto layout
         canvas._autoLayout({...canvas, nodes});
-        // 重置canvas.nodes的定位，用于re-layout.js的布局
+        // Reset canvas.nodes positioning for re-layout.js layout
         // eslint-disable-next-line @typescript-eslint/no-use-before-define
         resetCanvasNodesPosition(canvas, nodes);
       } else {

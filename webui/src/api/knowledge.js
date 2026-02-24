@@ -1,5 +1,8 @@
 import axiosReq from '@/utils/axios-req'
 import {fetchData} from "@/utils/fetchData";
+import { i18n } from '@/lang'
+
+const getPromptName = () => i18n.global.locale.value === 'tr' ? 'tr' : 'default'
 
 export const knowledgeListReq = () => {
   return axiosReq({
@@ -98,14 +101,14 @@ export const createKnowledgeBaseReq = (knowledgeBaseName, info, embedModel) => {
 export const chatReq = (query, conversationId, modelName, history, historyLen) => {
   return fetchData('chat/chat', {
     query, conversation_id: conversationId, model_name: modelName, history,
-    prompt_name: 'default', temperature: 0.7, max_tokens: 0, history_len: historyLen, stream: true
+    prompt_name: getPromptName(), temperature: 0.7, max_tokens: 0, history_len: historyLen, stream: true
   })
 }
 
 export const knowledgeChatReq = (query, ignoreCache, answerCache, knowledgeBaseName, modelName, history, historyLen) => {
   return fetchData('chat/knowledge_base_chat', {
     query, ignore_cache: ignoreCache, answer_cache: answerCache, knowledge_base_name: knowledgeBaseName,
-    model_name: modelName, history, prompt_name: 'default',
+    model_name: modelName, history, prompt_name: getPromptName(),
     temperature: 0.7, max_tokens: 0, top_k: 3, score_threshold: 0.5, history_len: historyLen, stream: true
   })
 }

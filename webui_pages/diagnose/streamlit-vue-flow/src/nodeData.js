@@ -2,10 +2,10 @@ import titleContentNode from './node/title-content-node';
 import agentGroupNode from './node/agent_group_node';
 import Edge from './util/edge';
 
-// 下: [0,1]
-// 上: [0,-1]
-// 右: [1,0]
-// 左: [-1,0]
+// Down: [0,1]
+// Up: [0,-1]
+// Right: [1,0]
+// Left: [-1,0]
 
 const data = {
   nodes: [
@@ -13,7 +13,7 @@ const data = {
       isRoot: true,
       id: 'A',
       userData: {
-        title: '初始化专家角色',
+        title: 'Initialize Expert Roles',
         content: '',
         isCompleted: false,
         isRuning: false,
@@ -32,7 +32,7 @@ const data = {
       id: 'B',
       isRoot: true,
       userData: {
-        title: '初始化诊断报告',
+        title: 'Initialize Diagnosis Report',
         content: '',
         isCompleted: false,
         isRuning: false,
@@ -54,7 +54,7 @@ const data = {
     {
       id: 'C',
       userData: {
-        title: '根据异常分配诊断专家',
+        title: 'Assign Diagnosis Experts by Anomaly',
         content: '',
         isCompleted: false,
         isRuning: false,
@@ -76,7 +76,7 @@ const data = {
     {
       id: 'D',
       userData: {
-        title: '专家诊断',
+        title: 'Expert Diagnosis',
         content: '',
         isCompleted: false,
         isRuning: false,
@@ -99,7 +99,7 @@ const data = {
     {
       id: 'E',
       userData: {
-        title: '圆桌讨论',
+        title: 'Roundtable Discussion',
         content: '',
         isCompleted: false,
         isRuning: false
@@ -121,7 +121,7 @@ const data = {
     {
       id: 'F',
       userData: {
-        title: '报告生成',
+        title: 'Generate Report',
         content: '',
         isCompleted: false,
         isRuning: false

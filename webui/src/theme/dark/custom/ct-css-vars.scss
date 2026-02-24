@@ -1,72 +1,78 @@
 html.dark {
   /*element-plus section */
-  --el-menu-active-color: #409eff;
-  --el-menu-text-color: #bfcbd9;
-  --el-menu-hover-text-color: var(--el-color-primary);
-  --el-menu-bg-color: #304156;
-  --el-menu-hover-bg-color: #263445;
+  --el-menu-active-color: #38BDF8;
+  --el-menu-text-color: #94A3B8;
+  --el-menu-hover-text-color: #F8FAFC;
+  --el-menu-bg-color: #0F172A;
+  --el-menu-hover-bg-color: #1E293B;
   --el-menu-item-height: 56px;
   --el-menu-border-color: none;
+  
   /*layout section*/
-  //layout
-  --layout-border-left-color: #ddd;
-  //Breadcrumb
-  --breadcrumb-no-redirect: #97a8be;
-  //Hamburger
-  --hamburger-color: #fff;
+  --layout-border-left-color: #334155;
+  --breadcrumb-no-redirect: #94A3B8;
+  --hamburger-color: #F8FAFC;
   --hamburger-width: 20px;
   --hamburger-height: 20px;
-  --el-text-color-primary: #fff;
+  --el-text-color-primary: #F8FAFC;
+  --el-text-color-regular: #CBD5E1;
+  --el-text-color-secondary: #94A3B8;
+  
   //Sidebar
   --sidebar-el-icon-size: 20px;
-  --sidebar-logo-background: #2b2f3a;
-  --sidebar-logo-color: #ff9901;
+  --sidebar-logo-background: #0F172A;
+  --sidebar-logo-color: #38BDF8;
   --sidebar-logo-width: 32px;
   --sidebar-logo-height: 32px;
-  --sidebar-logo-title-color: #fff;
+  --sidebar-logo-title-color: #F8FAFC;
   --side-bar-width: 210px;
-  --side-bar-border-right-color: #2b2f3a;
-  //TagsView
-  --tags-view-background: #304156;
-  --tags-view-border-bottom: #2b2f3a;
-  --tags-view-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 0 3px 0 rgba(0, 0, 0, 0.04);
-  --tags-view-item-background: #fff;
-  --tags-view-item-border-color: #d8dce5;
-  --tags-view-item-color: #495060;
-  --tag-view-height: 32px;
-  --tags-view-item-active-background: #42b983;
-  --tags-view-item-active-color: #fff;
-  --tags-view-item-active-border-color: #42b983;
-  --tags-view-contextmenu-background: #fff;
-  --tags-view-contextmenu-color: #333;
-  --tags-view-contextmenu-box-shadow: 2px 2px 3px 0 rgba(0, 0, 0, 0.3);
-  --tags-view-contextmenu-hover-background: #eee;
-  //close-icon
-  --tags-view-close-icon-hover-background: #b4bccc;
-  --tags-view-close-icon-hover-color: #fff;
+  --side-bar-border-right-color: #1E293B;
+  
   //AppMain.vue
   --app-main-padding: 10px;
-  --app-main-background: #304156;
+  --app-main-background: #0F172A;
+  
   //Navbar.vue
   --nav-bar-height: 50px;
-  --nav-bar-background: #2b2f3a;
-  --nav-bar-box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-  --nav-bar-right-menu-background: #2b2f3a;
+  --nav-bar-background: #1E293B;
+  --nav-bar-box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  --nav-bar-right-menu-background: #1E293B;
 
   //transition 动画
-  //侧边栏切换动画时长
   --sideBar-switch-duration: 0.2s;
-  //logo切换动画时长
-  --logo-switch-duration: 1s;
-  //页面动画时长
+  --logo-switch-duration: 0.5s;
   --page-transform-duration: 0.2s;
-  //面包屑导航动画时长
   --breadcrumb-change-duration: 0.2s;
 
   //进度条颜色
-  --pregress-bar-color: #409eff;
+  --pregress-bar-color: #38BDF8;
+  
   //背景
-  --body-background: #f2F2f2;
+  --body-background: #0F172A;
+  
   //border颜色
-  --border-color: #e4e7ed;
+  --border-color: #334155;
+  
+  // Element Plus Dark Mode Overrides
+  --el-color-primary: #38BDF8;
+  --el-color-primary-rgb: 56, 189, 248;
+  --el-color-primary-light-3: #7DD3FC;
+  --el-color-primary-light-5: #BAE6FD;
+  --el-color-primary-light-7: #E0F2FE;
+  --el-color-primary-light-9: rgba(56, 189, 248, 0.1);
+  --el-color-primary-dark-2: #0284C7;
+  
+  --el-bg-color: #1E293B;
+  --el-bg-color-page: #0F172A;
+  --el-bg-color-overlay: #1E293B;
+  --el-border-color: #334155;
+  --el-border-color-light: #475569;
+  --el-border-color-lighter: #475569;
+  --el-fill-color-blank: #1E293B;
+  --el-fill-color: #334155;
+  --el-fill-color-light: #334155;
+  --el-fill-color-lighter: #1E293B;
+  --el-mask-color: rgba(15, 23, 42, 0.8);
+  --el-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --el-box-shadow-light: 0 2px 4px -1px rgba(0, 0, 0, 0.3);
 }

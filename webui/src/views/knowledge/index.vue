@@ -1,7 +1,7 @@
 <template>
   <div class="columnSC" style="width: 100%">
     <div class="rowBC" style="padding: 20px; width: 100%">
-      <div style="font-size: 24px; color: #333333">{{ $t('KnowledgeListTitle') }}</div>
+      <div style="font-size: 24px; color: var(--el-text-color-primary)">{{ $t('KnowledgeListTitle') }}</div>
       <el-button size="default" plain type="primary" @click="onCreateKnowledgeClick">{{ $t('KnowledgeCreteButtonTitle') }}</el-button>
     </div>
     <div class="rowSC wrap knowledges-container" style="padding: 10px 20px; width: 100%">
@@ -21,7 +21,7 @@
         <div class="rowSC wrap">
           <div v-for="(vs_item, vs_index) in item.vs_types" :key="vs_index" style="margin-right: 16px">
             <el-tag size="small" style="margin-bottom: 5px">{{ vs_item.vs_type }}</el-tag>
-            <span style="color: #333333; margin: 0 2px">/</span>
+            <span style="color: var(--el-text-color-regular); margin: 0 2px">/</span>
             <el-tag size="small" style="margin-bottom: 5px">{{vs_item.file_count}} files</el-tag>
           </div>
         </div>
@@ -167,10 +167,10 @@ const onCreateClick = () => {
 .knowledge-container {
   flex: 1 1 280px;
   height: 140px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--el-border-color-light);
   border-radius: 16px;
   cursor: pointer;
-  background: white;
+  background: var(--el-bg-color);
   display: flex;
   flex-direction: column;
   padding: 16px;
@@ -178,13 +178,13 @@ const onCreateClick = () => {
 
   .title {
     font-size: 16px;
-    color: #0F172A;
+    color: var(--el-text-color-primary);
     font-weight: 600;
   }
 
   .desc {
     font-size: 13px;
-    color: #64748B;
+    color: var(--el-text-color-secondary);
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;

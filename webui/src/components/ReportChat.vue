@@ -79,9 +79,9 @@ const dealMessage = (index) => {
         <div class="text-item left">
             <div style="display: flex; flex-direction: row; align-items: center; margin-bottom: 10px">
               <div class="face">${message.sender.slice(0, 1)}</div>
-              <div style="font-size: 1rem; color: #333333; margin-bottom: 5px">
+              <div style="font-size: 1rem; color: var(--el-text-color-primary); margin-bottom: 5px">
                 ${message.sender}
-                <span style="margin-left: 5px; color: #666666">${message.time}</span>
+                <span style="margin-left: 5px; color: var(--el-text-color-secondary)">${message.time}</span>
               </div>
             </div>
           <div style="display: flex; flex-direction: column">
@@ -127,23 +127,23 @@ const dealMessage = (index) => {
     line-height: 40px;
     border-radius: 40px;
     margin-right: 12px;
-    background-color: #ffffff;
+    background-color: var(--el-bg-color);
     text-align: center;
-    color: #0F172A;
+    color: var(--el-text-color-primary);
     font-size: 20px;
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .content {
-    color: #1E293B;
+    color: var(--el-text-color-primary);
     font-size: 14px;
     min-height: 20px;
     border-radius: 12px;
     padding: 16px 20px;
     line-height: 1.6;
-    background-color: #F8FAFC;
-    border: 1px solid var(--border-color);
+    background-color: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-light);
     word-break: break-all;
     word-wrap: break-word;
     position: relative;
@@ -171,7 +171,7 @@ const dealMessage = (index) => {
   }
 
   .time {
-    color: #64748B;
+    color: var(--el-text-color-secondary);
     font-size: 12px;
     text-align: center;
     margin-bottom: 10px;
@@ -182,7 +182,7 @@ const dealMessage = (index) => {
     justify-content: center;
     margin-bottom: 10px;
     font-size: 15px;
-    color: #94A3B8;
+    color: var(--el-text-color-secondary);
   }
 }
 </style>

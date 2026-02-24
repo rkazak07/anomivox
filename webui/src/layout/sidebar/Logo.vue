@@ -99,16 +99,13 @@ const { title } = toRefs(state)
   .sidebar-title {
     display: inline-block;
     margin: 0;
-    color: #0F172A;
+    color: var(--sidebar-logo-title-color, #0F172A);
     font-weight: 800;
     line-height: 60px;
     font-size: 22px;
     letter-spacing: -0.5px;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     white-space: nowrap;
-    background: linear-gradient(135deg, #0F172A 0%, #334155 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
   }
 }
 

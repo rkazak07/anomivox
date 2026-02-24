@@ -68,4 +68,13 @@ html.lighting-theme {
   --body-background: #f2F2f2;
   //border颜色
   --border-color: #e4e7ed;
+  
+  // Element Plus Light Mode Overrides
+  --el-color-primary: #0284C7;
+  --el-color-primary-rgb: 2, 132, 199;
+  --el-color-primary-light-3: #38BDF8;
+  --el-color-primary-light-5: #7DD3FC;
+  --el-color-primary-light-7: #BAE6FD;
+  --el-color-primary-light-9: #F0F9FF;
+  --el-color-primary-dark-2: #0369A1;
 }

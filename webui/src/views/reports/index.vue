@@ -38,7 +38,7 @@
             v-for="(item, index) in historyMessages"
             :key="index"
             class="diagnose-item columnSS"
-            style="background: RGBA(255, 255, 255, 1.00);"
+            style="background: var(--el-bg-color);"
         >
           <div class="rowBC w-full">
             <div class="rowSC w-full">
@@ -46,9 +46,9 @@
                 <div :style="severityStyle[alert_item.alert_level]">
                   [{{ alert_item.alert_level }}{{ alert_item.alert_level !== 'INFO' ? '🔥' : '' }}]
                 </div>
-                <div style="color: #666666; margin-left: 5px">{{ alert_item.alert_name }}</div>
+                <div style="color: var(--el-text-color-regular); margin-left: 5px">{{ alert_item.alert_name }}</div>
               </div>
-              <div style="color: #999999; font-size: 12px; height: 12px; line-height: 12px; margin-top: 4px">{{ item.time }}</div>
+              <div style="color: var(--el-text-color-secondary); font-size: 12px; height: 12px; line-height: 12px; margin-top: 4px">{{ item.time }}</div>
             </div>
             <div class="rowSC">
               <el-button type="success" size="small" style="margin:0 10px" @click="onReviewClick(item)">{{ $t('playbackButton') }}<i
@@ -69,7 +69,7 @@
               arrow="always"
               direction="horizontal"
               height="260"
-              style="background: RGBA(255, 255, 255, 1.00); padding: 10px; margin: 10px; border-radius: 8px; width: 100%"
+              style="background: var(--el-bg-color); padding: 10px; margin: 10px; border-radius: 8px; width: 100%"
               motion-blur
           >
             <el-carousel-item v-for="(chartItem, chartIndex) in charts" :key="chartIndex">
@@ -82,10 +82,10 @@
     <div
         v-loading="openReportLoading"
         class="relative columnSS"
-        style="overflow-y: scroll; height: 100vh; overflow-x: hidden; width: 45%; background: RGBA(255, 255, 255, 1.00);"
+        style="overflow-y: scroll; height: 100vh; overflow-x: hidden; width: 45%; background: var(--el-bg-color);"
     >
       <div
-          style="background-color: white; padding: 10px; margin: 10px; border-radius: 8px;"
+          style="background-color: var(--el-bg-color); padding: 10px; margin: 10px; border-radius: 8px;"
           v-html="openReportContent"
       />
     </div>
@@ -113,7 +113,7 @@
               @scroll="stepScrollEvent"
           >
             <div class="review-step">
-              <div style="height: 40px; line-height: 40px; color: #333333; font-weight: bold; font-size: 18px">
+              <div style="height: 40px; line-height: 40px; color: var(--el-text-color-primary); font-weight: bold; font-size: 18px">
                 1.{{ $t('setpTip1') }}
               </div>
               <div class="rowSS c-align-items-center" style="height: calc(100% - 40px)">
@@ -219,7 +219,7 @@
             </div>
 
             <div class="review-step">
-              <span style="height: 40px; line-height: 40px; color: #333333; font-weight: bold; margin: 10px 0; font-size: 18px">
+              <span style="height: 40px; line-height: 40px; color: var(--el-text-color-primary); font-weight: bold; margin: 10px 0; font-size: 18px">
                 2.{{ $t('setpTip2') }}
               </span>
               <report-chat
@@ -234,8 +234,8 @@
             </div>
 
             <div class="review-step" style="margin-top: 30px">
-              <span style="height: 40px; line-height: 40px; color: #333333; font-weight: bold; font-size: 18px">3.{{ $t('setpTip3') }}</span>
-              <div style="width: 100%; padding: 10px; background-color: RGBA(242, 246, 255, 1); border-radius: 8px" v-html="reportContent"/>
+              <span style="height: 40px; line-height: 40px; color: var(--el-text-color-primary); font-weight: bold; font-size: 18px">3.{{ $t('setpTip3') }}</span>
+              <div style="width: 100%; padding: 10px; background-color: var(--el-fill-color-light); border-radius: 8px" v-html="reportContent"/>
             </div>
           </div>
         </transition>
@@ -575,7 +575,7 @@ const stepScrollEvent = () => {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  color: #333;
+  color: var(--el-text-color-primary);
   font-weight: bold;
 }
 
@@ -612,7 +612,7 @@ table td {
   line-height: 1.5;
   text-align: left;
   vertical-align: top;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--el-border-color-light);
 }
 
 table th {
@@ -625,8 +625,8 @@ table colgroup + thead tr:first-child th,
 table colgroup + thead tr:first-child td,
 table thead:first-child tr:first-child th,
 table thead:first-child tr:first-child td {
-  border: 1px solid #e1e1e1;
-  background-color: #f5f5f5;
+  border: 1px solid var(--el-border-color-light);
+  background-color: var(--el-fill-color-light);
 }
 
 .el-carousel__button {
@@ -643,7 +643,7 @@ table thead:first-child tr:first-child td {
 
 .chat-container {
   overflow-y: scroll;
-  background: RGBA(242, 246, 255, 1.00);
+  background: var(--el-fill-color-light);
   border-radius: 12px;
   flex-shrink: 0
 }
@@ -671,18 +671,18 @@ table thead:first-child tr:first-child td {
   border-radius: 16px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
-  background: #FFFFFF !important;
-  border: 1px solid var(--border-color);
+  background: var(--el-bg-color) !important;
+  border: 1px solid var(--el-border-color-light);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 
   &:hover {
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
     transform: translateY(-2px);
-    border-color: #BAE6FD;
+    border-color: var(--el-color-primary-light-5);
   }
 
   .title {
-    color: #0F172A;
+    color: var(--el-text-color-primary);
     font-size: 16px;
     font-weight: 600;
   }

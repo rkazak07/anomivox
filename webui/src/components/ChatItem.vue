@@ -61,7 +61,7 @@ const htmlContent = computed(() => {
 }
 
 .content {
-  color: #333333;
+  color: var(--el-text-color-primary);
   font-size: 14px;
   min-height: 20px;
   border-radius: 16px;
@@ -79,9 +79,9 @@ const htmlContent = computed(() => {
   margin: 0 10px;
   .face {}
   .content {
-    color: #1E293B;
-    background: #F8FAFC;
-    border: 1px solid var(--border-color);
+    color: var(--el-text-color-primary);
+    background: var(--el-fill-color-light);
+    border: 1px solid var(--el-border-color-light);
     border-radius: 4px 16px 16px 16px;
   }
 }

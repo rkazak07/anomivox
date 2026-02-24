@@ -133,16 +133,16 @@ const onContinueClick = () => {
   width: 100%;
   flex-shrink: 1;
   border-radius: 30px;
-  background: white;
+  background: var(--el-bg-color);
   overflow: hidden;
   padding: 10px 20px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--el-border-color-light);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
 
   &:focus-within {
     box-shadow: 0 4px 16px rgba(2, 132, 199, 0.15);
-    border-color: #38BDF8;
+    border-color: var(--el-color-primary);
   }
 }
 

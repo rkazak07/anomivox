@@ -22,7 +22,7 @@
       </div>
       <template v-if="!fold">
         <div v-for="(item, index) in messageMarkdownDatas" :key="index" class="text-item columnSS">
-          <span v-if="item.time" style="font-size: 1rem; color: #666666; margin-bottom: 5px; margin-left: 5px; ">
+          <span v-if="item.time" style="font-size: 1rem; color: var(--el-text-color-secondary); margin-bottom: 5px; margin-left: 5px; ">
             {{ item.time }}
           </span>
           <div class="relative content columnSS">
@@ -133,10 +133,10 @@ const onEditClick = (item) => {
   position: relative;
   padding-bottom: 20px;
   width: 100%;
-  background: #ffffff;
+  background: var(--el-bg-color);
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--el-border-color-light);
   margin-bottom: 16px;
 
   .message-header {
@@ -158,14 +158,14 @@ const onEditClick = (item) => {
     position: relative;
 
     .content {
-      color: #1E293B;
+      color: var(--el-text-color-primary);
       font-size: 14px;
       min-height: 20px;
       border-radius: 12px;
       padding: 16px 20px;
       line-height: 1.6;
-      background-color: #F8FAFC;
-      border: 1px solid var(--border-color);
+      background-color: var(--el-fill-color-light);
+      border: 1px solid var(--el-border-color-light);
       word-break: break-all;
       word-wrap: break-word;
       position: relative;
@@ -178,7 +178,7 @@ const onEditClick = (item) => {
         justify-content: flex-end;
         margin-top: 12px;
         padding-top: 12px;
-        border-top: 1px solid var(--border-color);
+        border-top: 1px solid var(--el-border-color-light);
 
         .edit {
           cursor: pointer;
@@ -193,7 +193,7 @@ const onEditClick = (item) => {
   }
 
   .time {
-    color: #64748B;
+    color: var(--el-text-color-secondary);
     font-size: 12px;
     text-align: center;
     margin-bottom: 10px;
@@ -204,7 +204,7 @@ const onEditClick = (item) => {
     justify-content: center;
     margin-bottom: 10px;
     font-size: 15px;
-    color: #94A3B8;
+    color: var(--el-text-color-secondary);
   }
 
   .face {
@@ -213,9 +213,9 @@ const onEditClick = (item) => {
     line-height: 40px;
     border-radius: 40px;
     margin-right: 12px;
-    background-color: #ffffff;
+    background-color: var(--el-bg-color);
     text-align: center;
-    color: #0F172A;
+    color: var(--el-text-color-primary);
     font-size: 20px;
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);

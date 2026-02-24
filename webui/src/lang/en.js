@@ -61,7 +61,7 @@ export default {
   stop: 'Stop',
   stopSuccessfully: 'Stop Successfully!',
   router: {
-    Chat: 'LLM Chat',
+    Chat: 'AI Chat',
     Knowledge: 'Knowledge Base',
     KnowledgeChat: 'Knowledge Chat',
     DatabaseChat: 'Database',

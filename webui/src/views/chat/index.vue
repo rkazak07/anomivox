@@ -191,21 +191,21 @@ const onSendClick = (value) => {
 .chat-container {
   height: calc(100vh - 48px);
   overflow: hidden;
-  background: #FFFFFF;
+  background: var(--el-bg-color);
   border-radius: 16px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--border-color);
+  box-shadow: var(--el-box-shadow-light);
+  border: 1px solid var(--el-border-color-light);
 
   .header {
     width: 100%;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--el-border-color-light);
     display: flex;
     align-items: center;
     padding: 16px 24px;
     flex-wrap: wrap;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     grid-gap: 12px 24px;
-    background: #F8FAFC;
+    background: var(--el-fill-color-light);
     border-top-left-radius: 16px;
     border-top-right-radius: 16px;
     
@@ -216,7 +216,7 @@ const onSendClick = (value) => {
       
       span {
         font-weight: 500;
-        color: #475569 !important;
+        color: var(--el-text-color-regular) !important;
       }
     }
   }

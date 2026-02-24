@@ -106,9 +106,9 @@ const isActived = computed(() => {
   }
 }
 .sidebar-item-active {
-  background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%) !important;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
-  border: 1px solid #BAE6FD;
+  background: var(--el-color-primary-light-9) !important;
+  box-shadow: 0 4px 12px rgba(var(--el-color-primary-rgb), 0.15);
+  border: 1px solid var(--el-color-primary-light-7);
   
   span {
     color: var(--el-menu-active-color);

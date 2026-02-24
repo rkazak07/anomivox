@@ -11,13 +11,21 @@
     </div>
 
     <div class="columnCC">
-      <div class="columnCC"
-           style="margin-bottom: 16px; cursor: pointer; background: #F1F5F9; padding: 8px; border-radius: 12px; transition: all 0.3s ease;"
-           @click="onThemeClick"
-           onmouseover="this.style.background='#E2E8F0'"
-           onmouseout="this.style.background='#F1F5F9'">
-        <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="14888" width="24" height="24">
-          <path d="M298.35 84.69h427.3a213.65 213.65 0 0 1 213.66 213.66v427.3a213.65 213.65 0 0 1-213.66 213.66H298.34A213.65 213.65 0 0 1 84.69 725.66V298.35A213.66 213.66 0 0 1 298.35 84.69z" fill="#E2E8F0" p-id="14889"/><path d="M792 504.56l-1.34 0.05C777.09 368.79 662.9 262.74 524 262.74c-144.77 0-262.71 115.19-267.82 259.21h23.91l-24 0.81c-3.76 125 67.29 236.09 201.55 273s112.74-61.85 100.78-69.09-20.39-26.83-9.83-49.35 19.64-21.31 68.82-22.21C750.85 657.28 782.39 562 789.75 522h2.06c-0.12-3.29-0.31-6.57-0.54-9.83 0.58-4.83 0.73-7.61 0.73-7.61z m-434 29.65a48.1 48.1 0 1 1 47.84-48.1 48 48 0 0 1-47.84 48.1z m88.6-116.07a48 48 0 1 1 47.95-48 48 48 0 0 1-47.93 48z m150 2.53a48.1 48.1 0 1 1 47.85-48.1 48 48 0 0 1-47.85 48.1z m93.26 113.54a48.1 48.1 0 1 1 47.95-48.1 48 48 0 0 1-47.95 48.1z" fill="#0284C7" p-id="14890"/></svg>
+      <div class="theme-toggle" @click="onThemeClick">
+        <svg v-if="currentTheme === 'lighting-theme'" class="icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <svg v-else class="icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
       </div>
       <div class="columnCC" style="padding-bottom: 24px;">
         <div class="lang-toggle" @click="onLanguageClick">
@@ -42,13 +50,15 @@ const { allRoutes } = storeToRefs(useBasicStore())
 const routeInstance = useRoute()
 let useConfigStore = reactive({})
 const currentLang = ref('tr')
+const currentTheme = ref('lighting-theme')
 
-const themeList = ['lighting-theme', 'china-red']
+const themeList = ['lighting-theme', 'dark']
 
 setTimeout(() => {
   import('@/store/config').then((res) => {
     useConfigStore = res.useConfigStore
     currentLang.value = useConfigStore().language
+    currentTheme.value = useConfigStore().theme
   })
 }, 300)
 
@@ -69,8 +79,10 @@ const onLanguageClick = () => {
 }
 const onThemeClick = () => {
   const { theme, setTheme } = useConfigStore()
-  setTheme(themeList[(themeList.indexOf(theme) + 1) % themeList.length])
-  console.log('change theme:', theme)
+  const newTheme = themeList[(themeList.indexOf(theme) + 1) % themeList.length]
+  setTheme(newTheme)
+  currentTheme.value = newTheme
+  console.log('change theme:', newTheme)
 }
 
 </script>
@@ -84,29 +96,47 @@ const onThemeClick = () => {
   background-color: var(--el-menu-bg-color);
 }
 
+.theme-toggle {
+  margin-bottom: 16px;
+  cursor: pointer;
+  background: var(--el-fill-color-light, #F1F5F9);
+  padding: 8px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  color: var(--el-text-color-regular, #64748B);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background: var(--el-fill-color, #E2E8F0);
+    color: var(--el-color-primary, #0284C7);
+  }
+}
+
 .lang-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F1F5F9;
+  background: var(--el-fill-color-light, #F1F5F9);
   padding: 8px 16px;
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: #64748B;
+  color: var(--el-text-color-regular, #64748B);
   font-weight: 600;
   font-size: 14px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--el-border-color-light, #E2E8F0);
   
   &:hover {
-    background: #E2E8F0;
-    color: #0F172A;
+    background: var(--el-fill-color, #E2E8F0);
+    color: var(--el-text-color-primary, #0F172A);
   }
 
   span {
     transition: color 0.3s ease;
     &.active {
-      color: #0284C7;
+      color: var(--el-color-primary, #0284C7);
     }
   }
 

@@ -32,7 +32,7 @@ resizeHandler()
   position: relative;
   border-radius: 15px;
   overflow: auto;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--el-border-color-light);
 }
 .sidebar-container {
   transition: width var(--sideBar-switch-duration);

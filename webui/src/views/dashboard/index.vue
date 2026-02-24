@@ -1,9 +1,7 @@
 <template>
   <div class="scroll-y">
     <div class="mt-10px mb-10px font-bold">switch theme</div>
-    <el-button @click="setTheme('base-theme')">base-theme(default)</el-button>
     <el-button @click="setTheme('lighting-theme')">lighting-theme</el-button>
-    <el-button @click="setTheme('china-red')">china-red(default)</el-button>
     <el-button @click="setTheme('dark')">dark-theme</el-button>
 
     <div class="mt-10px mb-10px font-bold">switch size</div>

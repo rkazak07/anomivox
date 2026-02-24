@@ -61,7 +61,7 @@ export default {
   stop: 'Durdur',
   stopSuccessfully: 'Başarıyla Durduruldu!',
   router: {
-    Chat: 'LLM Sohbet',
+    Chat: 'AI Sohbet',
     Knowledge: 'Bilgi Tabanı',
     KnowledgeChat: 'Bilgi Tabanı Sohbet',
     DatabaseChat: 'Veritabanı',

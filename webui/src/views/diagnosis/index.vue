@@ -1,7 +1,7 @@
 <template>
   <div style="height: calc(100vh - 30px)">
-    <el-container style="height: 100%; background: #F8FAFC;">
-      <el-aside width="240px" style="border-right: 1px solid var(--border-color); height: 100%; background: #FFFFFF;">
+        <el-container style="height: 100%; background: var(--el-fill-color-light);">
+      <el-aside width="240px" style="border-right: 1px solid var(--el-border-color-light); height: 100%; background: var(--el-bg-color);">
         <div class="columnSS" style="width: 100%; margin-top: 20px; padding: 16px">
           <div class="rowBC" style="margin: 0 0 10px 10px; width: calc(100% - 20px)">
             <div style="font-weight: bold; font-size: 20px; ">{{ $t('Diagnosis') }}</div>
@@ -95,7 +95,7 @@
               <DiagnosisOneChat :sender="diagnoseData?.reportGeneration?.sender" :can-fold="false" :messages="diagnoseData?.reportGeneration?.messages" @edit-click="onEditClick"/>
             </template>
             <template v-if="activeIndex === 'reportDemonstration'">
-              <div style="padding: 20px; background: #f2f2f2; border-radius: 8px" v-html="reportContent"/>
+              <div style="padding: 20px; background: var(--el-fill-color-light); border-radius: 8px" v-html="reportContent"/>
             </template>
           </div>
           <DiagnosisInputContainer
@@ -307,18 +307,18 @@ const onStopDiagnoseClick = () => {
 //}
 
 .upload-disabled {
-  background: #e2e2e2;
+  background: var(--el-fill-color-darker);
 }
 
 .output {
   font-size: 14px;
-  color: #ffffff;
+  color: var(--el-text-color-primary);
   white-space: pre-wrap;
   word-break: break-all;
 
   h1, h2, h3, h4, h5, h6 {
     font-size: 14px;
-    color: #ffffff;
+    color: var(--el-text-color-primary);
   }
 }
 </style>
@@ -332,8 +332,8 @@ const onStopDiagnoseClick = () => {
   border-radius: 16px;
   cursor: pointer;
   border: 1px solid transparent;
-  color: #64748B;
-  background: #FFFFFF;
+  color: var(--el-text-color-regular);
+  background: var(--el-bg-color);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
@@ -343,10 +343,10 @@ const onStopDiagnoseClick = () => {
   }
 
   &:hover {
-    background: #F8FAFC;
+    background: var(--el-fill-color-light);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    color: #0F172A;
+    color: var(--el-text-color-primary);
   }
 
   &.active {

@@ -97,7 +97,7 @@ export const settings = {
    *  default theme
    * base-theme/lighting-theme/dark-theme
    * */
-  defaultTheme: 'base-theme',
+  defaultTheme: 'lighting-theme',
   /*
    * setting default defaultSize
    * large / default /small

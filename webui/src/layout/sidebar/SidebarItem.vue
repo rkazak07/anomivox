@@ -75,16 +75,18 @@ const isActived = computed(() => {
   align-items: center;
   cursor: pointer;
   flex-direction: column;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   margin-bottom: 16px;
-  width: 72px;
-  height: 72px;
-  border-radius: 12px;
+  width: 76px;
+  height: 76px;
+  border-radius: 16px;
   background-color: transparent;
+  justify-content: center;
   
   &:hover {
     background-color: var(--el-menu-hover-bg-color);
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     
     span {
       color: var(--el-menu-hover-text-color);
@@ -100,16 +102,20 @@ const isActived = computed(() => {
     text-align: center;
     font-weight: 500;
     transition: color 0.3s ease;
-    margin-top: -4px;
+    margin-top: 4px;
   }
 }
 .sidebar-item-active {
-  background-color: var(--el-menu-hover-bg-color) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%) !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  border: 1px solid #BAE6FD;
   
   span {
     color: var(--el-menu-active-color);
-    font-weight: 600;
+    font-weight: 700;
+  }
+  .el-icon {
+    color: var(--el-menu-active-color) !important;
   }
 }
 </style>

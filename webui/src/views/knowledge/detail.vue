@@ -1,8 +1,8 @@
 <template>
   <div style="height: calc(100vh - 30px)">
-    <el-container style="height: 100%">
-      <el-aside width="200px" style="border-right: 1px solid var(--border-color); height: 100%;">
-        <div class="columnSS" style="width: 100%; padding: 10px;">
+    <el-container style="height: 100%; background: #F8FAFC;">
+      <el-aside width="240px" style="border-right: 1px solid var(--border-color); height: 100%; background: #FFFFFF;">
+        <div class="columnSS" style="width: 100%; padding: 16px;">
           <div class="rowSC">
             <el-button icon="ArrowLeftBold" type="primary" plain circle size="default" @click="routerBack()"/>
             <span style="font-weight: bold; font-size: 20px; margin-left: 10px">{{ $route.query.kb_name }}</span>
@@ -365,29 +365,32 @@ const routerBack = () => {
 .menu-item {
   width: 100%;
   margin-bottom: 12px;
-  padding: 12px 16px;
-  border-radius: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
   cursor: pointer;
   border: 1px solid transparent;
-  color: #475569;
-  background: #f8fafc;
-  transition: all 0.3s ease;
-  font-weight: 500;
+  color: #64748B;
+  background: #FFFFFF;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 
   .el-icon {
     margin-right: 10px;
   }
 
   &:hover {
-    background: #f1f5f9;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background: #F8FAFC;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    color: #0F172A;
   }
 
   &.active {
-    background: var(--el-color-primary);
+    background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
     color: white;
-    box-shadow: 0 4px 12px rgba(var(--el-color-primary-rgb), 0.3);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+    border: none;
   }
 }
 

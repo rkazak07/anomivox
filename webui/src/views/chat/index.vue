@@ -189,27 +189,45 @@ const onSendClick = (value) => {
 
 <style lang="scss" scoped>
 .chat-container {
-  height: calc(100vh - 40px);
+  height: calc(100vh - 48px);
   overflow: hidden;
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--border-color);
 
   .header {
     width: 100%;
-    border-bottom: 1px solid #eeeeee;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
-    padding: 10px 20px;
+    padding: 16px 24px;
     flex-wrap: wrap;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    grid-gap: 10px 20px;
+    grid-gap: 12px 24px;
+    background: #F8FAFC;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    
+    .header-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      
+      span {
+        font-weight: 500;
+        color: #475569 !important;
+      }
+    }
   }
 
   .messages-container {
-    height: calc(100vh - 160px);
+    height: calc(100vh - 180px);
     width: 100%;
     flex-shrink: 1;
     background: transparent;
     overflow-y: auto;
-    padding-bottom: 20px;
+    padding: 20px;
   }
 }
 </style>

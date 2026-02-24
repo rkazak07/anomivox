@@ -64,23 +64,25 @@ const htmlContent = computed(() => {
   color: #333333;
   font-size: 14px;
   min-height: 20px;
-  border-radius: 10px;
-  padding: 0 15px;
-  line-height: 1.4;
+  border-radius: 16px;
+  padding: 12px 20px;
+  line-height: 1.6;
   word-break: break-all;
   word-wrap: break-word;
   position: relative;
-  margin-top: 5px;
-  box-shadow: 0 0 5px 5px rgba(0, 0, 0, 0.06);;
+  margin-top: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
 }
 
 .left {
   margin: 0 10px;
   .face {}
   .content {
-    color: #333333;
-    border: 1px solid #eeeeee;
-    border-radius: 0 10px 10px 10px;
+    color: #1E293B;
+    background: #F8FAFC;
+    border: 1px solid var(--border-color);
+    border-radius: 4px 16px 16px 16px;
   }
 }
 
@@ -89,10 +91,11 @@ const htmlContent = computed(() => {
   flex-direction: row-reverse;
   .face {}
   .content {
-    color: #41b584;
-    background-color: #ecf8f3;
-    border: 1px solid #41b584;
-    border-radius: 10px 0 10px 10px;
+    color: #FFFFFF;
+    background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
+    border: none;
+    border-radius: 16px 4px 16px 16px;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
   }
 }
 

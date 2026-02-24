@@ -12,13 +12,14 @@
 
     <div class="columnCC">
       <div class="columnCC"
-           style="margin-bottom: 10px; cursor: pointer; background: RGBA(232, 231, 230, 1.00); padding: 2px; border-radius: 8px"
-           @click="onThemeClick">
-        <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="14888" width="40"
-             height="40">
-          <path d="M298.35 84.69h427.3a213.65 213.65 0 0 1 213.66 213.66v427.3a213.65 213.65 0 0 1-213.66 213.66H298.34A213.65 213.65 0 0 1 84.69 725.66V298.35A213.66 213.66 0 0 1 298.35 84.69z" fill="#E8E7E6" p-id="14889"/><path d="M792 504.56l-1.34 0.05C777.09 368.79 662.9 262.74 524 262.74c-144.77 0-262.71 115.19-267.82 259.21h23.91l-24 0.81c-3.76 125 67.29 236.09 201.55 273s112.74-61.85 100.78-69.09-20.39-26.83-9.83-49.35 19.64-21.31 68.82-22.21C750.85 657.28 782.39 562 789.75 522h2.06c-0.12-3.29-0.31-6.57-0.54-9.83 0.58-4.83 0.73-7.61 0.73-7.61z m-434 29.65a48.1 48.1 0 1 1 47.84-48.1 48 48 0 0 1-47.84 48.1z m88.6-116.07a48 48 0 1 1 47.95-48 48 48 0 0 1-47.93 48z m150 2.53a48.1 48.1 0 1 1 47.85-48.1 48 48 0 0 1-47.85 48.1z m93.26 113.54a48.1 48.1 0 1 1 47.95-48.1 48 48 0 0 1-47.95 48.1z" fill="#DD4F47" p-id="14890"/></svg>
+           style="margin-bottom: 16px; cursor: pointer; background: #F1F5F9; padding: 8px; border-radius: 12px; transition: all 0.3s ease;"
+           @click="onThemeClick"
+           onmouseover="this.style.background='#E2E8F0'"
+           onmouseout="this.style.background='#F1F5F9'">
+        <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="14888" width="24" height="24">
+          <path d="M298.35 84.69h427.3a213.65 213.65 0 0 1 213.66 213.66v427.3a213.65 213.65 0 0 1-213.66 213.66H298.34A213.65 213.65 0 0 1 84.69 725.66V298.35A213.66 213.66 0 0 1 298.35 84.69z" fill="#E2E8F0" p-id="14889"/><path d="M792 504.56l-1.34 0.05C777.09 368.79 662.9 262.74 524 262.74c-144.77 0-262.71 115.19-267.82 259.21h23.91l-24 0.81c-3.76 125 67.29 236.09 201.55 273s112.74-61.85 100.78-69.09-20.39-26.83-9.83-49.35 19.64-21.31 68.82-22.21C750.85 657.28 782.39 562 789.75 522h2.06c-0.12-3.29-0.31-6.57-0.54-9.83 0.58-4.83 0.73-7.61 0.73-7.61z m-434 29.65a48.1 48.1 0 1 1 47.84-48.1 48 48 0 0 1-47.84 48.1z m88.6-116.07a48 48 0 1 1 47.95-48 48 48 0 0 1-47.93 48z m150 2.53a48.1 48.1 0 1 1 47.85-48.1 48 48 0 0 1-47.85 48.1z m93.26 113.54a48.1 48.1 0 1 1 47.95-48.1 48 48 0 0 1-47.95 48.1z" fill="#0284C7" p-id="14890"/></svg>
       </div>
-      <div class="columnCC" style="padding-bottom: 20px;">
+      <div class="columnCC" style="padding-bottom: 24px;">
         <div class="lang-toggle" @click="onLanguageClick">
           <span :class="{ active: currentLang === 'en' }">EN</span>
           <span class="divider">/</span>
@@ -87,24 +88,25 @@ const onThemeClick = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
+  background: #F1F5F9;
   padding: 8px 16px;
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: #a3b1c6;
+  color: #64748B;
   font-weight: 600;
   font-size: 14px;
+  border: 1px solid #E2E8F0;
   
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
+    background: #E2E8F0;
+    color: #0F172A;
   }
 
   span {
     transition: color 0.3s ease;
     &.active {
-      color: #38bdf8;
+      color: #0284C7;
     }
   }
 

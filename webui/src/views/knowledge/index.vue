@@ -152,44 +152,46 @@ const onCreateClick = () => {
 
 <style>
 .knowledge-container:hover {
-  box-shadow: 0 0 5px 5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
   border-color: var(--el-color-primary);
+  transform: translateY(-2px);
 }
 
 .knowledges-container {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  grid-gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-gap: 20px;
 }
 </style>
 
 <style lang="scss">
 .knowledge-container {
-  flex: 1 1 200px;
-  height: 130px;
-  border: 1.5px solid var(--border-color);
-  border-radius: 8px;
+  flex: 1 1 280px;
+  height: 140px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
   cursor: pointer;
   background: white;
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  padding: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   .title {
     font-size: 16px;
-    color: #333333;
+    color: #0F172A;
+    font-weight: 600;
   }
 
   .desc {
-    font-size: 14px;
-    color: #666666;
+    font-size: 13px;
+    color: #64748B;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
-    margin: 10px 0;
+    margin: 12px 0;
     flex-shrink: 0;
+    line-height: 1.5;
   }
 }
-
-
 </style>

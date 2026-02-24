@@ -127,25 +127,29 @@ const onEditClick = (item) => {
 }
 
 .scroll-container {
-  transition: all 0.1s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
   padding-bottom: 20px;
   width: 100%;
   background: #ffffff;
-  border-radius: 8px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+  margin-bottom: 16px;
 
   .message-header {
     position: sticky;
     top: 0;
     width: 100%;
     z-index: 10;
-    padding: 5px 10px;
+    padding: 12px 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   }
 
   .text-item {
-    margin: 20px 10px;
+    margin: 20px;
     align-items: flex-start;
     justify-content: flex-start;
     word-break: break-all;
@@ -154,22 +158,27 @@ const onEditClick = (item) => {
     position: relative;
 
     .content {
-      color: #333333;
+      color: #1E293B;
       font-size: 14px;
       min-height: 20px;
-      border-radius: 8px;
-      padding: 6px 12px;
-      line-height: 20px;
-      background-color: #f4f4f4;
+      border-radius: 12px;
+      padding: 16px 20px;
+      line-height: 1.6;
+      background-color: #F8FAFC;
+      border: 1px solid var(--border-color);
       word-break: break-all;
       word-wrap: break-word;
       position: relative;
+      width: 100%;
 
       .footer {
         width: 100%;
         display: flex;
         flex-direction: row;
         justify-content: flex-end;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border-color);
 
         .edit {
           cursor: pointer;
@@ -184,7 +193,7 @@ const onEditClick = (item) => {
   }
 
   .time {
-    color: #666;
+    color: #64748B;
     font-size: 12px;
     text-align: center;
     margin-bottom: 10px;
@@ -195,7 +204,7 @@ const onEditClick = (item) => {
     justify-content: center;
     margin-bottom: 10px;
     font-size: 15px;
-    color: #9d9d9d;
+    color: #94A3B8;
   }
 
   .face {
@@ -203,13 +212,13 @@ const onEditClick = (item) => {
     height: 40px;
     line-height: 40px;
     border-radius: 40px;
-    margin-right: 7px;
+    margin-right: 12px;
     background-color: #ffffff;
     text-align: center;
-    color: #333333;
-    font-size: 24px;
-    font-weight: bold;
-    box-shadow: 0 0 5px 5px rgba(0, 0, 0, 0.1);
+    color: #0F172A;
+    font-size: 20px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 }
 </style>

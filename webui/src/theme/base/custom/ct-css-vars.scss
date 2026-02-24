@@ -1,68 +1,68 @@
 html.base-theme {
   /*element-plus section */
-  --el-menu-active-color: #ffffff;
-  --el-menu-text-color: #a3b1c6;
-  --el-menu-hover-text-color: #ffffff;
-  --el-menu-bg-color: #1e293b;
-  --el-menu-hover-bg-color: #334155;
+  --el-menu-active-color: #38BDF8;
+  --el-menu-text-color: #64748B;
+  --el-menu-hover-text-color: #0F172A;
+  --el-menu-bg-color: #FFFFFF;
+  --el-menu-hover-bg-color: #F8FAFC;
   --el-menu-item-height: 56px;
-  --el-menu-border-color: none;
+  --el-menu-border-color: transparent;
   /*layout section*/
   //layout
-  --layout-border-left-color: #e2e8f0;
+  --layout-border-left-color: #E2E8F0;
   //Breadcrumb
-  --breadcrumb-no-redirect: #64748b;
+  --breadcrumb-no-redirect: #94A3B8;
   //Hamburger
-  --hamburger-color: #1e293b;
+  --hamburger-color: #0F172A;
   --hamburger-width: 20px;
   --hamburger-height: 20px;
   //Sidebar
-  --sidebar-el-icon-size: 20px;
-  --sidebar-logo-background: #1e293b;
-  --sidebar-logo-color: #38bdf8;
-  --sidebar-logo-width: 32px;
-  --sidebar-logo-height: 32px;
-  --sidebar-logo-title-color: #ffffff;
-  --side-bar-width: 240px;
-  --side-bar-border-right-color: #e2e8f0;
+  --sidebar-el-icon-size: 22px;
+  --sidebar-logo-background: #FFFFFF;
+  --sidebar-logo-color: #0F172A;
+  --sidebar-logo-width: 36px;
+  --sidebar-logo-height: 36px;
+  --sidebar-logo-title-color: #0F172A;
+  --side-bar-width: 260px;
+  --side-bar-border-right-color: #F1F5F9;
   //TagsView
-  --tags-view-background: #ffffff;
-  --tags-view-border-bottom: #e2e8f0;
-  --tags-view-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 0 3px 0 rgba(0, 0, 0, 0.02);
-  --tags-view-item-background: #ffffff;
-  --tags-view-item-border-color: #cbd5e1;
-  --tags-view-item-color: #475569;
-  --tag-view-height: 36px;
-  --tags-view-item-active-background: #3b82f6;
-  --tags-view-item-active-color: #ffffff;
-  --tags-view-item-active-border-color: #3b82f6;
-  --tags-view-contextmenu-background: #ffffff;
-  --tags-view-contextmenu-color: #1e293b;
-  --tags-view-contextmenu-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --tags-view-contextmenu-hover-background: #f1f5f9;
+  --tags-view-background: #FFFFFF;
+  --tags-view-border-bottom: #F1F5F9;
+  --tags-view-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --tags-view-item-background: #FFFFFF;
+  --tags-view-item-border-color: #E2E8F0;
+  --tags-view-item-color: #64748B;
+  --tag-view-height: 38px;
+  --tags-view-item-active-background: #F0F9FF;
+  --tags-view-item-active-color: #0284C7;
+  --tags-view-item-active-border-color: #BAE6FD;
+  --tags-view-contextmenu-background: #FFFFFF;
+  --tags-view-contextmenu-color: #0F172A;
+  --tags-view-contextmenu-box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --tags-view-contextmenu-hover-background: #F8FAFC;
   //close-icon
-  --tags-view-close-icon-hover-background: #94a3b8;
-  --tags-view-close-icon-hover-color: #ffffff;
+  --tags-view-close-icon-hover-background: #E2E8F0;
+  --tags-view-close-icon-hover-color: #0F172A;
   //AppMain.vue
-  --app-main-padding: 16px;
-  --app-main-background: #f8fafc;
+  --app-main-padding: 24px;
+  --app-main-background: #F8FAFC;
   //Navbar.vue
-  --nav-bar-height: 60px;
-  --nav-bar-background: #ffffff;
-  --nav-bar-box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --nav-bar-right-menu-background: #ffffff;
+  --nav-bar-height: 64px;
+  --nav-bar-background: #FFFFFF;
+  --nav-bar-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  --nav-bar-right-menu-background: #FFFFFF;
 
   //transition
-  --sideBar-switch-duration: 0.3s;
+  --sideBar-switch-duration: 0.4s;
   //logo
-  --logo-switch-duration: 0.3s;
-  --page-transform-duration: 0.3s;
+  --logo-switch-duration: 0.4s;
+  --page-transform-duration: 0.4s;
 
   --breadcrumb-change-duration: 0.3s;
 
-  --pregress-bar-color: #3b82f6;
+  --pregress-bar-color: #38BDF8;
 
-  --body-background: #f1f5f9;
+  --body-background: #F8FAFC;
 
-  --border-color: #e2e8f0;
+  --border-color: #E2E8F0;
 }

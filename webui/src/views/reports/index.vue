@@ -666,16 +666,25 @@ table thead:first-child tr:first-child td {
 
 .diagnose-item {
   flex-shrink: 1;
-  padding: 10px 20px;
-  margin-bottom: 10px;
-  border-bottom-left-radius: 10px;
-  border-top-left-radius: 10px;
-  transition: height 3s ease-in-out;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+
+  &:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    transform: translateY(-2px);
+    border-color: #BAE6FD;
+  }
 
   .title {
-    color: #333333;
+    color: #0F172A;
     font-size: 16px;
+    font-weight: 600;
   }
 }
 

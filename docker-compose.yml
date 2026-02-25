@@ -160,6 +160,73 @@ services:
       - agent_network
     restart: unless-stopped
 
+  # ─────────────────────────────────────────────
+  # Telegram Bot — Otonom DB Yönetim
+  # ─────────────────────────────────────────────
+
+  telegram_bot:
+    build: .
+    environment:
+      APP_MODE: telegram_bot
+      PYTHONPATH: /app
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS:-}
+      ANOMIVOX_API_URL: http://api:7861
+      PROMETHEUS_URL: http://prometheus:9090
+      PG_HOST: postgres_db
+      PG_PORT: 5432
+      PG_USER: ${POSTGRES_USER:-test}
+      PG_PASSWORD: ${POSTGRES_PASSWORD:-Test123_456}
+      PG_DB: ${POSTGRES_DB:-anomivox}
+    ports:
+      - "8024:8024"
+    volumes:
+      - ./configs:/app/configs
+    networks:
+      - agent_network
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # WhatsApp Bot — Otonom DB Yönetim (Cloud API)
+  # ─────────────────────────────────────────────
+
+  whatsapp_bot:
+    build: .
+    environment:
+      APP_MODE: whatsapp_bot
+      PYTHONPATH: /app
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-anomivox_whatsapp_verify_2024}
+      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS:-}
+      WHATSAPP_DEFAULT_RECIPIENT: ${WHATSAPP_DEFAULT_RECIPIENT:-}
+      ANOMIVOX_API_URL: http://api:7861
+      PROMETHEUS_URL: http://prometheus:9090
+      PG_HOST: postgres_db
+      PG_PORT: 5432
+      PG_USER: ${POSTGRES_USER:-test}
+      PG_PASSWORD: ${POSTGRES_PASSWORD:-Test123_456}
+      PG_DB: ${POSTGRES_DB:-anomivox}
+    ports:
+      - "8025:8025"
+    volumes:
+      - ./configs:/app/configs
+    networks:
+      - agent_network
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 # ─────────────────────────────────────────────
 # Kalıcı Veri Volumeleri
 # ─────────────────────────────────────────────

@@ -97,6 +97,9 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     mount_filename_summary_routes(app)
     mount_alert_routes(app)
     mount_diagnose_routes(app)
+    mount_telegram_routes(app)
+    mount_whatsapp_routes(app)
+    mount_mail_routes(app)
 
     from server.utils import all_embed_models
 
@@ -177,6 +180,33 @@ def mount_auth_routes(app: FastAPI):
     app.post("/auth/toggle_user", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcıyı aktif/deaktif et (admin)")(api_toggle_user)
     app.post("/auth/delete_user", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcıyı sil (admin)")(api_delete_user)
     app.post("/auth/change_password", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcı şifresini değiştir (admin)")(api_change_password)
+
+
+def mount_telegram_routes(app: FastAPI):
+    from server.telegram_bot.telegram_config_api import (
+        get_telegram_config, save_telegram_config, test_telegram_connection
+    )
+    app.get("/telegram/config", tags=["Telegram"], response_model=BaseResponse, summary="Telegram ayarlarını getir (admin)")(get_telegram_config)
+    app.post("/telegram/config", tags=["Telegram"], response_model=BaseResponse, summary="Telegram ayarlarını kaydet (admin)")(save_telegram_config)
+    app.post("/telegram/test", tags=["Telegram"], response_model=BaseResponse, summary="Telegram bağlantı testi (admin)")(test_telegram_connection)
+
+
+def mount_whatsapp_routes(app: FastAPI):
+    from server.whatsapp_bot.whatsapp_config_api import (
+        get_whatsapp_config, save_whatsapp_config, test_whatsapp_connection
+    )
+    app.get("/whatsapp/config", tags=["WhatsApp"], response_model=BaseResponse, summary="WhatsApp ayarlarını getir (admin)")(get_whatsapp_config)
+    app.post("/whatsapp/config", tags=["WhatsApp"], response_model=BaseResponse, summary="WhatsApp ayarlarını kaydet (admin)")(save_whatsapp_config)
+    app.post("/whatsapp/test", tags=["WhatsApp"], response_model=BaseResponse, summary="WhatsApp bağlantı testi (admin)")(test_whatsapp_connection)
+
+
+def mount_mail_routes(app: FastAPI):
+    from server.mail_service.mail_config_api import (
+        get_mail_config, save_mail_config, test_mail_connection
+    )
+    app.get("/mail/config", tags=["Mail"], response_model=BaseResponse, summary="Mail ayarlarını getir (admin)")(get_mail_config)
+    app.post("/mail/config", tags=["Mail"], response_model=BaseResponse, summary="Mail ayarlarını kaydet (admin)")(save_mail_config)
+    app.post("/mail/test", tags=["Mail"], response_model=BaseResponse, summary="SMTP bağlantı testi (admin)")(test_mail_connection)
 
 
 def mount_diagnose_routes(app: FastAPI):

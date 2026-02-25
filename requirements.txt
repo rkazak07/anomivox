@@ -81,3 +81,7 @@ watchdog>=3.0.0
 
 # index advisor tool
 index-eab==0.1.0
+
+# Telegram Bot
+python-telegram-bot[job-queue]>=21.0
+aiohttp>=3.9.0

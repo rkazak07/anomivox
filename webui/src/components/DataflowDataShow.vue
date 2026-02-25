@@ -9,7 +9,7 @@
           <div>
             <el-divider content-position="left">
               <div class="rowSC">
-                <el-icon size="18" style="margin-right: 5px"  color="var(--el-color-success)" ><Printer /></el-icon>
+                <el-icon size="18" style="margin-right: 5px"  color="var(--el-color-success)" ><Document /></el-icon>
                 Query
               </div>
             </el-divider>
@@ -18,7 +18,7 @@
           <div>
             <el-divider content-position="left">
               <div class="rowSC">
-                <el-icon size="18" style="margin-right: 5px" color="var(--el-color-success)" ><Coin /></el-icon>
+                <el-icon size="18" style="margin-right: 5px" color="var(--el-color-success)" ><Wallet /></el-icon>
                 Data
               </div>
             </el-divider>
@@ -33,7 +33,7 @@
           <div>
             <el-divider content-position="left">
               <div class="rowSC">
-                <el-icon size="18" style="margin-right: 5px" color="var(--el-color-success)" ><Histogram /></el-icon>
+                <el-icon size="18" style="margin-right: 5px" color="var(--el-color-success)" ><DataLine /></el-icon>
                 Visualization
               </div>
             </el-divider>

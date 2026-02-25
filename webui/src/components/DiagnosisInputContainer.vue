@@ -34,8 +34,8 @@
             style="width: calc(100% - 40px); font-size: 14px"
         />
       </template>
-      <el-button icon="Promotion" type="success" :disabled="sendBtnDisabled || inputDisabled" circle size="default" style="font-size: 22px; margin-left: 10px"
-                 @click="onSendClick"/>
+      <el-button icon="Position" type="success" :disabled="sendBtnDisabled || inputDisabled" circle size="default" style="font-size: 22px; margin-left: 10px"
+                 @click="onSendClick" />
 
       <el-tooltip
           class="box-item"

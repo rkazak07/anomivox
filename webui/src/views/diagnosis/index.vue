@@ -95,7 +95,7 @@
               <DiagnosisOneChat :sender="diagnoseData?.reportGeneration?.sender" :can-fold="false" :messages="diagnoseData?.reportGeneration?.messages" @edit-click="onEditClick"/>
             </template>
             <template v-if="activeIndex === 'reportDemonstration'">
-              <div style="padding: 20px; background: var(--el-fill-color-light); border-radius: 8px" v-html="reportContent"/>
+              <div style="padding: 20px; background: var(--el-fill-color-light); border-radius: 8px; color: var(--el-text-color-primary);" v-html="reportContent"/>
             </template>
           </div>
           <DiagnosisInputContainer

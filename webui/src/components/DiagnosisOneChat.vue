@@ -13,10 +13,10 @@
         </div>
         <div v-if="canFold" style="color: #ffffff; font-size: 20px" @click="toggleFold">
           <el-icon v-show="fold">
-            <ArrowDownBold/>
+            <ArrowDown/>
           </el-icon>
           <el-icon v-show="!fold">
-            <ArrowUpBold/>
+            <ArrowUp/>
           </el-icon>
         </div>
       </div>

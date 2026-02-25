@@ -9,7 +9,7 @@
         <div class="rowBC">
           <div class="title rowSC">
             <el-icon style="margin-right: 5px;" size="20" color="var(--el-color-primary)">
-              <TakeawayBox/>
+              <Notebook/>
             </el-icon>
             <span>{{ item.kb_name }}</span>
           </div>

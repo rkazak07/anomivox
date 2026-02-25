@@ -51,15 +51,9 @@
               <div style="color: var(--el-text-color-secondary); font-size: 12px; height: 12px; line-height: 12px; margin-top: 4px">{{ item.time }}</div>
             </div>
             <div class="rowSC">
-              <el-button type="success" size="small" style="margin:0 10px" @click="onReviewClick(item)">{{ $t('playbackButton') }}<i
-                  class="el-icon-video-camera-solid el-icon--right"
-                  style="font-size: 16px"
-              />
+              <el-button type="success" size="small" style="margin:0 10px" @click="onReviewClick(item)">{{ $t('playbackButton') }}<el-icon class="el-icon--right" style="font-size: 16px"><VideoCamera /></el-icon>
               </el-button>
-              <el-button type="warning" size="small" @click="onReportClick(item, index)">{{ $t('reportButton') }}<i
-                  class="el-icon-document-add el-icon--right"
-                  style="font-size: 16px"
-              /></el-button>
+              <el-button type="warning" size="small" @click="onReportClick(item, index)">{{ $t('reportButton') }}<el-icon class="el-icon--right" style="font-size: 16px"><DocumentAdd /></el-icon></el-button>
             </div>
           </div>
           <el-carousel
@@ -85,7 +79,7 @@
         style="overflow-y: scroll; height: 100vh; overflow-x: hidden; width: 45%; background: var(--el-bg-color);"
     >
       <div
-          style="background-color: var(--el-bg-color); padding: 10px; margin: 10px; border-radius: 8px;"
+          style="background-color: var(--el-bg-color); padding: 10px; margin: 10px; border-radius: 8px; color: var(--el-text-color-primary);"
           v-html="openReportContent"
       />
     </div>
@@ -235,7 +229,7 @@
 
             <div class="review-step" style="margin-top: 30px">
               <span style="height: 40px; line-height: 40px; color: var(--el-text-color-primary); font-weight: bold; font-size: 18px">3.{{ $t('setpTip3') }}</span>
-              <div style="width: 100%; padding: 10px; background-color: var(--el-fill-color-light); border-radius: 8px" v-html="reportContent"/>
+              <div style="width: 100%; padding: 10px; background-color: var(--el-fill-color-light); border-radius: 8px; color: var(--el-text-color-primary);" v-html="reportContent"/>
             </div>
           </div>
         </transition>

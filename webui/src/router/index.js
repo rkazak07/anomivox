@@ -27,7 +27,7 @@ export const constantRoutes = [
         name: 'Chat',
         component: () => import('@/views/chat/index.vue'),
         //using el svg icon, the elSvgIcon first when at the same time using elSvgIcon and icon
-        meta: { title: 'Chat', elSvgIcon: 'ChatDotRound', affix: true }
+        meta: { title: 'Chat', elSvgIcon: 'ChatLineRound', affix: true }
       }
     ]
   },
@@ -40,7 +40,7 @@ export const constantRoutes = [
         name: 'KnowledgeChat',
         component: () => import('@/views/knowledge-chat/index.vue'),
         //using el svg icon, the elSvgIcon first when at the same time using elSvgIcon and icon
-        meta: { title: 'KnowledgeChat', elSvgIcon: 'ChatDotSquare', affix: true }
+        meta: { title: 'KnowledgeChat', elSvgIcon: 'ChatLineSquare', affix: true }
       }
     ]
   },
@@ -53,7 +53,7 @@ export const constantRoutes = [
         name: 'Diagnosis',
         component: () => import('@/views/diagnosis/index.vue'),
         //using el svg icon, the elSvgIcon first when at the same time using elSvgIcon and icon
-        meta: { title: 'Diagnosis', elSvgIcon: 'MagicStick', affix: true }
+        meta: { title: 'Diagnosis', elSvgIcon: 'Odometer', affix: true }
       }
     ]
   },
@@ -66,7 +66,7 @@ export const constantRoutes = [
         name: 'Reports',
         component: () => import('@/views/reports/index.vue'),
         //using el svg icon, the elSvgIcon first when at the same time using elSvgIcon and icon
-        meta: { title: 'Reports', elSvgIcon: 'Menu', affix: true }
+        meta: { title: 'Reports', elSvgIcon: 'DataBoard', affix: true }
       }
     ]
   },
@@ -79,14 +79,14 @@ export const constantRoutes = [
         name: 'Knowledge',
         component: () => import('@/views/knowledge/index.vue'),
         //using el svg icon, the elSvgIcon first when at the same time using elSvgIcon and icon
-        meta: { title: 'Knowledge', elSvgIcon: 'Collection'}
+        meta: { title: 'Knowledge', elSvgIcon: 'Notebook'}
       },
       {
         path: '/knowledge/detail',
         name: 'KnowledgeDetail',
         component: () => import('@/views/knowledge/detail.vue'),
         //using el svg icon, the elSvgIcon first when at the same time using elSvgIcon and icon
-        meta: { title: 'Knowledge', elSvgIcon: 'Collection', activeMenu: '/knowledge'}
+        meta: { title: 'Knowledge', elSvgIcon: 'Notebook', activeMenu: '/knowledge'}
       }
     ]
   },

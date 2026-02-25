@@ -4,7 +4,7 @@
       <el-aside width="240px" style="border-right: 1px solid var(--el-border-color-light); height: 100%; background: var(--el-bg-color);">
         <div class="columnSS" style="width: 100%; padding: 16px;">
           <div class="rowSC">
-            <el-button icon="ArrowLeftBold" type="primary" plain circle size="default" @click="routerBack()"/>
+            <el-button icon="Back" type="primary" plain circle size="default" @click="routerBack()"/>
             <span style="font-weight: bold; font-size: 20px; margin-left: 10px">{{ $route.query.kb_name }}</span>
           </div>
           <div class="columnSS" style="width: 100%; margin-top: 20px">

@@ -11,8 +11,9 @@
           clearable
           size="default"
           style="width: calc(100% - 40px);"
+          @keydown.enter.prevent="onSendClick"
       />
-      <el-button icon="Promotion" type="success" :disabled="sendBtnDisabled" circle size="default" style="font-size: 22px;" @click="onSendClick" />
+      <el-button icon="Position" type="success" :disabled="sendBtnDisabled" circle size="default" style="font-size: 22px;" @click="onSendClick" />
     </div>
     <slot name="right">
       <div />
@@ -22,7 +23,7 @@
 
 <script setup lang="ts" name="BottomInputContainer">
 
-import {ref} from "vue";
+import {ref, computed, Ref} from "vue";
 
 const props = defineProps({
   placeholder: {
@@ -43,7 +44,9 @@ const userInput: Ref<string> = ref('')
 
 const sendBtnDisabled = computed(() => userInput.value === '')
 
-const onSendClick = () => {
+const onSendClick = (e?: Event) => {
+  if (e && (e as any).isComposing) return
+  if (sendBtnDisabled.value) return
   emit('send-click', userInput.value)
   userInput.value = ''
 }

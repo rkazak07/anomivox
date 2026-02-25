@@ -1,8 +1,12 @@
 <template>
   <div class="chat-item-container">
     <div :class="'rowSC ' + roleClass">
-      <img v-if="isUser" src="@/assets/chat-user.png" class="face"/>
-      <img v-else src="@/assets/chat-robot.png" class="face" />
+      <el-avatar v-if="isUser" class="face" style="background-color: var(--el-color-primary);">
+        <el-icon size="20"><UserFilled /></el-icon>
+      </el-avatar>
+      <el-avatar v-else class="face" style="background-color: var(--el-color-success);">
+        <el-icon size="22"><Service /></el-icon>
+      </el-avatar>
 <!--      <span style="margin: 0 10px; color: red">abc</span>-->
 <!--      <span style="color: #2c59cb">sdada</span>-->
     </div>
@@ -12,7 +16,7 @@
       </div>
       <div v-else>
         <div class="content rowBC" style="padding: 10px 20px">
-          <el-icon class="is-loading" size="20" color="#333333">
+          <el-icon class="is-loading" size="20" color="var(--el-text-color-primary)">
             <Loading />
           </el-icon>
         </div>

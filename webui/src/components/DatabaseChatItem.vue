@@ -1,8 +1,12 @@
 <template>
   <div class="chat-item-container">
     <div :class="'rowSC ' + roleClass">
-      <img v-if="isUser" src="@/assets/chat-user.png" class="face"/>
-      <img v-else src="@/assets/chat-robot.png" class="face" />
+      <el-avatar v-if="isUser" class="face" style="background-color: var(--el-color-primary);">
+        <el-icon size="20"><UserFilled /></el-icon>
+      </el-avatar>
+      <el-avatar v-else class="face" style="background-color: var(--el-color-success);">
+        <el-icon size="22"><Service /></el-icon>
+      </el-avatar>
     </div>
     <div :class="'rowSC ' + roleClass">
       <div class="columnSS content">
@@ -14,7 +18,7 @@
             <div>
               <el-divider content-position="left">
                 <div class="rowSC">
-                  <el-icon size="18" style="margin-right: 5px"  :color="currentStep > 0 ? 'var(--el-color-success)': ''" ><Printer /></el-icon>
+                  <el-icon size="18" style="margin-right: 5px"  :color="currentStep > 0 ? 'var(--el-color-success)': ''" ><Document /></el-icon>
                   {{currentStep === 0 ? 'Generating query' : 'Query generated successfully'}}
                   <el-icon v-if="currentStep < 1 && message.loading" class="is-loading" size="20" color="#333333" style="margin-left: 5px;">
                     <Loading />
@@ -26,7 +30,7 @@
             <div v-if="currentStep >= 1">
               <el-divider content-position="left">
                 <div class="rowSC">
-                  <el-icon size="18" style="margin-right: 5px" :color="currentStep > 1 ? 'var(--el-color-success)': ''" ><Coin /></el-icon>
+                  <el-icon size="18" style="margin-right: 5px" :color="currentStep > 1 ? 'var(--el-color-success)': ''" ><Wallet /></el-icon>
                   {{currentStep === 1 ? 'Fetching data' : 'Data fetched successfully'}}
                   <el-icon v-if="currentStep < 2 && message.loading" class="is-loading" size="20" color="#333333" style="margin-left: 5px;">
                     <Loading />
@@ -44,7 +48,7 @@
             <div v-if="currentStep >= 2">
               <el-divider content-position="left">
                 <div class="rowSC">
-                  <el-icon size="18" style="margin-right: 5px" :color="currentStep > 2 ? 'var(--el-color-success)': ''" ><Histogram /></el-icon>
+                  <el-icon size="18" style="margin-right: 5px" :color="currentStep > 2 ? 'var(--el-color-success)': ''" ><DataLine /></el-icon>
                   {{currentStep === 2 ? 'Visualizing data' : 'Visualization complete'}}
                   <el-icon v-if="currentStep < 3 && message.loading" class="is-loading" size="20" color="#333333" style="margin-left: 5px;">
                     <Loading />

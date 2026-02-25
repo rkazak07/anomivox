@@ -2,7 +2,7 @@
   <div class="relative columnSC chat-container">
     <div class="header">
       <div class="header-item">
-        <span style="color: #333333;">{{ $t('llmModel') }}</span>
+        <span>{{ $t('llmModel') }}</span>
         <el-select
             v-model="llmModel"
             class="llm-select"
@@ -22,7 +22,7 @@
         </el-select>
       </div>
       <div class="header-item">
-        <span style="color: #333333;">{{ $t('historicalSessionRounds') }}</span>
+        <span>{{ $t('historicalSessionRounds') }}</span>
         <el-input-number v-model="historyLength" size="default" :min="1" :max="5"/>
       </div>
     </div>

@@ -7,6 +7,7 @@ from .diagnose_config import *
 from .telegram_config import *
 from .whatsapp_config import *
 from .mail_config import *
+from .clawbot_config import *
 
 
 VERSION = "v0.0.1"

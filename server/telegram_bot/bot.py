@@ -131,7 +131,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/reindex — Tablo reindex\n"
         "/alerts — Son Prometheus alertleri\n"
         "/report — Son teşhis raporları\n"
-        "/help — Bu mesajı göster"
+        "/ask — 🐾 ClawBot doğal dil DB sorgusu\n"
+        "/help — Bu mesajı göster\n\n"
+        "💡 Komut olmadan doğrudan mesaj yazarak da ClawBot'a sorabilirsiniz\\!"
     )
     await update.message.reply_text(welcome, parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -1000,6 +1002,95 @@ async def health_report_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  CLAWBOT ENTEGRASYONU — Doğal Dil DB Asistanı
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+async def cmd_ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /ask <soru> — ClawBot ile doğal dilde DB sorgulama.
+    Örnek: /ask veritabanı neden yavaş?
+    """
+    if not is_authorized(update.effective_user.id):
+        await update.message.reply_text("⛔ Yetkiniz yok.")
+        return
+
+    question = " ".join(context.args) if context.args else ""
+    if not question.strip():
+        await update.message.reply_text(
+            "🤖 *ClawBot — Doğal Dil DB Asistanı*\n\n"
+            "Kullanım: `/ask <sorunuz>`\n\n"
+            "Örnekler:\n"
+            "• `/ask veritabanı neden yavaş?`\n"
+            "• `/ask kaç veritabanı var?`\n"
+            "• `/ask sağlık raporu`\n"
+            "• `/ask index önerisi ver`\n"
+            "• `/ask aktif bağlantıları göster`\n\n"
+            "💡 Komut olmadan doğrudan mesaj da yazabilirsiniz\\!",
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
+        return
+
+    await _process_clawbot_message(update, question)
+
+
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Komut olmayan metin mesajlarını ClawBot'a yönlendir.
+    Kullanıcı doğrudan 'veritabanı neden yavaş?' gibi yazabilir.
+    """
+    if not is_authorized(update.effective_user.id):
+        return
+
+    text = update.message.text
+    if not text or not text.strip():
+        return
+
+    await _process_clawbot_message(update, text.strip())
+
+
+async def _process_clawbot_message(update: Update, message: str):
+    """ClawBot engine'e mesaj gönder ve yanıtı Telegram'a yaz."""
+    msg = await update.message.reply_text("🤖 Analiz ediliyor...")
+
+    try:
+        # ClawBot engine import
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from server.clawbot.engine import process_message
+
+        result = await process_message(
+            message=message,
+            channel="telegram",
+            user_id=str(update.effective_user.id),
+            use_llm_enrichment=True,
+        )
+
+        response_text = result.get("response", "Yanıt alınamadı.")
+        intent = result.get("intent", "unknown")
+        elapsed = result.get("elapsed_sec", 0)
+
+        # Telegram mesaj limiti: 4096 karakter
+        if len(response_text) > 3900:
+            response_text = response_text[:3900] + "\n\n... _(yanıt kısaltıldı)_"
+
+        footer = f"\n\n🏷 _{intent}_ • ⏱ _{elapsed:.1f}s_"
+
+        try:
+            await msg.edit_text(
+                response_text + footer,
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            # Markdown parse hatası olursa düz metin olarak gönder
+            await msg.edit_text(response_text + f"\n\n🏷 {intent} • ⏱ {elapsed:.1f}s")
+
+    except ConnectionError as e:
+        await msg.edit_text(f"❌ *DB Bağlantı Hatası*\n\n`{str(e)[:200]}`", parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.error(f"ClawBot error: {e}", exc_info=True)
+        await msg.edit_text(f"❌ *ClawBot Hatası*\n\n`{str(e)[:200]}`", parse_mode=ParseMode.MARKDOWN)
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  ANA UYGULAMA
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1045,10 +1136,14 @@ def main():
     app.add_handler(CommandHandler("alerts", cmd_alerts))
     app.add_handler(CommandHandler("diagnose", cmd_diagnose))
     app.add_handler(CommandHandler("report", cmd_report))
+    app.add_handler(CommandHandler("ask", cmd_ask))
 
     # Callback handler'ları (inline butonlar)
     app.add_handler(CallbackQueryHandler(health_report_callback, pattern="^health_report$"))
     app.add_handler(CallbackQueryHandler(callback_kill, pattern="^(kill_|cancel_|vacuum_|reindex_|dismiss)"))
+
+    # Serbest metin mesajlarını ClawBot'a yönlendir (komut olmayan mesajlar)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
 
     # Proaktif sağlık kontrolü (periyodik)
     if TELEGRAM_CHAT_ID and TELEGRAM_HEALTH_CHECK_INTERVAL > 0:
@@ -1077,6 +1172,7 @@ def main():
             BotCommand("alerts", "Prometheus alertleri"),
             BotCommand("diagnose", "Teşhis raporları"),
             BotCommand("report", "Son raporlar"),
+            BotCommand("ask", "🐾 ClawBot doğal dil sorgu"),
             BotCommand("help", "Yardım"),
         ])
         # Webhook sunucusunu başlat

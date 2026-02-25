@@ -100,6 +100,7 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     mount_telegram_routes(app)
     mount_whatsapp_routes(app)
     mount_mail_routes(app)
+    mount_clawbot_routes(app)
 
     from server.utils import all_embed_models
 
@@ -207,6 +208,23 @@ def mount_mail_routes(app: FastAPI):
     app.get("/mail/config", tags=["Mail"], response_model=BaseResponse, summary="Mail ayarlarını getir (admin)")(get_mail_config)
     app.post("/mail/config", tags=["Mail"], response_model=BaseResponse, summary="Mail ayarlarını kaydet (admin)")(save_mail_config)
     app.post("/mail/test", tags=["Mail"], response_model=BaseResponse, summary="SMTP bağlantı testi (admin)")(test_mail_connection)
+
+
+def mount_clawbot_routes(app: FastAPI):
+    from server.clawbot.clawbot_api import (
+        clawbot_ask, clawbot_health, clawbot_skills,
+        get_clawbot_config, save_clawbot_config,
+        list_databases, save_database, delete_database, test_database,
+    )
+    app.post("/clawbot/ask", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot mesaj gönder")(clawbot_ask)
+    app.get("/clawbot/health", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot durum kontrolü")(clawbot_health)
+    app.get("/clawbot/skills", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot skill listesi")(clawbot_skills)
+    app.get("/clawbot/config", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot ayarları (admin)")(get_clawbot_config)
+    app.post("/clawbot/config", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot ayarları kaydet (admin)")(save_clawbot_config)
+    app.get("/clawbot/databases", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantıları listele (admin)")(list_databases)
+    app.post("/clawbot/databases", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantısı ekle/güncelle (admin)")(save_database)
+    app.delete("/clawbot/databases", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantısı sil (admin)")(delete_database)
+    app.post("/clawbot/databases/test", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantısı test et (admin)")(test_database)
 
 
 def mount_diagnose_routes(app: FastAPI):

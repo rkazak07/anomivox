@@ -650,6 +650,185 @@
       </el-form>
     </div>
 
+    <!-- ClawBot Settings (admin only) -->
+    <div v-if="isAdmin" class="settings-section clawbot-section">
+      <div class="section-header rowBC">
+        <h3>
+          <span style="margin-right: 8px; vertical-align: middle; font-size: 18px;">🤖</span>
+          {{ $t('clawbotSettings') }}
+        </h3>
+        <el-tag :type="clawbotDatabases.length > 0 ? 'success' : 'info'" size="default" effect="plain" round>
+          <el-icon style="margin-right: 4px;"><Monitor /></el-icon>
+          {{ clawbotDatabases.length }} DB
+        </el-tag>
+      </div>
+
+      <p class="section-desc">{{ $t('clawbotDesc') }}</p>
+
+      <el-form label-position="top" class="telegram-form">
+
+        <!-- ═══ Multi-DB Bağlantıları ═══ -->
+        <div class="form-group">
+          <div class="form-group-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>🐘 {{ $t('clawbotDatabases') }}</span>
+            <el-button type="primary" size="small" @click="onAddDatabase">
+              <el-icon style="margin-right: 4px;"><Plus /></el-icon>
+              {{ $t('clawbotAddDb') }}
+            </el-button>
+          </div>
+
+          <!-- DB List -->
+          <el-table :data="clawbotDatabases" style="width: 100%; margin-top: 12px;" size="small" stripe>
+            <el-table-column prop="name" :label="$t('clawbotDbName')" min-width="120">
+              <template #default="{ row }">
+                <span>{{ row.name }}</span>
+                <el-tag v-if="row.is_default" type="success" size="small" style="margin-left: 6px;">Default</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column :label="$t('clawbotPgHost')" min-width="140">
+              <template #default="{ row }">{{ row.host }}:{{ row.port }}</template>
+            </el-table-column>
+            <el-table-column prop="dbname" :label="$t('clawbotPgDb')" min-width="100" />
+            <el-table-column prop="user" :label="$t('clawbotPgUser')" min-width="80" />
+            <el-table-column :label="$t('status')" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? 'ON' : 'OFF' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column :label="$t('actions')" width="180" align="center">
+              <template #default="{ row }">
+                <el-button size="small" type="primary" text @click="onEditDatabase(row)">
+                  <el-icon><Edit /></el-icon>
+                </el-button>
+                <el-button size="small" type="success" text :loading="testingDb === row.id" @click="onTestDatabase(row)">
+                  <el-icon><Connection /></el-icon>
+                </el-button>
+                <el-button size="small" type="danger" text @click="onDeleteDatabase(row)" :disabled="row.is_default && clawbotDatabases.length === 1">
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- ═══ Agent / LLM Ayarları ═══ -->
+        <div class="form-group">
+          <div class="form-group-title">🧠 {{ $t('clawbotAgentSettings') }}</div>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotAgentMode')">
+                <el-radio-group v-model="clawbotConfig.agent_mode">
+                  <el-radio-button value="cloud">☁️ Cloud</el-radio-button>
+                  <el-radio-button value="local">🖥️ Local</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotLlmProvider')">
+                <el-select v-model="clawbotConfig.llm_provider" style="width: 100%" :disabled="clawbotConfig.agent_mode === 'local'">
+                  <el-option label="Groq" value="groq" />
+                  <el-option label="OpenAI" value="openai" />
+                  <el-option label="Google Gemini" value="gemini" />
+                  <el-option label="DeepSeek" value="deepseek" />
+                  <el-option label="Anthropic" value="anthropic" />
+                  <el-option label="Custom" value="custom" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotLlmModel')">
+                <el-input v-model="clawbotConfig.llm_model" :placeholder="clawbotConfig.agent_mode === 'local' ? 'llama3' : 'llama-3.3-70b-versatile'" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item :label="$t('clawbotLlmApiKey')">
+                <el-input v-model="clawbotConfig.llm_api_key" type="password" show-password :placeholder="clawbotConfig.llm_api_key_set ? '••••••••' : 'API Key'" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item :label="$t('clawbotLlmApiUrl')">
+                <el-input v-model="clawbotConfig.llm_api_url" :placeholder="clawbotConfig.agent_mode === 'local' ? 'http://localhost:11434/v1' : 'Auto (provider)'" />
+                <div class="form-hint">{{ $t('clawbotLlmApiUrlHint') }}</div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16" v-show="clawbotConfig.agent_mode === 'local'">
+            <el-col :span="12">
+              <el-form-item :label="$t('clawbotLocalModel')">
+                <el-input v-model="clawbotConfig.local_model" placeholder="llama3" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item :label="$t('clawbotLocalApiUrl')">
+                <el-input v-model="clawbotConfig.local_api_url" placeholder="http://localhost:11434/v1" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotTemperature')">
+                <el-slider v-model="clawbotConfig.llm_temperature" :min="0" :max="1" :step="0.1" show-input :show-input-controls="false" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotMaxTokens')">
+                <el-input-number v-model="clawbotConfig.llm_max_tokens" :min="256" :max="8192" :step="256" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- ═══ Davranış Ayarları ═══ -->
+        <div class="form-group">
+          <div class="form-group-title">⚙️ {{ $t('clawbotBehavior') }}</div>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotUseLlm')">
+                <el-switch v-model="clawbotConfig.use_llm" />
+                <div class="form-hint">{{ $t('clawbotUseLlmHint') }}</div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotConfirmActions')">
+                <el-switch v-model="clawbotConfig.require_action_confirm" />
+                <div class="form-hint">{{ $t('clawbotConfirmActionsHint') }}</div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotSlowThreshold')">
+                <el-input-number v-model="clawbotConfig.slow_query_threshold" :min="100" :max="60000" :step="100" style="width: 100%" />
+                <div class="form-hint">{{ $t('clawbotSlowThresholdHint') }}</div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item :label="$t('clawbotProactiveInterval')">
+                <el-input-number v-model="clawbotConfig.proactive_interval" :min="0" :max="3600" :step="30" style="width: 100%" />
+                <div class="form-hint">{{ $t('clawbotProactiveIntervalHint') }}</div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="16">
+              <el-form-item :label="$t('clawbotProactiveChannels')">
+                <el-input v-model="clawbotConfig.proactive_channels" placeholder="telegram,whatsapp,mail" />
+                <div class="form-hint">{{ $t('clawbotProactiveChannelsHint') }}</div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="telegram-actions">
+          <el-button type="primary" :loading="savingClawbot" @click="onSaveClawbot">
+            <el-icon style="margin-right: 6px;"><Check /></el-icon>
+            {{ $t('save') }}
+          </el-button>
+        </div>
+      </el-form>
+    </div>
+
     <!-- Non-admin users see info message -->
     <div v-else class="settings-section">
       <el-result icon="info" :title="$t('noPermission')" :sub-title="$t('noPermissionDesc')">
@@ -658,6 +837,62 @@
         </template>
       </el-result>
     </div>
+
+    <!-- DB Add/Edit Dialog -->
+    <el-dialog v-model="showDbDialog" :title="dbForm.id ? $t('clawbotEditDb') : $t('clawbotAddDb')" width="520px" :close-on-click-modal="false">
+      <el-form label-position="top">
+        <el-form-item :label="$t('clawbotDbName')">
+          <el-input v-model="dbForm.name" placeholder="Production DB" />
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="14">
+            <el-form-item :label="$t('clawbotPgHost')">
+              <el-input v-model="dbForm.host" placeholder="192.168.1.100" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="10">
+            <el-form-item :label="$t('clawbotPgPort')">
+              <el-input-number v-model="dbForm.port" :min="1" :max="65535" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item :label="$t('clawbotPgUser')">
+              <el-input v-model="dbForm.user" placeholder="postgres" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('clawbotPgPassword')">
+              <el-input v-model="dbForm.password" type="password" show-password placeholder="••••••••" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item :label="$t('clawbotPgDb')">
+          <el-input v-model="dbForm.dbname" placeholder="mydb" />
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item>
+              <el-checkbox v-model="dbForm.is_default">{{ $t('clawbotSetDefault') }}</el-checkbox>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item>
+              <el-checkbox v-model="dbForm.enabled">{{ $t('clawbotEnabled') }}</el-checkbox>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="showDbDialog = false">{{ $t('cancel') }}</el-button>
+        <el-button type="success" :loading="testingDb === '__dialog__'" @click="onTestDbFromDialog">
+          <el-icon style="margin-right: 4px;"><Connection /></el-icon>
+          {{ $t('testConnection') }}
+        </el-button>
+        <el-button type="primary" :loading="savingDb" @click="onSaveDatabase">{{ $t('save') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- Create User Dialog -->
     <el-dialog v-model="showCreateDialog" :title="$t('addUser')" width="420px" :close-on-click-modal="false">
@@ -701,6 +936,7 @@ import { listUsersReq, createUserReq, toggleUserReq, deleteUserReq, changePasswo
 import { getTelegramConfigReq, saveTelegramConfigReq, testTelegramReq } from '@/api/telegram'
 import { getWhatsappConfigReq, saveWhatsappConfigReq, testWhatsappReq } from '@/api/whatsapp'
 import { getMailConfigReq, saveMailConfigReq, testMailReq } from '@/api/mail'
+import { getClawbotConfigReq, saveClawbotConfigReq, listClawbotDatabasesReq, saveClawbotDatabaseReq, deleteClawbotDatabaseReq, testClawbotDatabaseReq } from '@/api/clawbot'
 import { useI18n } from 'vue-i18n'
 
 const { t: $t } = useI18n()
@@ -730,6 +966,8 @@ onMounted(() => {
     fetchTelegramConfig()
     fetchWhatsappConfig()
     fetchMailConfig()
+    fetchClawbotConfig()
+    fetchClawbotDatabases()
   }
 })
 
@@ -1028,6 +1266,235 @@ const applySmtpPreset = (preset) => {
     mailConfig.smtp_port = p.port
     mailConfig.use_tls = p.tls
     mailConfig.use_ssl = p.ssl
+  }
+}
+
+// ========== ClawBot Config ==========
+const savingClawbot = ref(false)
+const clawbotDatabases = ref([])
+const testingDb = ref(null)
+const showDbDialog = ref(false)
+const savingDb = ref(false)
+const dbForm = reactive({
+  id: null,
+  name: '',
+  host: '',
+  port: 5432,
+  user: '',
+  password: '',
+  dbname: '',
+  is_default: false,
+  enabled: true,
+})
+
+const clawbotConfig = reactive({
+  agent_mode: 'cloud',
+  llm_provider: 'groq',
+  llm_model: 'llama-3.3-70b-versatile',
+  llm_api_key: '',
+  llm_api_key_set: false,
+  llm_api_url: '',
+  llm_temperature: 0.3,
+  llm_max_tokens: 2048,
+  local_model: 'llama3',
+  local_api_url: 'http://localhost:11434/v1',
+  use_llm: true,
+  require_action_confirm: true,
+  slow_query_threshold: 1000,
+  proactive_interval: 300,
+  proactive_channels: 'telegram,whatsapp,mail',
+})
+
+const fetchClawbotConfig = async () => {
+  try {
+    const res = await getClawbotConfigReq()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      clawbotConfig.agent_mode = d.agent_mode || 'cloud'
+      clawbotConfig.llm_provider = d.llm_provider || 'groq'
+      clawbotConfig.llm_model = d.llm_model || 'llama-3.3-70b-versatile'
+      clawbotConfig.llm_api_key = d.llm_api_key || ''
+      clawbotConfig.llm_api_key_set = d.llm_api_key_set || false
+      clawbotConfig.llm_api_url = d.llm_api_url || ''
+      clawbotConfig.llm_temperature = d.llm_temperature ?? 0.3
+      clawbotConfig.llm_max_tokens = d.llm_max_tokens || 2048
+      clawbotConfig.local_model = d.local_model || 'llama3'
+      clawbotConfig.local_api_url = d.local_api_url || 'http://localhost:11434/v1'
+      clawbotConfig.use_llm = d.use_llm ?? true
+      clawbotConfig.require_action_confirm = d.require_action_confirm ?? true
+      clawbotConfig.slow_query_threshold = d.slow_query_threshold || 1000
+      clawbotConfig.proactive_interval = d.proactive_interval ?? 300
+      clawbotConfig.proactive_channels = d.proactive_channels || 'telegram,whatsapp,mail'
+    }
+  } catch (e) {
+    console.error('Failed to load ClawBot config:', e)
+  }
+}
+
+const fetchClawbotDatabases = async () => {
+  try {
+    const res = await listClawbotDatabasesReq()
+    if (res.code === 200 && res.data) {
+      clawbotDatabases.value = res.data
+    }
+  } catch (e) {
+    console.error('Failed to load ClawBot databases:', e)
+  }
+}
+
+const onSaveClawbot = async () => {
+  savingClawbot.value = true
+  try {
+    const res = await saveClawbotConfigReq({
+      agent_mode: clawbotConfig.agent_mode,
+      llm_provider: clawbotConfig.llm_provider,
+      llm_model: clawbotConfig.llm_model,
+      llm_api_key: clawbotConfig.llm_api_key,
+      llm_api_url: clawbotConfig.llm_api_url,
+      llm_temperature: clawbotConfig.llm_temperature,
+      llm_max_tokens: clawbotConfig.llm_max_tokens,
+      local_model: clawbotConfig.local_model,
+      local_api_url: clawbotConfig.local_api_url,
+      use_llm: clawbotConfig.use_llm,
+      require_action_confirm: clawbotConfig.require_action_confirm,
+      slow_query_threshold: clawbotConfig.slow_query_threshold,
+      proactive_interval: clawbotConfig.proactive_interval,
+      proactive_channels: clawbotConfig.proactive_channels,
+    })
+    if (res.code === 200) {
+      ElMessage.success(res.msg || 'ClawBot ayarları kaydedildi')
+    } else {
+      ElMessage.error(res.msg || 'Kaydetme hatası')
+    }
+  } catch (e) {
+    ElMessage.error('ClawBot kaydetme hatası')
+    console.error(e)
+  } finally {
+    savingClawbot.value = false
+  }
+}
+
+// DB CRUD
+const onAddDatabase = () => {
+  dbForm.id = null
+  dbForm.name = ''
+  dbForm.host = ''
+  dbForm.port = 5432
+  dbForm.user = ''
+  dbForm.password = ''
+  dbForm.dbname = ''
+  dbForm.is_default = clawbotDatabases.value.length === 0
+  dbForm.enabled = true
+  showDbDialog.value = true
+}
+
+const onEditDatabase = (row) => {
+  dbForm.id = row.id
+  dbForm.name = row.name
+  dbForm.host = row.host
+  dbForm.port = row.port
+  dbForm.user = row.user
+  dbForm.password = row.password_set ? '••••••••' : ''
+  dbForm.dbname = row.dbname
+  dbForm.is_default = row.is_default
+  dbForm.enabled = row.enabled
+  showDbDialog.value = true
+}
+
+const onSaveDatabase = async () => {
+  if (!dbForm.name || !dbForm.host || !dbForm.dbname || !dbForm.user) {
+    ElMessage.warning('Ad, Host, Kullanıcı ve DB alanları zorunludur')
+    return
+  }
+  savingDb.value = true
+  try {
+    const res = await saveClawbotDatabaseReq({
+      id: dbForm.id,
+      name: dbForm.name,
+      host: dbForm.host,
+      port: dbForm.port,
+      user: dbForm.user,
+      password: dbForm.password,
+      dbname: dbForm.dbname,
+      is_default: dbForm.is_default,
+      enabled: dbForm.enabled,
+    })
+    if (res.code === 200) {
+      ElMessage.success(res.msg || 'Kaydedildi')
+      showDbDialog.value = false
+      fetchClawbotDatabases()
+    } else {
+      ElMessage.error(res.msg || 'Hata')
+    }
+  } catch (e) {
+    ElMessage.error('Kaydetme hatası')
+  } finally {
+    savingDb.value = false
+  }
+}
+
+const onDeleteDatabase = async (row) => {
+  try {
+    await ElMessageBox.confirm(`"${row.name}" bağlantısını silmek istediğinize emin misiniz?`, 'Dikkat', { type: 'warning' })
+    const res = await deleteClawbotDatabaseReq(row.id)
+    if (res.code === 200) {
+      ElMessage.success(res.msg || 'Silindi')
+      fetchClawbotDatabases()
+    } else {
+      ElMessage.error(res.msg || 'Silme hatası')
+    }
+  } catch (e) { /* cancelled */ }
+}
+
+const onTestDatabase = async (row) => {
+  testingDb.value = row.id
+  try {
+    const res = await testClawbotDatabaseReq({
+      host: row.host,
+      port: row.port,
+      user: row.user,
+      password: '', // masked password — API will resolve from stored
+      dbname: row.dbname,
+      id: row.id,
+    })
+    if (res.code === 200) {
+      const d = res.data || {}
+      ElMessage.success(`✅ ${d.version || 'Bağlantı başarılı'} — ${d.size || ''}`)
+    } else {
+      ElMessage.error(res.msg || 'Bağlantı başarısız')
+    }
+  } catch (e) {
+    ElMessage.error('Bağlantı test hatası')
+  } finally {
+    testingDb.value = null
+  }
+}
+
+const onTestDbFromDialog = async () => {
+  if (!dbForm.host || !dbForm.dbname || !dbForm.user) {
+    ElMessage.warning('Host, Kullanıcı ve DB alanları zorunludur')
+    return
+  }
+  testingDb.value = '__dialog__'
+  try {
+    const res = await testClawbotDatabaseReq({
+      host: dbForm.host,
+      port: dbForm.port,
+      user: dbForm.user,
+      password: dbForm.password,
+      dbname: dbForm.dbname,
+      id: dbForm.id,
+    })
+    if (res.code === 200) {
+      const d = res.data || {}
+      ElMessage.success(`✅ ${d.version || 'Bağlantı başarılı'} — ${d.size || ''}`)
+    } else {
+      ElMessage.error(res.msg || 'Bağlantı başarısız')
+    }
+  } catch (e) {
+    ElMessage.error('Bağlantı test hatası')
+  } finally {
+    testingDb.value = null
   }
 }
 

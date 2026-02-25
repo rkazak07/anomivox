@@ -25,6 +25,7 @@ import signal
 from datetime import datetime
 
 import aiohttp
+from aiohttp import web
 
 # Proje kökünü Python path'e ekle
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -187,7 +188,9 @@ async def cmd_help(sender: str, session: aiohttp.ClientSession):
         "/alerts — Son Prometheus alertleri\n"
         "/diagnose — Teşhis başlat\n"
         "/report — Son rapor\n"
-        "/help — Bu mesaj"
+        "/ask — 🐾 ClawBot doğal dil sorgu\n"
+        "/help — Bu mesaj\n\n"
+        "💡 Komut olmadan doğrudan mesaj yazarak da ClawBot'a sorabilirsiniz!"
     )
     await send_whatsapp_message(sender, text, session)
 
@@ -449,6 +452,55 @@ async def cmd_report(sender: str, session: aiohttp.ClientSession):
         await send_whatsapp_message(sender, f"❌ Rapor alınamadı: {e}", session)
 
 
+# ─────────────────────────────────────────
+# ClawBot Doğal Dil DB Sorgusu
+# ─────────────────────────────────────────
+async def cmd_ask(sender: str, session: aiohttp.ClientSession, question: str = ""):
+    """ClawBot ile doğal dilde veritabanı sorgulama."""
+    if not question.strip():
+        await send_whatsapp_message(
+            sender,
+            "🐾 *ClawBot — Doğal Dil DB Asistanı*\n\n"
+            "Kullanım: /ask <sorunuz>\n\n"
+            "Örnekler:\n"
+            "• /ask veritabanı neden yavaş?\n"
+            "• /ask kaç veritabanı var?\n"
+            "• /ask sağlık raporu\n"
+            "• /ask index önerisi ver\n\n"
+            "💡 Komut olmadan doğrudan mesaj da yazabilirsiniz!",
+            session,
+        )
+        return
+
+    await _clawbot_process(sender, session, question)
+
+
+async def _clawbot_process(sender: str, session: aiohttp.ClientSession, message: str):
+    """ClawBot engine ile mesajı işle ve sonucu gönder."""
+    try:
+        from server.clawbot.engine import process_message
+
+        result = await process_message(
+            message=message,
+            channel="whatsapp",
+            user_id=sender,
+            use_llm_enrichment=True,
+        )
+
+        response_text = result.get("response", "Yanıt alınamadı.")
+        intent = result.get("intent", "unknown")
+        elapsed = result.get("elapsed_sec", 0)
+
+        footer = f"\n\n🏷 {intent} • ⏱ {elapsed:.1f}s"
+        await send_whatsapp_message(sender, response_text + footer, session)
+
+    except ConnectionError as e:
+        await send_whatsapp_message(sender, f"❌ DB Bağlantı Hatası: {str(e)[:200]}", session)
+    except Exception as e:
+        logger.error(f"ClawBot WhatsApp error: {e}", exc_info=True)
+        await send_whatsapp_message(sender, f"❌ ClawBot Hatası: {str(e)[:200]}", session)
+
+
 # Komut haritası
 COMMANDS = {
     "/help": cmd_help,
@@ -487,18 +539,26 @@ async def handle_incoming_message(body: dict, session: aiohttp.ClientSession):
                 continue
 
             if msg_type == "text":
-                text = msg["text"]["body"].strip().lower()
-                cmd = text.split()[0] if text else ""
+                text = msg["text"]["body"].strip()
+                text_lower = text.lower()
+                cmd = text_lower.split()[0] if text_lower else ""
 
-                handler = COMMANDS.get(cmd)
-                if handler:
+                if cmd == "/ask":
+                    # /ask <soru> — ClawBot doğal dil sorgusu
+                    question = text[len("/ask"):].strip()
+                    await cmd_ask(sender, session, question)
+                elif cmd in COMMANDS:
+                    handler = COMMANDS[cmd]
                     await handler(sender, session)
-                else:
+                elif cmd.startswith("/"):
                     await send_whatsapp_message(
                         sender,
                         "❓ Bilinmeyen komut. Komut listesi için /help yazın.",
                         session
                     )
+                else:
+                    # Komut olmayan metin → ClawBot'a yönlendir
+                    await _clawbot_process(sender, session, text)
     except Exception as e:
         logger.error(f"Mesaj işleme hatası: {e}", exc_info=True)
 
@@ -550,7 +610,7 @@ async def proactive_health_check(session: aiohttp.ClientSession):
 # ─────────────────────────────────────────
 # aiohttp Web Sunucusu (Webhook + Alert)
 # ─────────────────────────────────────────
-async def webhook_handler(request: aiohttp.web.Request):
+async def webhook_handler(request: web.Request):
     """Meta WhatsApp webhook — gelen mesajlar."""
     if request.method == "GET":
         # Webhook doğrulama (Meta tarafından yapılır)
@@ -560,32 +620,32 @@ async def webhook_handler(request: aiohttp.web.Request):
 
         if mode == "subscribe" and token == CONFIG.get("verify_token", ""):
             logger.info("Webhook doğrulandı")
-            return aiohttp.web.Response(text=challenge)
+            return web.Response(text=challenge)
         else:
-            return aiohttp.web.Response(status=403, text="Forbidden")
+            return web.Response(status=403, text="Forbidden")
 
     # POST — gelen mesaj
     try:
         body = await request.json()
     except Exception:
-        return aiohttp.web.Response(status=400, text="Invalid JSON")
+        return web.Response(status=400, text="Invalid JSON")
 
     session = request.app.get("http_session")
     if session:
         asyncio.create_task(handle_incoming_message(body, session))
 
-    return aiohttp.web.Response(status=200, text="OK")
+    return web.Response(status=200, text="OK")
 
 
-async def alert_handler(request: aiohttp.web.Request):
+async def alert_handler(request: web.Request):
     """Alertmanager webhook — Prometheus alertleri."""
     if not CONFIG.get("notify_on_alert"):
-        return aiohttp.web.Response(status=200, text="Alerts disabled")
+        return web.Response(status=200, text="Alerts disabled")
 
     try:
         body = await request.json()
     except Exception:
-        return aiohttp.web.Response(status=400, text="Invalid JSON")
+        return web.Response(status=400, text="Invalid JSON")
 
     alerts = body.get("alerts", [])
     session = request.app.get("http_session")
@@ -624,25 +684,25 @@ async def alert_handler(request: aiohttp.web.Request):
             except Exception as e:
                 logger.error(f"Otomatik teşhis hatası: {e}")
 
-    return aiohttp.web.Response(status=200, text="OK")
+    return web.Response(status=200, text="OK")
 
 
-async def health_endpoint(request: aiohttp.web.Request):
+async def health_endpoint(request: web.Request):
     """Basit health check endpoint."""
-    return aiohttp.web.json_response({"status": "ok", "service": "anomivox-whatsapp-bot"})
+    return web.json_response({"status": "ok", "service": "anomivox-whatsapp-bot"})
 
 
 # ─────────────────────────────────────────
 # App lifecycle
 # ─────────────────────────────────────────
-async def on_startup(app: aiohttp.web.Application):
+async def on_startup(app: web.Application):
     app["http_session"] = aiohttp.ClientSession()
     if CONFIG and CONFIG.get("health_check_interval", 0) > 0:
         app["health_task"] = asyncio.create_task(proactive_health_check(app["http_session"]))
     logger.info("WhatsApp Bot başlatıldı")
 
 
-async def on_cleanup(app: aiohttp.web.Application):
+async def on_cleanup(app: web.Application):
     if "health_task" in app:
         app["health_task"].cancel()
     if "http_session" in app:
@@ -658,7 +718,7 @@ def main():
     if not CONFIG["access_token"]:
         logger.warning("WHATSAPP_ACCESS_TOKEN ayarlanmamış. Bot webhook modunda başlatılıyor.")
 
-    app = aiohttp.web.Application()
+    app = web.Application()
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
 
@@ -668,7 +728,7 @@ def main():
 
     port = int(os.getenv("WHATSAPP_BOT_PORT", "8025"))
     logger.info(f"WhatsApp Bot dinleniyor: port {port}")
-    aiohttp.web.run_app(app, host="0.0.0.0", port=port)
+    web.run_app(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

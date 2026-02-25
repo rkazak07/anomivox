@@ -12,6 +12,7 @@ CONFIG_FILES=(
     "telegram_config.py"
     "whatsapp_config.py"
     "mail_config.py"
+    "clawbot_config.py"
 )
 
 for f in "${CONFIG_FILES[@]}"; do

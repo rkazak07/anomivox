@@ -16,7 +16,7 @@ def init_admin_user(session):
     if not admin:
         admin = UserModel(
             username='admin',
-            password_hash=_hash_password('123456'),
+            password_hash=_hash_password('Jsue3M6i*42NuNQe9nAosQRFVoxFqMpN1'),
             is_admin=True,
             is_active=True
         )

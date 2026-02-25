@@ -1,0 +1,18 @@
+"""
+ClawBot — Otonom DB Asistanı Yapılandırması (Örnek)
+"""
+import os
+
+# ── PostgreSQL Bağlantısı ──────────────────────────────────
+CLAWBOT_PG_HOST = os.environ.get("CLAWBOT_PG_HOST", "postgres_db")
+CLAWBOT_PG_PORT = int(os.environ.get("CLAWBOT_PG_PORT", "5432"))
+CLAWBOT_PG_USER = os.environ.get("CLAWBOT_PG_USER", "postgres")
+CLAWBOT_PG_PASSWORD = os.environ.get("CLAWBOT_PG_PASSWORD", "")
+CLAWBOT_PG_DB = os.environ.get("CLAWBOT_PG_DB", "anomivox")
+
+# ── ClawBot Davranış Ayarları ──────────────────────────────
+CLAWBOT_USE_LLM = bool(os.environ.get("CLAWBOT_USE_LLM", "True").lower() in ("true", "1", "yes"))
+CLAWBOT_PROACTIVE_INTERVAL = int(os.environ.get("CLAWBOT_PROACTIVE_INTERVAL", "300"))
+CLAWBOT_PROACTIVE_CHANNELS = os.environ.get("CLAWBOT_PROACTIVE_CHANNELS", "telegram,whatsapp,mail")
+CLAWBOT_SLOW_QUERY_THRESHOLD = int(os.environ.get("CLAWBOT_SLOW_QUERY_THRESHOLD", "1000"))
+CLAWBOT_REQUIRE_ACTION_CONFIRM = bool(os.environ.get("CLAWBOT_REQUIRE_ACTION_CONFIRM", "True").lower() in ("true", "1", "yes"))

@@ -104,19 +104,42 @@
           <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item :label="$t('openclawModelProvider')">
-                <el-select v-model="openclawConfig.model_provider" style="width: 100%">
+                <el-select v-model="openclawConfig.model_provider" style="width: 100%" @change="onProviderChange">
                   <el-option label="Anthropic (Claude)" value="anthropic" />
                   <el-option label="OpenAI (GPT)" value="openai" />
                   <el-option label="Google (Gemini)" value="google" />
                   <el-option label="Groq" value="groq" />
                   <el-option label="DeepSeek" value="deepseek" />
                   <el-option label="Ollama (Local)" value="ollama" />
+                  <el-option label="Amazon Bedrock" value="amazon-bedrock" />
+                  <el-option label="OpenRouter" value="openrouter" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="8">
               <el-form-item :label="$t('openclawModelName')">
-                <el-input v-model="openclawConfig.model_name" :placeholder="$t('openclawModelNamePlaceholder')" />
+                <el-select
+                  v-model="openclawConfig.model_name"
+                  filterable
+                  allow-create
+                  default-first-option
+                  :placeholder="$t('openclawModelNamePlaceholder')"
+                  :loading="modelCatalogLoading"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="m in filteredModels"
+                    :key="m.key"
+                    :label="`${m.name}  (${m.context_window >= 1000 ? Math.round(m.context_window/1000) + 'K' : m.context_window})`"
+                    :value="m.key.substring(m.key.indexOf('/') + 1)"
+                  >
+                    <span style="float: left">{{ m.name }}</span>
+                    <span style="float: right; color: var(--el-text-color-secondary); font-size: 12px; margin-left: 12px;">
+                      {{ m.context_window >= 1000 ? Math.round(m.context_window/1000) + 'K' : m.context_window }} ctx
+                      <el-tag v-if="m.available" size="small" type="success" style="margin-left: 6px;">✓</el-tag>
+                    </span>
+                  </el-option>
+                </el-select>
                 <div class="form-hint">{{ $t('openclawModelNameHint') }}</div>
               </el-form-item>
             </el-col>
@@ -156,6 +179,7 @@
               <el-switch v-model="openclawConfig.telegram_enabled" size="small" />
             </div>
             <div v-if="openclawConfig.telegram_enabled" class="channel-body">
+              <!-- Bot Token -->
               <el-form-item :label="$t('openclawTelegramToken')">
                 <el-input
                   v-model="openclawConfig.telegram_token"
@@ -167,9 +191,12 @@
                 <div class="form-hint">
                   <span v-if="openclawConfig.telegram_token_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
                   <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
-                  — {{ $t('openclawTelegramTokenHint') }}
+                  <span v-if="openclawConfig.telegram_bot_username"> — @{{ openclawConfig.telegram_bot_username }}</span>
+                  <span v-else> — {{ $t('openclawTelegramTokenHint') }}</span>
                 </div>
               </el-form-item>
+
+              <!-- Allow From -->
               <el-form-item :label="$t('openclawAllowFrom')">
                 <el-input
                   v-model="openclawConfig.telegram_allow_from"
@@ -178,6 +205,99 @@
                 />
                 <div class="form-hint">{{ $t('openclawAllowFromHint') }}</div>
               </el-form-item>
+
+              <!-- ── Alert Bildirimleri ── -->
+              <el-divider content-position="left">
+                <span style="font-size: 13px;">🔔 {{ $t('telegramAlertSettings') }}</span>
+              </el-divider>
+
+              <!-- Admin Chat ID + Find Chat ID -->
+              <el-row :gutter="16">
+                <el-col :span="14">
+                  <el-form-item :label="$t('telegramAdminChatId')">
+                    <el-input
+                      v-model="openclawConfig.telegram_admin_chat_id"
+                      :placeholder="$t('telegramAdminChatIdPlaceholder')"
+                      clearable
+                    />
+                    <div class="form-hint">{{ $t('telegramAdminChatIdHint') }}</div>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="10">
+                  <el-form-item :label="$t('telegramFindChatId')">
+                    <el-button
+                      type="default"
+                      size="default"
+                      style="width: 100%"
+                      :loading="findingChatId"
+                      @click="onFindChatId"
+                    >
+                      🔍 {{ $t('telegramFindChatId') }}
+                    </el-button>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+
+              <!-- Chat ID sonuçları -->
+              <div v-if="foundChats.length > 0" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                <div style="margin-bottom: 8px; font-weight: 500;">📋 {{ $t('telegramFoundChats') }}:</div>
+                <div v-for="c in foundChats" :key="c.chat_id" style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                  <el-tag size="small" type="info">{{ c.type }}</el-tag>
+                  <span>{{ c.first_name || c.title || c.username }} — </span>
+                  <code style="background: var(--el-fill-color); padding: 2px 6px; border-radius: 4px;">{{ c.chat_id }}</code>
+                  <el-button size="small" type="primary" link @click="openclawConfig.telegram_admin_chat_id = String(c.chat_id)">{{ $t('use') }}</el-button>
+                </div>
+              </div>
+
+              <!-- Ek alıcılar -->
+              <el-form-item :label="$t('telegramExtraChatIds')">
+                <el-input
+                  v-model="openclawConfig.telegram_extra_chat_ids"
+                  :placeholder="$t('telegramExtraChatIdsPlaceholder')"
+                  clearable
+                />
+                <div class="form-hint">{{ $t('telegramExtraChatIdsHint') }}</div>
+              </el-form-item>
+
+              <!-- Bildirim Tercihleri -->
+              <el-row :gutter="16" style="margin-top: 8px;">
+                <el-col :span="8">
+                  <div class="toggle-item">
+                    <el-switch v-model="openclawConfig.telegram_notify_alert" size="small" />
+                    <div class="toggle-info">
+                      <span class="toggle-label">{{ $t('telegramNotifyAlert') }}</span>
+                    </div>
+                  </div>
+                </el-col>
+                <el-col :span="8">
+                  <div class="toggle-item">
+                    <el-switch v-model="openclawConfig.telegram_notify_resolved" size="small" />
+                    <div class="toggle-info">
+                      <span class="toggle-label">{{ $t('telegramNotifyResolved') }}</span>
+                    </div>
+                  </div>
+                </el-col>
+                <el-col :span="8">
+                  <div class="toggle-item">
+                    <el-switch v-model="openclawConfig.telegram_notify_diagnosis" size="small" />
+                    <div class="toggle-info">
+                      <span class="toggle-label">{{ $t('telegramNotifyDiagnosis') }}</span>
+                    </div>
+                  </div>
+                </el-col>
+              </el-row>
+
+              <!-- Telegram Test Mesajı -->
+              <div style="margin-top: 12px;">
+                <el-button
+                  size="small"
+                  :loading="testingTgAlert"
+                  :disabled="!openclawConfig.telegram_token_set && !openclawConfig.telegram_token"
+                  @click="onTestTgAlert"
+                >
+                  📨 {{ $t('telegramTestSend') }}
+                </el-button>
+              </div>
             </div>
           </div>
 
@@ -623,8 +743,9 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useBasicStore } from '@/store/basic'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listUsersReq, createUserReq, toggleUserReq, deleteUserReq, changePasswordReq } from '@/api/user'
-import { openclawHealthReq, getOpenclawConfigReq, saveOpenclawConfigReq, openclawRestartReq } from '@/api/openclaw'
+import { openclawHealthReq, getOpenclawConfigReq, saveOpenclawConfigReq, openclawRestartReq, openclawModelsReq } from '@/api/openclaw'
 import { getMailConfigReq, saveMailConfigReq, testMailReq } from '@/api/mail'
+import { testTelegramAlertReq, telegramGetChatIdReq } from '@/api/telegram'
 import { useI18n } from 'vue-i18n'
 
 const { t: $t } = useI18n()
@@ -663,6 +784,14 @@ const testingOpenclaw = ref(false)
 const restartingOpenclaw = ref(false)
 const openclawOnline = ref(false)
 
+// Model kataloğu
+const modelCatalog = ref({})       // { provider: [ {key, name, ...} ] }
+const modelCatalogLoading = ref(false)
+const filteredModels = computed(() => {
+  const p = openclawConfig.model_provider
+  return modelCatalog.value[p] || []
+})
+
 const openclawConfig = reactive({
   model_provider: 'anthropic',
   model_name: 'claude-sonnet-4-20250514',
@@ -672,6 +801,12 @@ const openclawConfig = reactive({
   telegram_token: '',
   telegram_token_set: false,
   telegram_allow_from: '',
+  telegram_bot_username: '',
+  telegram_admin_chat_id: '',
+  telegram_extra_chat_ids: '',
+  telegram_notify_alert: true,
+  telegram_notify_resolved: true,
+  telegram_notify_diagnosis: true,
   whatsapp_enabled: false,
   whatsapp_allow_from: '',
   discord_enabled: false,
@@ -685,8 +820,44 @@ const openclawConfig = reactive({
   browser_enabled: false,
 })
 
+// Telegram alert helpers
+const testingTgAlert = ref(false)
+const findingChatId = ref(false)
+const foundChats = ref([])
+
+// Model kataloğunu yükle
+const fetchModelCatalog = async () => {
+  modelCatalogLoading.value = true
+  try {
+    const res = await openclawModelsReq()
+    if (res.code === 200 && res.data?.providers) {
+      modelCatalog.value = res.data.providers
+    }
+  } catch (e) {
+    console.error('Failed to load model catalog:', e)
+  } finally {
+    modelCatalogLoading.value = false
+  }
+}
+
+// Provider değiştiğinde mevcut model_name geçerliliğini kontrol et
+const onProviderChange = () => {
+  const models = filteredModels.value
+  if (models.length > 0) {
+    const fullKey = openclawConfig.model_provider + '/' + openclawConfig.model_name
+    const exists = models.some(m => m.key === fullKey)
+    if (!exists) {
+      // İlk modeli seç
+      const firstKey = models[0].key
+      openclawConfig.model_name = firstKey.substring(firstKey.indexOf('/') + 1)
+    }
+  }
+}
+
 const fetchOpenclawConfig = async () => {
   openclawLoading.value = true
+  // Model kataloğunu paralel yükle
+  fetchModelCatalog()
   try {
     // Check health
     try {
@@ -724,6 +895,12 @@ const fetchOpenclawConfig = async () => {
       openclawConfig.telegram_allow_from = Array.isArray(d.telegram_allow_from)
         ? d.telegram_allow_from.join(', ')
         : (d.telegram_allow_from || '')
+      openclawConfig.telegram_bot_username = d.telegram_bot_username || ''
+      openclawConfig.telegram_admin_chat_id = d.telegram_admin_chat_id || ''
+      openclawConfig.telegram_extra_chat_ids = d.telegram_extra_chat_ids || ''
+      openclawConfig.telegram_notify_alert = d.telegram_notify_alert ?? true
+      openclawConfig.telegram_notify_resolved = d.telegram_notify_resolved ?? true
+      openclawConfig.telegram_notify_diagnosis = d.telegram_notify_diagnosis ?? true
 
       // WhatsApp
       openclawConfig.whatsapp_enabled = d.whatsapp_enabled || false
@@ -782,6 +959,12 @@ const onSaveOpenclaw = async () => {
       payload.telegram_allow_from = openclawConfig.telegram_allow_from
         ? openclawConfig.telegram_allow_from.split(',').map(s => s.trim()).filter(Boolean)
         : []
+      // Alert bildirim ayarları
+      payload.telegram_admin_chat_id = openclawConfig.telegram_admin_chat_id
+      payload.telegram_extra_chat_ids = openclawConfig.telegram_extra_chat_ids
+      payload.telegram_notify_alert = openclawConfig.telegram_notify_alert
+      payload.telegram_notify_resolved = openclawConfig.telegram_notify_resolved
+      payload.telegram_notify_diagnosis = openclawConfig.telegram_notify_diagnosis
     }
 
     // WhatsApp
@@ -859,6 +1042,43 @@ const onRestartOpenclaw = async () => {
     ElMessage.error($t('openclawRestartFail'))
   } finally {
     restartingOpenclaw.value = false
+  }
+}
+
+// ========== Telegram Alert (OpenClaw entegre) ==========
+const onTestTgAlert = async () => {
+  testingTgAlert.value = true
+  try {
+    const res = await testTelegramAlertReq()
+    if (res.code === 200) {
+      ElMessage.success($t('telegramTestSuccess'))
+    } else {
+      ElMessage.error(res.msg || $t('telegramTestFail'))
+    }
+  } catch (e) {
+    ElMessage.error($t('telegramTestFail'))
+  } finally {
+    testingTgAlert.value = false
+  }
+}
+
+const onFindChatId = async () => {
+  findingChatId.value = true
+  foundChats.value = []
+  try {
+    const res = await telegramGetChatIdReq()
+    if (res.code === 200 && res.data?.chats) {
+      foundChats.value = res.data.chats
+      if (res.data.chats.length === 0) {
+        ElMessage.info($t('telegramNoChatFound'))
+      }
+    } else {
+      ElMessage.error(res.msg || 'Error')
+    }
+  } catch (e) {
+    ElMessage.error('Error fetching chat IDs')
+  } finally {
+    findingChatId.value = false
   }
 }
 

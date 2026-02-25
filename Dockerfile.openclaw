@@ -20,6 +20,10 @@ WORKDIR /home/node
 COPY openclaw-entrypoint.sh /usr/local/bin/openclaw-entrypoint.sh
 RUN chmod +x /usr/local/bin/openclaw-entrypoint.sh
 
+# OpenClaw skill dosyalarını kopyala
+COPY openclaw_skills/BOOTSTRAP.md /home/node/.openclaw/BOOTSTRAP.md
+COPY openclaw_skills/anomivox-dba/ /home/node/.openclaw/workspace/skills/anomivox-dba/
+
 # Volume mount noktalarını node kullanıcısı için hazırla
 RUN mkdir -p /home/node/.openclaw/workspace/skills && \
     chown -R node:node /home/node/.openclaw

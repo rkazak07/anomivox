@@ -34,6 +34,7 @@ services:
       - kb_data:/app/knowledge_base
       - logs_data:/app/logs
       - openclaw_data:/openclaw-config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - agent_network
     depends_on:
@@ -161,12 +162,39 @@ services:
     environment:
       APP_MODE: python_app
       PYTHONPATH: /app
+      # OpenClaw entegrasyonu — alert bildirimleri
+      OPENCLAW_GATEWAY_URL: http://openclaw:18789
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_NOTIFY_ENABLED: "true"
+      # Telegram Bot API — alert bildirimleri
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+      TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS:-}
+      # Prometheus
+      PROMETHEUS_URL: http://prometheus:9090
+      # Multi-DB — diagnostik sorgular için
+      DB_TYPE: ${DB_TYPE:-postgresql}
+      DB_HOST: ${DB_HOST:-postgres_db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-${POSTGRES_USER:-test}}
+      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-Test123_456}}
+      DB_NAME: ${DB_NAME:-${POSTGRES_DB:-anomivox}}
+      DB_SERVICE_NAME: ${DB_SERVICE_NAME:-}
+      # Legacy uyumluluk
+      PG_HOST: ${DB_HOST:-postgres_db}
+      PG_PORT: ${DB_PORT:-5432}
+      PG_USER: ${DB_USER:-${POSTGRES_USER:-test}}
+      PG_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-Test123_456}}
+      PG_DB: ${DB_NAME:-${POSTGRES_DB:-anomivox}}
     volumes:
       - ./configs:/app/configs
     ports:
       - "8023:8023"
     networks:
       - agent_network
+    depends_on:
+      postgres_db:
+        condition: service_healthy
     restart: unless-stopped
 
   # ─────────────────────────────────────────────

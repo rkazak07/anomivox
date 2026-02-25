@@ -11,6 +11,7 @@ OpenClaw Gateway'e bağlanarak:
 import json
 import os
 import logging
+import asyncio
 import aiohttp
 from fastapi import Body, Header
 from typing import Optional
@@ -152,6 +153,28 @@ async def get_openclaw_config(
     tg_groups = tg.get("groups", {})
     safe_config["telegram_groups"] = tg_groups
 
+    # Telegram alert ayarları (telegram_alert_config.py'den)
+    try:
+        from server.telegram.telegram_alert_api import _read_config as _read_tg_alert, _get_bot_info
+        tg_alert = _read_tg_alert()
+        safe_config["telegram_admin_chat_id"] = tg_alert.get("admin_chat_id", "")
+        safe_config["telegram_extra_chat_ids"] = tg_alert.get("extra_chat_ids", "")
+        safe_config["telegram_notify_alert"] = tg_alert.get("notify_on_alert", True)
+        safe_config["telegram_notify_resolved"] = tg_alert.get("notify_on_resolved", True)
+        safe_config["telegram_notify_diagnosis"] = tg_alert.get("notify_on_diagnosis", True)
+        # Bot username
+        if tg_token:
+            info = _get_bot_info(tg_token)
+            if info.get("ok"):
+                safe_config["telegram_bot_username"] = info.get("username", "")
+    except Exception as e:
+        logger.warning(f"Telegram alert config read error: {e}")
+        safe_config["telegram_admin_chat_id"] = ""
+        safe_config["telegram_extra_chat_ids"] = ""
+        safe_config["telegram_notify_alert"] = True
+        safe_config["telegram_notify_resolved"] = True
+        safe_config["telegram_notify_diagnosis"] = True
+
     # WhatsApp
     wa = channels.get("whatsapp", {})
     safe_config["whatsapp_enabled"] = wa.get("enabled", bool(wa))
@@ -203,11 +226,11 @@ async def save_openclaw_config(
                 if not config["agent"]:
                     config.pop("agent", None)
 
-        # API Key — sağlayıcıya göre agents.defaults.apiKey olarak sakla
-        if "api_key" in data and data["api_key"]:
-            agents = config.setdefault("agents", {})
-            defaults = agents.setdefault("defaults", {})
-            defaults["apiKey"] = data["api_key"]
+        # API Key — OpenClaw config'e YAZILMAZ (env var olarak geçer)
+        # apiKey config'te tanınmayan bir key, GROQ_API_KEY vb. docker env olarak verilir
+        # Eğer config'te kalmışsa temizle
+        agents_d = config.get("agents", {}).get("defaults", {})
+        agents_d.pop("apiKey", None)
 
         # Gateway
         if "gateway_port" in data:
@@ -222,12 +245,43 @@ async def save_openclaw_config(
         if data.get("telegram_enabled") is False:
             config["channels"].pop("telegram", None)
         else:
+            tg = config["channels"].setdefault("telegram", {})
+            tg["enabled"] = True
             if "telegram_bot_token" in data and data["telegram_bot_token"]:
-                config["channels"].setdefault("telegram", {})["botToken"] = data["telegram_bot_token"]
+                tg["botToken"] = data["telegram_bot_token"]
             if "telegram_allow_from" in data:
-                config["channels"].setdefault("telegram", {})["allowFrom"] = data["telegram_allow_from"]
+                allow_list = data["telegram_allow_from"]
+                tg["allowFrom"] = allow_list
+                # allowFrom doluysa allowlist, boşsa open — böylece herkes yazabilir
+                tg["dmPolicy"] = "allowlist" if allow_list else "open"
+            # Varsayılanları koru
+            tg.setdefault("groupPolicy", "allowlist")
+            tg.setdefault("streaming", "off")
             if "telegram_groups" in data:
-                config["channels"].setdefault("telegram", {})["groups"] = data["telegram_groups"]
+                tg["groups"] = data["telegram_groups"]
+
+        # Telegram alert ayarlarını telegram_alert_config.py'ye de yaz
+        try:
+            from server.telegram.telegram_alert_api import _read_config as _read_tg, _write_config as _write_tg
+            tg_alert = _read_tg()
+            # Bot token — OpenClaw'dan al
+            tg_ch = config.get("channels", {}).get("telegram", {})
+            bot_token = tg_ch.get("botToken", "") or tg_alert.get("bot_token", "")
+            tg_alert["bot_token"] = bot_token
+            tg_alert["enabled"] = data.get("telegram_enabled", tg_alert.get("enabled", True))
+            if "telegram_admin_chat_id" in data:
+                tg_alert["admin_chat_id"] = str(data["telegram_admin_chat_id"]).strip()
+            if "telegram_extra_chat_ids" in data:
+                tg_alert["extra_chat_ids"] = str(data["telegram_extra_chat_ids"]).strip()
+            if "telegram_notify_alert" in data:
+                tg_alert["notify_on_alert"] = bool(data["telegram_notify_alert"])
+            if "telegram_notify_resolved" in data:
+                tg_alert["notify_on_resolved"] = bool(data["telegram_notify_resolved"])
+            if "telegram_notify_diagnosis" in data:
+                tg_alert["notify_on_diagnosis"] = bool(data["telegram_notify_diagnosis"])
+            _write_tg(tg_alert)
+        except Exception as e:
+            logger.error(f"Telegram alert config write error: {e}")
 
         # WhatsApp
         if data.get("whatsapp_enabled") is False:
@@ -345,23 +399,153 @@ async def openclaw_channels(
 async def openclaw_restart(
     authorization: Optional[str] = Header(None)
 ):
-    """OpenClaw Gateway'i yeniden başlat (config değişikliklerini uygulamak için)"""
+    """OpenClaw Gateway'i yeniden başlat (Docker container restart)"""
     try:
-        gateway_url = _get_gateway_url()
-        token = os.environ.get("OPENCLAW_GATEWAY_TOKEN", "")
-        headers = {}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.UnixConnector(path="/var/run/docker.sock")
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(
-                f"{gateway_url}/api/gateway/restart",
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=15)
+                f"http://localhost/containers/{OPENCLAW_CONTAINER}/restart",
+                timeout=aiohttp.ClientTimeout(total=30)
             ) as resp:
-                if resp.status == 200:
+                if resp.status == 204:
                     return {"code": 200, "msg": "Gateway yeniden başlatılıyor"}
                 else:
-                    return {"code": resp.status, "msg": f"Gateway restart hatası: {resp.status}"}
+                    body = await resp.text()
+                    return {"code": resp.status, "msg": f"Docker restart hatası: {body[:200]}"}
     except Exception as e:
         return {"code": 500, "msg": f"Restart hatası: {str(e)[:200]}"}
+
+
+# ── Model Listesi ─────────────────────────────────────────
+# Model kataloğu OpenClaw CLI'dan çekilir ve bellekte cache'lenir.
+_models_cache: dict = {"data": None, "ts": 0}
+_MODELS_CACHE_TTL = 600  # 10 dakika
+
+OPENCLAW_CONTAINER = os.environ.get("OPENCLAW_CONTAINER_NAME", "anomivox-openclaw-1")
+
+
+async def _docker_exec(container: str, cmd: list[str], timeout: int = 30) -> tuple[int, str, str]:
+    """Docker socket API üzerinden container'da komut çalıştır"""
+    import urllib.parse
+    try:
+        connector = aiohttp.UnixConnector(path="/var/run/docker.sock")
+        async with aiohttp.ClientSession(connector=connector) as session:
+            # 1. exec oluştur
+            create_url = f"http://localhost/containers/{container}/exec"
+            create_body = {
+                "AttachStdout": True,
+                "AttachStderr": True,
+                "Cmd": cmd,
+            }
+            async with session.post(create_url, json=create_body) as resp:
+                if resp.status != 201:
+                    err = await resp.text()
+                    return 1, "", f"exec create failed ({resp.status}): {err[:200]}"
+                exec_id = (await resp.json())["Id"]
+
+            # 2. exec başlat
+            start_url = f"http://localhost/exec/{exec_id}/start"
+            async with session.post(start_url, json={"Detach": False}) as resp:
+                raw = await asyncio.wait_for(resp.read(), timeout=timeout)
+                # Docker demux: ilk 8 byte header, kalan data
+                output = _demux_docker_stream(raw)
+
+            # 3. exit code al
+            inspect_url = f"http://localhost/exec/{exec_id}/json"
+            async with session.get(inspect_url) as resp:
+                info = await resp.json()
+                exit_code = info.get("ExitCode", -1)
+
+            return exit_code, output, ""
+    except Exception as e:
+        return 1, "", str(e)[:300]
+
+
+def _demux_docker_stream(data: bytes) -> str:
+    """Docker stream multiplexing format'ını parse et"""
+    output = []
+    pos = 0
+    while pos + 8 <= len(data):
+        # header: [stream_type(1), 0, 0, 0, size(4)]
+        stream_type = data[pos]
+        size = int.from_bytes(data[pos+4:pos+8], "big")
+        pos += 8
+        if pos + size > len(data):
+            # Kalan veriyi al
+            output.append(data[pos:].decode("utf-8", errors="replace"))
+            break
+        chunk = data[pos:pos+size].decode("utf-8", errors="replace")
+        if stream_type in (1, 2):  # stdout veya stderr
+            output.append(chunk)
+        pos += size
+    # Eğer demux başarısızsa, raw olarak dön
+    if not output and data:
+        return data.decode("utf-8", errors="replace")
+    return "".join(output)
+
+
+async def _exec_openclaw_models_list() -> list:
+    """OpenClaw container'ından model listesini al"""
+    try:
+        exit_code, stdout, stderr = await _docker_exec(
+            OPENCLAW_CONTAINER,
+            ["openclaw", "models", "list", "--all", "--json"],
+            timeout=30,
+        )
+        if exit_code == 0 and stdout:
+            result = json.loads(stdout)
+            return result.get("models", [])
+        else:
+            logger.error(f"openclaw models list failed (exit={exit_code}): {stderr[:200]}")
+            return []
+    except json.JSONDecodeError as e:
+        logger.error(f"Model list JSON parse error: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Model list error: {e}")
+        return []
+
+
+async def openclaw_models(
+    provider: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
+):
+    """OpenClaw'un desteklediği model kataloğunu döndür"""
+    import time
+    now = time.time()
+
+    # Cache kontrolü
+    if _models_cache["data"] and (now - _models_cache["ts"]) < _MODELS_CACHE_TTL:
+        models = _models_cache["data"]
+    else:
+        models = await _exec_openclaw_models_list()
+        if models:
+            _models_cache["data"] = models
+            _models_cache["ts"] = now
+        else:
+            models = _models_cache["data"] or []
+
+    # Provider filtresi
+    if provider:
+        provider_lower = provider.lower()
+        models = [m for m in models if m.get("key", "").startswith(f"{provider_lower}/")]
+
+    # Provider'a göre grupla
+    providers = {}
+    for m in models:
+        key = m.get("key", "")
+        p = key.split("/")[0] if "/" in key else "other"
+        if p not in providers:
+            providers[p] = []
+        providers[p].append({
+            "key": key,
+            "name": m.get("name", key),
+            "context_window": m.get("contextWindow", 0),
+            "available": m.get("available", False),
+            "input": m.get("input", "text"),
+        })
+
+    return {"code": 200, "msg": "success", "data": {
+        "total": len(models),
+        "providers": providers,
+    }}

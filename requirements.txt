@@ -43,6 +43,9 @@ duckdb==0.9.2
 astor==0.8.1
 chromadb==0.4.20
 pymysql==1.1.0
+mysql-connector-python>=8.2.0
+oracledb>=2.0.0
+pymssql>=2.2.11
 paramiko==3.3.1
 psycopg2-binary; platform_python_implementation == "CPython"
 jpype1==1.4.1

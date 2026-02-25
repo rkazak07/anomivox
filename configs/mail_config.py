@@ -24,10 +24,10 @@ MAIL_RECIPIENTS = [
 ]
 
 # Bildirim ayarları
-MAIL_NOTIFY_ON_ALERT = True          # Prometheus alert geldiğinde mail gönder
-MAIL_NOTIFY_ON_DIAGNOSIS = True      # Teşhis tamamlandığında mail gönder
-MAIL_NOTIFY_ON_HEALTH = False        # Sağlık kontrolü sorunlarında mail gönder
+MAIL_NOTIFY_ON_ALERT = True
+MAIL_NOTIFY_ON_DIAGNOSIS = True
+MAIL_NOTIFY_ON_HEALTH = False
 
 # Proaktif izleme
-MAIL_HEALTH_CHECK_INTERVAL = 300     # Sağlık kontrolü aralığı (saniye)
-MAIL_SLOW_QUERY_THRESHOLD = 5.0      # Yavaş sorgu eşiği (saniye)
+MAIL_HEALTH_CHECK_INTERVAL = 300
+MAIL_SLOW_QUERY_THRESHOLD = 5.0

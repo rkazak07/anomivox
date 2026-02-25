@@ -98,6 +98,7 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     mount_alert_routes(app)
     mount_diagnose_routes(app)
     mount_mail_routes(app)
+    mount_telegram_alert_routes(app)
     mount_openclaw_routes(app)
 
     from server.utils import all_embed_models
@@ -193,10 +194,22 @@ def mount_mail_routes(app: FastAPI):
     app.post("/mail/test", tags=["Mail"], response_model=BaseResponse, summary="SMTP bağlantı testi (admin)")(test_mail_connection)
 
 
+def mount_telegram_alert_routes(app: FastAPI):
+    from server.telegram.telegram_alert_api import (
+        get_telegram_alert_config, save_telegram_alert_config,
+        test_telegram_alert, telegram_get_chat_id
+    )
+    app.get("/telegram/config", tags=["Telegram"], response_model=BaseResponse, summary="Telegram alert ayarlarını getir")(get_telegram_alert_config)
+    app.post("/telegram/config", tags=["Telegram"], response_model=BaseResponse, summary="Telegram alert ayarlarını kaydet")(save_telegram_alert_config)
+    app.post("/telegram/test", tags=["Telegram"], response_model=BaseResponse, summary="Telegram test mesajı gönder")(test_telegram_alert)
+    app.get("/telegram/chatid", tags=["Telegram"], response_model=BaseResponse, summary="Telegram chat ID bul")(telegram_get_chat_id)
+
+
 def mount_openclaw_routes(app: FastAPI):
     from server.openclaw.openclaw_api import (
         openclaw_health, get_openclaw_config, save_openclaw_config,
         openclaw_send_message, openclaw_channels, openclaw_restart,
+        openclaw_models,
     )
     app.get("/openclaw/health", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw Gateway durumu")(openclaw_health)
     app.get("/openclaw/config", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw ayarlarını getir")(get_openclaw_config)
@@ -204,6 +217,7 @@ def mount_openclaw_routes(app: FastAPI):
     app.post("/openclaw/send", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw mesaj gönder")(openclaw_send_message)
     app.get("/openclaw/channels", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw kanal listesi")(openclaw_channels)
     app.post("/openclaw/restart", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw Gateway restart")(openclaw_restart)
+    app.get("/openclaw/models", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw model kataloğu")(openclaw_models)
 
 
 def mount_diagnose_routes(app: FastAPI):

@@ -63,5 +63,19 @@ export const openclawRestartReq = () => {
   return axiosReq({
     url: 'openclaw/restart',
     method: 'post',
+    timeout: 35000,
+  })
+}
+
+/**
+ * OpenClaw model kataloğu
+ */
+export const openclawModelsReq = (provider = '') => {
+  return axiosReq({
+    url: 'openclaw/models',
+    method: 'get',
+    params: provider ? { provider } : {},
+    reqLoading: false,
+    timeout: 30000,
   })
 }

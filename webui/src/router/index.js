@@ -90,6 +90,18 @@ export const constantRoutes = [
       }
     ]
   },
+  {
+    path: '/settings',
+    component: Layout,
+    children: [
+      {
+        path: '/settings',
+        name: 'Settings',
+        component: () => import('@/views/settings/index.vue'),
+        meta: { title: 'Settings', elSvgIcon: 'Setting' }
+      }
+    ]
+  },
   { path: "/:pathMatch(.*)", redirect: "/404", hidden: true }
 ]
 

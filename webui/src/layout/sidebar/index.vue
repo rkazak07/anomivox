@@ -1,58 +1,106 @@
 <template>
-  <div id="Sidebar" class="reset-menu-style columnBC relative">
+  <div id="Sidebar" class="sidebar-root">
 
-    <div class="columnSC">
-      <!--logo-->
-      <Logo :collapse="true" style="margin: 20px 0; flex-shrink: 0" />
-      <!--router menu-->
-      <div class="columnSC" style="width: 100%; height: 100%; overflow-y: scroll; position: relative">
-        <sidebar-item v-for="route in allRoutes" :key="route.path" :item="route" :base-path="route.path" :active-path="activeMenu" />
-      </div>
+    <!-- Logo -->
+    <div class="sidebar-logo-area">
+      <Logo :collapse="true" />
     </div>
 
-    <div class="columnCC">
-      <div class="theme-toggle" @click="onThemeClick">
-        <svg v-if="currentTheme === 'lighting-theme'" class="icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-        <svg v-else class="icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
+    <!-- Navigation -->
+    <nav class="sidebar-nav">
+      <sidebar-item
+        v-for="route in allRoutes"
+        :key="route.path"
+        :item="route"
+        :base-path="route.path"
+        :active-path="activeMenu"
+      />
+    </nav>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <!-- Quick actions row -->
+      <div class="sidebar-actions">
+        <button class="action-btn" :title="isDark ? 'Light Mode' : 'Dark Mode'" @click="onThemeClick">
+          <svg v-if="isDark" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
+        <button class="action-btn lang-btn" :title="currentLang === 'tr' ? 'Switch to English' : 'Türkçe\'ye geç'" @click="onLanguageClick">
+          {{ currentLang === 'tr' ? 'TR' : 'EN' }}
+        </button>
       </div>
-      <div class="columnCC" style="padding-bottom: 24px;">
-        <div class="lang-toggle" @click="onLanguageClick">
-          <span :class="{ active: currentLang === 'en' }">EN</span>
-          <span class="divider">/</span>
-          <span :class="{ active: currentLang === 'tr' }">TR</span>
+
+      <!-- User section -->
+      <el-popover
+        placement="right-end"
+        :width="220"
+        trigger="click"
+        :show-arrow="false"
+        :offset="12"
+        popper-class="sidebar-user-popover"
+      >
+        <template #reference>
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">
+              <span>{{ avatarLetter }}</span>
+            </div>
+            <div class="sidebar-user-info">
+              <span class="sidebar-user-name">{{ displayName }}</span>
+              <span class="sidebar-user-role">{{ isAdmin ? 'Admin' : 'User' }}</span>
+            </div>
+            <svg class="sidebar-user-more" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
+            </svg>
+          </div>
+        </template>
+        <div class="popover-menu">
+          <div class="popover-menu-item" @click="goToSettings">
+            <el-icon :size="16"><Setting /></el-icon>
+            <span>{{ $t('settingsTitle') }}</span>
+          </div>
+          <div class="popover-menu-divider"></div>
+          <div class="popover-menu-item popover-menu-item--danger" @click="handleLogout">
+            <el-icon :size="16"><SwitchButton /></el-icon>
+            <span>{{ $t('logoutButton') }}</span>
+          </div>
         </div>
-      </div>
+      </el-popover>
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia/dist/pinia'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { Setting, SwitchButton } from '@element-plus/icons-vue'
 import Logo from './Logo.vue'
 import SidebarItem from './SidebarItem.vue'
 import { useBasicStore } from '@/store/basic'
-const { allRoutes } = storeToRefs(useBasicStore())
+import { resetState } from '@/hooks/use-permission'
+import { elMessage } from '@/hooks/use-element'
+import { loginOutReq } from '@/api/user'
+
+const { t: $t } = useI18n()
+const router = useRouter()
+const basicStore = useBasicStore()
+const { allRoutes } = storeToRefs(basicStore)
 const routeInstance = useRoute()
 let useConfigStore = reactive({})
 const currentLang = ref('tr')
 const currentTheme = ref('lighting-theme')
 
 const themeList = ['lighting-theme', 'dark']
+const isDark = computed(() => currentTheme.value === 'dark')
+
+const displayName = computed(() => basicStore.userInfo?.username || 'User')
+const avatarLetter = computed(() => (displayName.value[0] || 'U').toUpperCase())
+const isAdmin = computed(() => basicStore.roles?.includes('admin'))
 
 setTimeout(() => {
   import('@/store/config').then((res) => {
@@ -64,7 +112,6 @@ setTimeout(() => {
 
 const activeMenu = computed(() => {
   const { meta, path } = routeInstance
-  // if set path, the sidebar will highlight the path you set
   if (meta.activeMenu) {
     return meta.activeMenu
   }
@@ -82,67 +129,210 @@ const onThemeClick = () => {
   const newTheme = themeList[(themeList.indexOf(theme) + 1) % themeList.length]
   setTheme(newTheme)
   currentTheme.value = newTheme
-  console.log('change theme:', newTheme)
 }
 
+const goToSettings = () => {
+  router.push('/settings')
+}
+
+const handleLogout = () => {
+  loginOutReq().then(() => {
+    elMessage($t('logoutSuccess'))
+    router.push('/login?redirect=/')
+    nextTick(() => {
+      resetState()
+    })
+  })
+}
 </script>
+
 <style lang="scss">
-//fix open the item style issue
+/* ── Sidebar Root ── */
+.sidebar-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--el-menu-bg-color);
+  border-right: 1px solid var(--side-bar-border-right-color);
+  overflow: hidden;
+}
+
 .el-menu-vertical {
   width: var(--side-bar-width);
 }
-.reset-menu-style {
-  border-right: 1px solid var(--side-bar-border-right-color);
-  background-color: var(--el-menu-bg-color);
+
+/* ── Logo ── */
+.sidebar-logo-area {
+  flex-shrink: 0;
+  padding: 20px 14px 16px;
+  display: flex;
+  align-items: center;
 }
 
-.theme-toggle {
-  margin-bottom: 16px;
+/* ── Navigation ── */
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+
+  /* Thin custom scrollbar */
+  &::-webkit-scrollbar {
+    width: 3px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--el-border-color-lighter);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ── Footer ── */
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--el-border-color-lighter, rgba(255,255,255,0.06));
+}
+
+/* ── Action Buttons (theme + lang) ── */
+.sidebar-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: var(--el-fill-color-lighter, rgba(255,255,255,0.04));
+  color: var(--el-text-color-secondary, #94A3B8);
   cursor: pointer;
-  background: var(--el-fill-color-light, #F1F5F9);
+  transition: all 0.2s ease;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+
+  &:hover {
+    background: var(--el-fill-color, rgba(255,255,255,0.08));
+    color: var(--el-text-color-primary, #F8FAFC);
+  }
+}
+
+.lang-btn {
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+}
+
+/* ── User Section ── */
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 8px;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-  color: var(--el-text-color-regular, #64748B);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &:hover {
-    background: var(--el-fill-color, #E2E8F0);
-    color: var(--el-color-primary, #0284C7);
-  }
-}
-
-.lang-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--el-fill-color-light, #F1F5F9);
-  padding: 8px 16px;
-  border-radius: 20px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  color: var(--el-text-color-regular, #64748B);
-  font-weight: 600;
-  font-size: 14px;
-  border: 1px solid var(--el-border-color-light, #E2E8F0);
-  
-  &:hover {
-    background: var(--el-fill-color, #E2E8F0);
-    color: var(--el-text-color-primary, #0F172A);
-  }
+  transition: all 0.2s ease;
 
-  span {
-    transition: color 0.3s ease;
-    &.active {
-      color: var(--el-color-primary, #0284C7);
+  &:hover {
+    background: var(--el-fill-color-lighter, rgba(255,255,255,0.04));
+
+    .sidebar-user-more {
+      opacity: 1;
     }
   }
+}
 
-  .divider {
-    margin: 0 8px;
-    opacity: 0.5;
+.sidebar-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--el-color-primary, #38BDF8), var(--el-color-primary-light-3, #7DD3FC));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  span {
+    font-weight: 700;
+    font-size: 13px;
+    color: #fff;
+    line-height: 1;
   }
+}
+
+.sidebar-user-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #F8FAFC);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-role {
+  font-size: 11px;
+  color: var(--el-text-color-secondary, #94A3B8);
+  line-height: 1.2;
+}
+
+.sidebar-user-more {
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--el-text-color-secondary, #94A3B8);
+  transition: opacity 0.2s ease;
+}
+
+/* ── Popover Menu ── */
+.sidebar-user-popover {
+  border-radius: 12px !important;
+  padding: 6px !important;
+  border: 1px solid var(--el-border-color-lighter) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08) !important;
+}
+
+.popover-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--el-text-color-regular);
+  font-size: 13px;
+  font-weight: 500;
+
+  &:hover {
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-primary);
+  }
+
+  &--danger:hover {
+    background: var(--el-color-danger-light-9, rgba(239,68,68,0.1));
+    color: var(--el-color-danger, #EF4444);
+  }
+}
+
+.popover-menu-divider {
+  height: 1px;
+  background: var(--el-border-color-lighter);
+  margin: 4px 8px;
 }
 </style>

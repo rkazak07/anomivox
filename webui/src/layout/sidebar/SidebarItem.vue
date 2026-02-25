@@ -2,8 +2,8 @@
   <template v-if="!item.hidden">
     <template v-if="showSidebarItem(item.children, item)">
       <Link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild.path)">
-        <div :class="`sidebar-item ${isActived ? ' sidebar-item-active': ''}`">
-          <el-icon style="margin: 10px 0" :color="isActived ? 'var(--el-menu-active-color)' : 'var(--el-menu-text-color)' " size="24">
+        <div :class="['sidebar-item', { 'sidebar-item-active': isActived }]">
+          <el-icon :color="isActived ? 'var(--el-menu-active-color)' : 'var(--el-menu-text-color)'" size="18">
             <component :is="onlyOneChild.meta?.elSvgIcon" />
           </el-icon>
           <span>{{ langTitle(onlyOneChild.meta?.title) }}</span>
@@ -73,21 +73,17 @@ const isActived = computed(() => {
 .sidebar-item {
   display: flex;
   align-items: center;
+  gap: 10px;
   cursor: pointer;
-  flex-direction: column;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-bottom: 16px;
-  width: 76px;
-  height: 76px;
-  border-radius: 16px;
+  transition: all 0.2s ease;
+  margin: 2px 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background-color: transparent;
-  justify-content: center;
-  
+
   &:hover {
     background-color: var(--el-menu-hover-bg-color);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-    
+
     span {
       color: var(--el-menu-hover-text-color);
     }
@@ -95,24 +91,25 @@ const isActived = computed(() => {
       color: var(--el-menu-hover-text-color) !important;
     }
   }
-  
+
   span {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--el-menu-text-color);
-    text-align: center;
     font-weight: 500;
-    transition: color 0.3s ease;
-    margin-top: 4px;
+    transition: color 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
   }
 }
+
 .sidebar-item-active {
   background: var(--el-color-primary-light-9) !important;
-  box-shadow: 0 4px 12px rgba(var(--el-color-primary-rgb), 0.15);
-  border: 1px solid var(--el-color-primary-light-7);
-  
+
   span {
     color: var(--el-menu-active-color);
-    font-weight: 700;
+    font-weight: 600;
   }
   .el-icon {
     color: var(--el-menu-active-color) !important;

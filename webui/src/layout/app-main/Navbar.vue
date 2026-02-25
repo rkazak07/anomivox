@@ -25,18 +25,30 @@
       <!-- Kullanıcı menüsü -->
       <el-dropdown trigger="click" size="medium">
         <div class="avatar-wrapper">
-          <img src="https://github.jzfai.top/file/images/nav-right-logo.gif" class="user-avatar" />
+          <el-avatar :size="32" style="background-color: var(--el-color-primary)">
+            <el-icon :size="18"><UserFilled /></el-icon>
+          </el-avatar>
+          <span class="username-text">{{ basicStore.userInfo.username || 'User' }}</span>
           <CaretBottom style="width: 1em; height: 1em; margin-left: 4px" />
         </div>
         <template #dropdown>
           <el-dropdown-menu>
             <router-link to="/">
-              <el-dropdown-item>{{ langTitle('Home') }}</el-dropdown-item>
+              <el-dropdown-item>
+                <el-icon style="margin-right: 6px"><HomeFilled /></el-icon>
+                {{ $t('home') }}
+              </el-dropdown-item>
             </router-link>
-            <a target="_blank" href="https://github.com/jzfai/vue3-admin-template">
-              <el-dropdown-item>{{ langTitle('Github') }}</el-dropdown-item>
-            </a>
-            <el-dropdown-item divided @click="loginOut">{{ langTitle('login out') }}</el-dropdown-item>
+            <router-link to="/settings">
+              <el-dropdown-item>
+                <el-icon style="margin-right: 6px"><Setting /></el-icon>
+                {{ $t('settingsTitle') }}
+              </el-dropdown-item>
+            </router-link>
+            <el-dropdown-item divided @click="loginOut">
+              <el-icon style="margin-right: 6px"><SwitchButton /></el-icon>
+              {{ $t('logoutButton') }}
+            </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -46,8 +58,9 @@
 
 <script setup>
 import { nextTick, computed } from 'vue'
-import { CaretBottom } from '@element-plus/icons-vue'
+import { CaretBottom, UserFilled, HomeFilled, Setting, SwitchButton } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Breadcrumb from './Breadcrumb.vue'
 import Hamburger from './Hamburger.vue'
 import { resetState } from '@/hooks/use-permission'
@@ -56,6 +69,8 @@ import { useBasicStore } from '@/store/basic'
 import { langTitle } from '@/hooks/use-common'
 import { loginOutReq } from '@/api/user'
 import { i18n } from '@/lang'
+
+const { t: $t } = useI18n()
 
 const basicStore = useBasicStore()
 const { settings, sidebar, setToggleSideBar } = basicStore
@@ -73,7 +88,7 @@ const currentLangLabel = computed(() => langLabels[i18n.global.locale.value] || 
 const router = useRouter()
 const loginOut = () => {
   loginOutReq().then(() => {
-    elMessage('Çıkış başarılı')
+    elMessage($t('logoutSuccess'))
     router.push(`/login?redirect=/`)
     nextTick(() => {
       resetState()
@@ -93,23 +108,19 @@ const loginOut = () => {
 }
 
 .avatar-wrapper {
-  margin-top: 5px;
-  position: relative;
+  display: flex;
+  align-items: center;
   cursor: pointer;
 
-  .user-avatar {
-    cursor: pointer;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-  }
-
-  .el-icon-caret-bottom {
-    cursor: pointer;
-    position: absolute;
-    right: -20px;
-    top: 25px;
-    font-size: 12px;
+  .username-text {
+    margin-left: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

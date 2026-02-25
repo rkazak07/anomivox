@@ -4,18 +4,18 @@
       <div class="title-container">
         <h3 class="title text-center">{{ settings.title }}</h3>
       </div>
-      <el-form-item prop="keyword" :rules="formRules.isNotNull('Kullanıcı adı boş bırakılamaz')">
+      <el-form-item prop="keyword" :rules="formRules.isNotNull($t('usernameRequired'))">
         <div class="rowSC">
           <span class="svg-container">
             <svg-icon icon-class="user" />
           </span>
-          <el-input v-model="subForm.keyword" placeholder="Kullanıcı adı (admin)" />
+          <el-input v-model="subForm.keyword" :placeholder="$t('usernamePlaceholder')" />
           <!-- placeholder -->
           <div class="show-pwd" />
         </div>
       </el-form-item>
       <!--<el-form-item prop="password" :rules="formRules.passwordValid">-->
-      <el-form-item prop="password" :rules="formRules.isNotNull('Şifre boş bırakılamaz')">
+      <el-form-item prop="password" :rules="formRules.isNotNull($t('passwordRequired'))">
         <div class="rowSC flex-1">
           <span class="svg-container">
             <svg-icon icon-class="password" />
@@ -26,7 +26,7 @@
               v-model="subForm.password"
               :type="passwordType"
               name="password"
-              placeholder="password(123456)"
+              :placeholder="$t('passwordPlaceholder')"
               @keyup.enter="handleLogin"
           />
           <span class="show-pwd" @click="showPwd">
@@ -36,18 +36,21 @@
       </el-form-item>
       <div class="tip-message">{{ tipMessage }}</div>
       <el-button :loading="subLoading" type="primary" class="login-btn" size="default" @click.prevent="handleLogin">
-        Login
+        {{ $t('loginButton') }}
       </el-button>
     </el-form>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBasicStore } from '@/store/basic'
 import { elMessage, useElement } from '@/hooks/use-element'
 import { loginReq } from '@/api/user'
+import { useI18n } from 'vue-i18n'
+
+const { t: $t } = useI18n()
 
 /* listen router change and set the query  */
 const { settings } = useBasicStore()
@@ -55,7 +58,7 @@ const { settings } = useBasicStore()
 const formRules = useElement().formRules
 //form
 const subForm = reactive({
-  keyword: 'anomivox',
+  keyword: 'admin',
   password: '123456'
 })
 const state = reactive({
@@ -100,14 +103,23 @@ const router = useRouter()
 const basicStore = useBasicStore()
 
 const loginFunc = () => {
-  loginReq(subForm)
-      .then(({ data }) => {
-        elMessage('Giriş başarılı')
-        basicStore.setToken(data?.jwtToken)
-        router.push('/')
+  loginReq({ username: subForm.keyword, password: subForm.password })
+      .then((res) => {
+        if (res.code === 200) {
+          elMessage($t('loginSuccess'))
+          basicStore.setToken(res.data.token)
+          basicStore.setUserInfo({
+            userInfo: { username: res.data.username, avatar: '' },
+            roles: res.data.is_admin ? ['admin'] : ['user'],
+            codes: []
+          })
+          router.push('/')
+        } else {
+          tipMessage.value = res.msg
+        }
       })
       .catch((err) => {
-        tipMessage.value = err?.msg
+        tipMessage.value = err?.msg || $t('loginFailed')
       })
       .finally(() => {
         subLoading.value = false

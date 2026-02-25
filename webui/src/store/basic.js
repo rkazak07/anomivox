@@ -27,7 +27,7 @@ export const useBasicStore = defineStore('basic', {
   },
   persist: {
     storage: localStorage,
-    paths: ['token']
+    paths: ['token', 'userInfo', 'roles']
   },
   actions: {
     remotePromiseArrByReqUrl(reqUrl) {

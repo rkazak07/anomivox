@@ -9,10 +9,7 @@ CONFIG_FILES=(
     "basic_config.py"
     "prompt_config.py"
     "diagnose_config.py"
-    "telegram_config.py"
-    "whatsapp_config.py"
     "mail_config.py"
-    "clawbot_config.py"
 )
 
 for f in "${CONFIG_FILES[@]}"; do
@@ -63,12 +60,6 @@ MODE=${APP_MODE:-all-webui}
 if [ "$MODE" = "python_app" ]; then
     echo "[entrypoint] Başlatılıyor: python3 prometheus_service_docker/app.py"
     exec python3 prometheus_service_docker/app.py
-elif [ "$MODE" = "telegram_bot" ]; then
-    echo "[entrypoint] Başlatılıyor: Anomivox Telegram Bot"
-    exec python3 -m server.telegram_bot.bot
-elif [ "$MODE" = "whatsapp_bot" ]; then
-    echo "[entrypoint] Başlatılıyor: Anomivox WhatsApp Bot"
-    exec python3 -m server.whatsapp_bot.bot
 else
     echo "[entrypoint] Başlatılıyor: python startup.py --${MODE}"
     exec python startup.py --${MODE}

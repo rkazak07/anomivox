@@ -71,18 +71,6 @@ export const constantRoutes = [
     ]
   },
   {
-    path: '/clawbot',
-    component: Layout,
-    children: [
-      {
-        path: '/clawbot',
-        name: 'ClawBot',
-        component: () => import('@/views/clawbot/index.vue'),
-        meta: { title: 'ClawBot', elSvgIcon: 'Monitor', affix: true }
-      }
-    ]
-  },
-  {
     path: '/knowledge',
     component: Layout,
     children: [

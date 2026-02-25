@@ -8,8 +8,6 @@ receivers:
   - name: 'anomivox'
     webhook_configs:
       - url: 'http://python_app:8023/alert'
-      - url: 'http://telegram_bot:8024/alert'
-      - url: 'http://whatsapp_bot:8025/alert'
 inhibit_rules:
   - source_match:
       severity: 'critical'

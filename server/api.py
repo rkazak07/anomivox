@@ -97,10 +97,8 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     mount_filename_summary_routes(app)
     mount_alert_routes(app)
     mount_diagnose_routes(app)
-    mount_telegram_routes(app)
-    mount_whatsapp_routes(app)
     mount_mail_routes(app)
-    mount_clawbot_routes(app)
+    mount_openclaw_routes(app)
 
     from server.utils import all_embed_models
 
@@ -183,22 +181,7 @@ def mount_auth_routes(app: FastAPI):
     app.post("/auth/change_password", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcı şifresini değiştir (admin)")(api_change_password)
 
 
-def mount_telegram_routes(app: FastAPI):
-    from server.telegram_bot.telegram_config_api import (
-        get_telegram_config, save_telegram_config, test_telegram_connection
-    )
-    app.get("/telegram/config", tags=["Telegram"], response_model=BaseResponse, summary="Telegram ayarlarını getir (admin)")(get_telegram_config)
-    app.post("/telegram/config", tags=["Telegram"], response_model=BaseResponse, summary="Telegram ayarlarını kaydet (admin)")(save_telegram_config)
-    app.post("/telegram/test", tags=["Telegram"], response_model=BaseResponse, summary="Telegram bağlantı testi (admin)")(test_telegram_connection)
 
-
-def mount_whatsapp_routes(app: FastAPI):
-    from server.whatsapp_bot.whatsapp_config_api import (
-        get_whatsapp_config, save_whatsapp_config, test_whatsapp_connection
-    )
-    app.get("/whatsapp/config", tags=["WhatsApp"], response_model=BaseResponse, summary="WhatsApp ayarlarını getir (admin)")(get_whatsapp_config)
-    app.post("/whatsapp/config", tags=["WhatsApp"], response_model=BaseResponse, summary="WhatsApp ayarlarını kaydet (admin)")(save_whatsapp_config)
-    app.post("/whatsapp/test", tags=["WhatsApp"], response_model=BaseResponse, summary="WhatsApp bağlantı testi (admin)")(test_whatsapp_connection)
 
 
 def mount_mail_routes(app: FastAPI):
@@ -210,21 +193,17 @@ def mount_mail_routes(app: FastAPI):
     app.post("/mail/test", tags=["Mail"], response_model=BaseResponse, summary="SMTP bağlantı testi (admin)")(test_mail_connection)
 
 
-def mount_clawbot_routes(app: FastAPI):
-    from server.clawbot.clawbot_api import (
-        clawbot_ask, clawbot_health, clawbot_skills,
-        get_clawbot_config, save_clawbot_config,
-        list_databases, save_database, delete_database, test_database,
+def mount_openclaw_routes(app: FastAPI):
+    from server.openclaw.openclaw_api import (
+        openclaw_health, get_openclaw_config, save_openclaw_config,
+        openclaw_send_message, openclaw_channels, openclaw_restart,
     )
-    app.post("/clawbot/ask", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot mesaj gönder")(clawbot_ask)
-    app.get("/clawbot/health", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot durum kontrolü")(clawbot_health)
-    app.get("/clawbot/skills", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot skill listesi")(clawbot_skills)
-    app.get("/clawbot/config", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot ayarları (admin)")(get_clawbot_config)
-    app.post("/clawbot/config", tags=["ClawBot"], response_model=BaseResponse, summary="ClawBot ayarları kaydet (admin)")(save_clawbot_config)
-    app.get("/clawbot/databases", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantıları listele (admin)")(list_databases)
-    app.post("/clawbot/databases", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantısı ekle/güncelle (admin)")(save_database)
-    app.delete("/clawbot/databases", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantısı sil (admin)")(delete_database)
-    app.post("/clawbot/databases/test", tags=["ClawBot"], response_model=BaseResponse, summary="DB bağlantısı test et (admin)")(test_database)
+    app.get("/openclaw/health", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw Gateway durumu")(openclaw_health)
+    app.get("/openclaw/config", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw ayarlarını getir")(get_openclaw_config)
+    app.post("/openclaw/config", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw ayarlarını kaydet")(save_openclaw_config)
+    app.post("/openclaw/send", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw mesaj gönder")(openclaw_send_message)
+    app.get("/openclaw/channels", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw kanal listesi")(openclaw_channels)
+    app.post("/openclaw/restart", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw Gateway restart")(openclaw_restart)
 
 
 def mount_diagnose_routes(app: FastAPI):

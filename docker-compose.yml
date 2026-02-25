@@ -16,8 +16,16 @@ services:
       PG_DB: ${POSTGRES_DB:-anomivox}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
+      # OpenClaw Gateway (Docker iç ağ)
+      OPENCLAW_GATEWAY_HOST: openclaw
+      OPENCLAW_GATEWAY_PORT: "18789"
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_CONFIG_DIR: /openclaw-config
     ports:
       - "7861:7861"
     volumes:
@@ -25,6 +33,7 @@ services:
       - chroma_data:/app/chroma_db
       - kb_data:/app/knowledge_base
       - logs_data:/app/logs
+      - openclaw_data:/openclaw-config
     networks:
       - agent_network
     depends_on:
@@ -136,7 +145,7 @@ services:
     environment:
       PG_EXPORTER_URL: "postgresql://${POSTGRES_USER:-test}:${POSTGRES_PASSWORD:-Test123_456}@postgres_db:5432/${POSTGRES_DB:-anomivox}?sslmode=disable"
     ports:
-      - "9187:9187"
+      - "9187:9630"
     networks:
       - agent_network
     depends_on:
@@ -161,71 +170,55 @@ services:
     restart: unless-stopped
 
   # ─────────────────────────────────────────────
-  # Telegram Bot — Otonom DB Yönetim
+  # OpenClaw — Kişisel AI Asistanı (Gateway)
+  # ─────────────────────────────────────────────
+  # Telegram, WhatsApp, Discord, Slack vb. tüm
+  # kanal yönetimi OpenClaw Gateway üzerinden yapılır.
+  # Daha fazla bilgi: https://docs.openclaw.ai
   # ─────────────────────────────────────────────
 
-  telegram_bot:
-    build: .
+  openclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile.openclaw
     environment:
-      APP_MODE: telegram_bot
-      PYTHONPATH: /app
+      NODE_ENV: production
+      # ── OpenClaw Paths ──
+      OPENCLAW_HOME: /home/node/.openclaw
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      # ── Gateway Ayarları ──
+      OPENCLAW_GATEWAY_PORT: "18789"
+      OPENCLAW_GATEWAY_BIND: ${OPENCLAW_GATEWAY_BIND:-lan}
+      OPENCLAW_GATEWAY_MODE: ${OPENCLAW_GATEWAY_MODE:-local}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      # ── Model ──
+      OPENCLAW_MODEL: ${OPENCLAW_MODEL:-groq/llama-3.3-70b-versatile}
+      # ── LLM Provider API Keys ──
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      # ── Kanal Tokenları (ilk kurulumda config'e yazılır) ──
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS:-}
-      ANOMIVOX_API_URL: http://api:7861
-      PROMETHEUS_URL: http://prometheus:9090
-      PG_HOST: postgres_db
-      PG_PORT: 5432
-      PG_USER: ${POSTGRES_USER:-test}
-      PG_PASSWORD: ${POSTGRES_PASSWORD:-Test123_456}
-      PG_DB: ${POSTGRES_DB:-anomivox}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
     ports:
-      - "8024:8024"
+      - "18789:18789"
     volumes:
-      - ./configs:/app/configs
+      - openclaw_data:/home/node/.openclaw
+      - openclaw_workspace:/home/node/.openclaw/workspace
     networks:
       - agent_network
-    depends_on:
-      postgres_db:
-        condition: service_healthy
-      api:
-        condition: service_healthy
     restart: unless-stopped
-
-  # ─────────────────────────────────────────────
-  # WhatsApp Bot — Otonom DB Yönetim (Cloud API)
-  # ─────────────────────────────────────────────
-
-  whatsapp_bot:
-    build: .
-    environment:
-      APP_MODE: whatsapp_bot
-      PYTHONPATH: /app
-      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
-      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
-      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-anomivox_whatsapp_verify_2024}
-      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS:-}
-      WHATSAPP_DEFAULT_RECIPIENT: ${WHATSAPP_DEFAULT_RECIPIENT:-}
-      ANOMIVOX_API_URL: http://api:7861
-      PROMETHEUS_URL: http://prometheus:9090
-      PG_HOST: postgres_db
-      PG_PORT: 5432
-      PG_USER: ${POSTGRES_USER:-test}
-      PG_PASSWORD: ${POSTGRES_PASSWORD:-Test123_456}
-      PG_DB: ${POSTGRES_DB:-anomivox}
-    ports:
-      - "8025:8025"
-    volumes:
-      - ./configs:/app/configs
-    networks:
-      - agent_network
-    depends_on:
-      postgres_db:
-        condition: service_healthy
-      api:
-        condition: service_healthy
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:18789/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 # ─────────────────────────────────────────────
 # Kalıcı Veri Volumeleri
@@ -235,6 +228,8 @@ volumes:
   kb_data:
   logs_data:
   pg_data:
+  openclaw_data:
+  openclaw_workspace:
 
 # ─────────────────────────────────────────────
 # Ağ

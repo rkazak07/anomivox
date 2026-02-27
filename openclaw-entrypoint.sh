@@ -28,7 +28,7 @@ mkdir -p "${OPENCLAW_HOME}/workspace/skills" 2>/dev/null || true
 
 # ── Config dosyası yoksa env'den oluştur ──────────────────
 if [ ! -f "${CONFIG_FILE}" ]; then
-    echo "[openclaw] İlk çalıştırma — config oluşturuluyor..."
+    echo "[ai-agent] İlk çalıştırma — config oluşturuluyor..."
 
     # Model ayarı
     MODEL="${OPENCLAW_MODEL:-anthropic/claude-opus-4-6}"
@@ -61,7 +61,7 @@ EOF
 
     # Telegram konfigürasyonu (eğer token varsa)
     if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
-        echo "[openclaw] Telegram bot konfigürasyonu ekleniyor..."
+        echo "[ai-agent] Telegram bot konfigürasyonu ekleniyor..."
         TMP=$(mktemp)
         jq --arg token "$TELEGRAM_BOT_TOKEN" \
            '.channels.telegram = {"botToken": $token}' \
@@ -70,7 +70,7 @@ EOF
 
     # Discord konfigürasyonu (eğer token varsa)
     if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
-        echo "[openclaw] Discord bot konfigürasyonu ekleniyor..."
+        echo "[ai-agent] Discord bot konfigürasyonu ekleniyor..."
         TMP=$(mktemp)
         jq --arg token "$DISCORD_BOT_TOKEN" \
            '.channels.discord = {"token": $token}' \
@@ -79,7 +79,7 @@ EOF
 
     # Slack konfigürasyonu (eğer token varsa)
     if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_APP_TOKEN:-}" ]; then
-        echo "[openclaw] Slack bot konfigürasyonu ekleniyor..."
+        echo "[ai-agent] Slack bot konfigürasyonu ekleniyor..."
         TMP=$(mktemp)
         jq --arg bot "$SLACK_BOT_TOKEN" --arg app "$SLACK_APP_TOKEN" \
            '.channels.slack = {"botToken": $bot, "appToken": $app}' \
@@ -88,25 +88,25 @@ EOF
 
     # Gateway auth token (eğer varsa)
     if [ -n "${OPENCLAW_GATEWAY_TOKEN:-}" ]; then
-        echo "[openclaw] Gateway auth token ekleniyor..."
+        echo "[ai-agent] Gateway auth token ekleniyor..."
         TMP=$(mktemp)
         jq --arg token "$OPENCLAW_GATEWAY_TOKEN" \
            '.gateway.auth = {"token": $token}' \
            "${CONFIG_FILE}" > "$TMP" && mv "$TMP" "${CONFIG_FILE}"
     fi
 
-    echo "[openclaw] Config oluşturuldu: ${CONFIG_FILE}"
+    echo "[ai-agent] Config oluşturuldu: ${CONFIG_FILE}"
 else
-    echo "[openclaw] Mevcut config kullanılıyor: ${CONFIG_FILE}"
+    echo "[ai-agent] Mevcut config kullanılıyor: ${CONFIG_FILE}"
 fi
 
-echo "[openclaw] ────────────────────────────────────────"
-echo "[openclaw] OpenClaw Gateway başlatılıyor..."
-echo "[openclaw] Port: ${GATEWAY_PORT}"
-echo "[openclaw] Bind: ${GATEWAY_BIND}"
-echo "[openclaw] Mode: ${GATEWAY_MODE}"
-echo "[openclaw] Config: ${CONFIG_FILE}"
-echo "[openclaw] ────────────────────────────────────────"
+echo "[ai-agent] ────────────────────────────────────────"
+echo "[ai-agent] AI Agent Gateway başlatılıyor..."
+echo "[ai-agent] Port: ${GATEWAY_PORT}"
+echo "[ai-agent] Bind: ${GATEWAY_BIND}"
+echo "[ai-agent] Mode: ${GATEWAY_MODE}"
+echo "[ai-agent] Config: ${CONFIG_FILE}"
+echo "[ai-agent] ────────────────────────────────────────"
 
 # Gateway'i başlat
 exec openclaw gateway --port "${GATEWAY_PORT}" --allow-unconfigured

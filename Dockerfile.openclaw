@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════
-# OpenClaw Gateway — Anomivox AI Assistant
+# AI Agent Gateway — Anomivox AI Assistant
 # ═══════════════════════════════════════════════════════════
 # Bu Dockerfile OpenClaw paketini build aşamasında kurar.
 # Her restart'ta npm install yapılmaz, sadece rebuild gerekir.

@@ -211,13 +211,13 @@ def mount_openclaw_routes(app: FastAPI):
         openclaw_send_message, openclaw_channels, openclaw_restart,
         openclaw_models,
     )
-    app.get("/openclaw/health", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw Gateway durumu")(openclaw_health)
-    app.get("/openclaw/config", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw ayarlarını getir")(get_openclaw_config)
-    app.post("/openclaw/config", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw ayarlarını kaydet")(save_openclaw_config)
-    app.post("/openclaw/send", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw mesaj gönder")(openclaw_send_message)
-    app.get("/openclaw/channels", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw kanal listesi")(openclaw_channels)
-    app.post("/openclaw/restart", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw Gateway restart")(openclaw_restart)
-    app.get("/openclaw/models", tags=["OpenClaw"], response_model=BaseResponse, summary="OpenClaw model kataloğu")(openclaw_models)
+    app.get("/openclaw/health", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent Gateway durumu")(openclaw_health)
+    app.get("/openclaw/config", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent ayarlarını getir")(get_openclaw_config)
+    app.post("/openclaw/config", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent ayarlarını kaydet")(save_openclaw_config)
+    app.post("/openclaw/send", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent mesaj gönder")(openclaw_send_message)
+    app.get("/openclaw/channels", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent kanal listesi")(openclaw_channels)
+    app.post("/openclaw/restart", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent Gateway restart")(openclaw_restart)
+    app.get("/openclaw/models", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent model kataloğu")(openclaw_models)
 
 
 def mount_diagnose_routes(app: FastAPI):

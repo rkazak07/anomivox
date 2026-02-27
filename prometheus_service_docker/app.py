@@ -16,7 +16,7 @@ app = FastAPI()
 logger = logging.getLogger("alert_app")
 logging.basicConfig(level=logging.INFO)
 
-# ── OpenClaw Gateway entegrasyonu ──────────────────────────
+# ── AI Agent Gateway entegrasyonu ──────────────────────────
 OPENCLAW_GATEWAY_URL = os.environ.get("OPENCLAW_GATEWAY_URL", "http://openclaw:18789")
 OPENCLAW_GATEWAY_TOKEN = os.environ.get("OPENCLAW_GATEWAY_TOKEN", "")
 OPENCLAW_NOTIFY_ENABLED = os.environ.get("OPENCLAW_NOTIFY_ENABLED", "true").lower() == "true"
@@ -395,7 +395,7 @@ def _diag_mssql(cur, diag):
 
 
 # ═══════════════════════════════════════════════════════════
-# Alert Formatlama & OpenClaw Bildirim
+# Alert Formatlama & AI Agent Bildirim
 # ═══════════════════════════════════════════════════════════
 
 def notify_openclaw(message: str):
@@ -404,9 +404,9 @@ def notify_openclaw(message: str):
 
     Strateji:
       1. TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID varsa → doğrudan Telegram Bot API
-      2. Yoksa OpenClaw Gateway API dene (fallback)
+      2. Yoksa AI Agent Gateway API dene (fallback)
 
-    Kullanıcı Telegram'dan yanıt verdiğinde OpenClaw otomatik olarak
+    Kullanıcı Telegram'dan yanıt verdiğinde AI Agent otomatik olarak
     AI agent üzerinden cevap üretir.
     """
     if not OPENCLAW_NOTIFY_ENABLED:
@@ -444,7 +444,7 @@ def notify_openclaw(message: str):
         except Exception as e:
             logger.error(f"Telegram Bot API error: {e}")
 
-    # ── 2. Fallback: OpenClaw Gateway ──
+    # ── 2. Fallback: AI Agent Gateway ──
     if not sent:
         try:
             headers = {"Content-Type": "application/json"}
@@ -457,9 +457,9 @@ def notify_openclaw(message: str):
                 headers=headers,
                 timeout=30,
             )
-            logger.info(f"OpenClaw notify response: {resp.status_code}")
+            logger.info(f"AI Agent notify response: {resp.status_code}")
         except Exception as e:
-            logger.error(f"OpenClaw notify failed: {e}")
+            logger.error(f"AI Agent notify failed: {e}")
 
 
 def query_prometheus_instant(query: str) -> dict:

@@ -21,7 +21,7 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
-      # OpenClaw Gateway (Docker iç ağ)
+      # AI Agent Gateway (Docker iç ağ)
       OPENCLAW_GATEWAY_HOST: openclaw
       OPENCLAW_GATEWAY_PORT: "18789"
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
@@ -162,7 +162,7 @@ services:
     environment:
       APP_MODE: python_app
       PYTHONPATH: /app
-      # OpenClaw entegrasyonu — alert bildirimleri
+      # AI Agent entegrasyonu — alert bildirimleri
       OPENCLAW_GATEWAY_URL: http://openclaw:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_NOTIFY_ENABLED: "true"
@@ -198,10 +198,10 @@ services:
     restart: unless-stopped
 
   # ─────────────────────────────────────────────
-  # OpenClaw — Kişisel AI Asistanı (Gateway)
+  # AI Agent — Kişisel AI Asistanı (Gateway)
   # ─────────────────────────────────────────────
   # Telegram, WhatsApp, Discord, Slack vb. tüm
-  # kanal yönetimi OpenClaw Gateway üzerinden yapılır.
+  # kanal yönetimi AI Agent Gateway üzerinden yapılır.
   # Daha fazla bilgi: https://docs.openclaw.ai
   # ─────────────────────────────────────────────
 
@@ -211,7 +211,7 @@ services:
       dockerfile: Dockerfile.openclaw
     environment:
       NODE_ENV: production
-      # ── OpenClaw Paths ──
+      # ── AI Agent Paths ──
       OPENCLAW_HOME: /home/node/.openclaw
       OPENCLAW_STATE_DIR: /home/node/.openclaw
       OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json

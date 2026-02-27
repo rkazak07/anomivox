@@ -1,7 +1,7 @@
 """
-OpenClaw Gateway API — Anomivox entegrasyonu
+AI Agent Gateway API — Anomivox entegrasyonu
 
-OpenClaw Gateway'e bağlanarak:
+AI Agent Gateway'e bağlanarak:
 - Config okuma/yazma (openclaw.json)
 - Channel yönetimi (Telegram, WhatsApp, Discord, Slack)
 - Mesaj gönderme
@@ -18,7 +18,7 @@ from typing import Optional
 
 logger = logging.getLogger("openclaw_api")
 
-# ── OpenClaw config dosyası yolu ──────────────────────────
+# ── AI Agent config dosyası yolu ──────────────────────────
 OPENCLAW_CONFIG_DIR = os.environ.get(
     "OPENCLAW_CONFIG_DIR",
     os.path.join(os.path.expanduser("~"), ".openclaw")
@@ -27,7 +27,7 @@ OPENCLAW_CONFIG_PATH = os.path.join(OPENCLAW_CONFIG_DIR, "openclaw.json")
 
 
 def _get_gateway_url():
-    """OpenClaw Gateway URL"""
+    """AI Agent Gateway URL"""
     host = os.environ.get("OPENCLAW_GATEWAY_HOST", "openclaw")
     port = os.environ.get("OPENCLAW_GATEWAY_PORT", "18789")
     return f"http://{host}:{port}"
@@ -40,7 +40,7 @@ def _read_config() -> dict:
             with open(OPENCLAW_CONFIG_PATH, "r") as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"OpenClaw config read error: {e}")
+            logger.error(f"AI Agent config read error: {e}")
     return {}
 
 
@@ -50,9 +50,9 @@ def _write_config(config: dict):
     try:
         with open(OPENCLAW_CONFIG_PATH, "w") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
-        logger.info("OpenClaw config saved")
+        logger.info("AI Agent config saved")
     except Exception as e:
-        logger.error(f"OpenClaw config write error: {e}")
+        logger.error(f"AI Agent config write error: {e}")
         raise
 
 
@@ -60,7 +60,7 @@ def _write_config(config: dict):
 async def openclaw_health(
     authorization: Optional[str] = Header(None)
 ):
-    """OpenClaw Gateway sağlık durumu"""
+    """AI Agent Gateway sağlık durumu"""
     try:
         gateway_url = _get_gateway_url()
         async with aiohttp.ClientSession() as session:
@@ -77,7 +77,7 @@ async def openclaw_health(
                             details = await resp.json()
                         except Exception:
                             pass
-                    return {"code": 200, "msg": "OpenClaw Gateway aktif", "data": {
+                    return {"code": 200, "msg": "AI Agent Gateway aktif", "data": {
                         "status": "online",
                         "gateway_url": gateway_url,
                         "details": details,
@@ -100,7 +100,7 @@ async def openclaw_health(
 async def get_openclaw_config(
     authorization: Optional[str] = Header(None)
 ):
-    """OpenClaw yapılandırmasını getir"""
+    """AI Agent yapılandırmasını getir"""
     config = _read_config()
 
     # Token/key alanlarını maskele
@@ -210,7 +210,7 @@ async def save_openclaw_config(
     data: dict = Body(...),
     authorization: Optional[str] = Header(None)
 ):
-    """OpenClaw yapılandırmasını kaydet"""
+    """AI Agent yapılandırmasını kaydet"""
     try:
         config = _read_config()
 
@@ -317,7 +317,7 @@ async def save_openclaw_config(
             config.setdefault("browser", {})["enabled"] = bool(data["browser_enabled"])
 
         _write_config(config)
-        return {"code": 200, "msg": "OpenClaw ayarları kaydedildi"}
+        return {"code": 200, "msg": "AI Agent ayarları kaydedildi"}
     except Exception as e:
         return {"code": 500, "msg": f"Kaydetme hatası: {str(e)[:200]}"}
 
@@ -327,7 +327,7 @@ async def openclaw_send_message(
     data: dict = Body(...),
     authorization: Optional[str] = Header(None)
 ):
-    """OpenClaw üzerinden mesaj gönder"""
+    """AI Agent üzerinden mesaj gönder"""
     message = data.get("message", "")
     channel = data.get("channel", "")  # telegram, whatsapp, discord, slack
     recipient = data.get("recipient", "")
@@ -368,7 +368,7 @@ async def openclaw_send_message(
 async def openclaw_channels(
     authorization: Optional[str] = Header(None)
 ):
-    """OpenClaw aktif channel'ları listele"""
+    """AI Agent aktif channel'ları listele"""
     config = _read_config()
     channels = config.get("channels", {})
 
@@ -399,7 +399,7 @@ async def openclaw_channels(
 async def openclaw_restart(
     authorization: Optional[str] = Header(None)
 ):
-    """OpenClaw Gateway'i yeniden başlat (Docker container restart)"""
+    """AI Agent Gateway'i yeniden başlat (Docker container restart)"""
     try:
         connector = aiohttp.UnixConnector(path="/var/run/docker.sock")
         async with aiohttp.ClientSession(connector=connector) as session:
@@ -485,7 +485,7 @@ def _demux_docker_stream(data: bytes) -> str:
 
 
 async def _exec_openclaw_models_list() -> list:
-    """OpenClaw container'ından model listesini al"""
+    """AI Agent container'ından model listesini al"""
     try:
         exit_code, stdout, stderr = await _docker_exec(
             OPENCLAW_CONTAINER,
@@ -496,7 +496,7 @@ async def _exec_openclaw_models_list() -> list:
             result = json.loads(stdout)
             return result.get("models", [])
         else:
-            logger.error(f"openclaw models list failed (exit={exit_code}): {stderr[:200]}")
+            logger.error(f"ai-agent models list failed (exit={exit_code}): {stderr[:200]}")
             return []
     except json.JSONDecodeError as e:
         logger.error(f"Model list JSON parse error: {e}")
@@ -510,7 +510,7 @@ async def openclaw_models(
     provider: Optional[str] = None,
     authorization: Optional[str] = Header(None),
 ):
-    """OpenClaw'un desteklediği model kataloğunu döndür"""
+    """AI Agent'un desteklediği model kataloğunu döndür"""
     import time
     now = time.time()
 

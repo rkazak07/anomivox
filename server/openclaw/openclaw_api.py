@@ -121,6 +121,18 @@ async def get_openclaw_config(
 
     safe_config["model"] = new_model or old_model or "anthropic/claude-opus-4-6"
 
+    # openai-responses wrapper ile kaydedilmiş Ollama modelleri:
+    # config'de "openai/llama3.1:8b" olarak durur ama UI'da "ollama/llama3.1:8b" göstermeli
+    # Bunu tespit etmek için providers içinde openai + api:openai-responses + ollama baseUrl var mı bak
+    _providers = config.get("models", {}).get("providers", {})
+    _openai_prov = _providers.get("openai", {})
+    _is_ollama_wrapper = (
+        _openai_prov.get("api") == "openai-responses"
+        and "11434" in _openai_prov.get("baseUrl", "")
+    )
+    if _is_ollama_wrapper and safe_config["model"].startswith("openai/"):
+        safe_config["model"] = "ollama/" + safe_config["model"].split("/", 1)[1]
+
     # API Key — sadece set olup olmadığını döndür
     api_key_env_map = {
         "anthropic": "ANTHROPIC_API_KEY",
@@ -204,11 +216,36 @@ async def get_openclaw_config(
     safe_config["browser_enabled"] = browser.get("enabled", False)
 
     # Ollama — Explicit provider ayarlarından veya env'den oku
-    ollama_provider = config.get("models", {}).get("providers", {}).get("ollama", {})
+    # openai wrapper üzerinden de olabilir (fetch-failed bug fix)
+    ollama_provider = (
+        config.get("models", {}).get("providers", {}).get("ollama", {})
+        or config.get("models", {}).get("providers", {}).get("openai", {})
+    )
     ollama_url = ollama_provider.get("baseUrl", "") or os.environ.get("OLLAMA_BASE_URL", "")
+    # baseUrl openai wrapper ise "/v1" suffix'ini temizle
+    if ollama_url.endswith("/v1"):
+        ollama_url = ollama_url[:-3]
     ollama_api_key = ollama_provider.get("apiKey", "") or os.environ.get("OLLAMA_API_KEY", "")
     safe_config["ollama_url"] = ollama_url
     safe_config["ollama_api_key_set"] = bool(ollama_api_key)
+
+    # Ollama model parametreleri — agents.defaults.contextTokens + agents.defaults.models[model].params
+    defaults = config.get("agents", {}).get("defaults", {})
+    safe_config["ollama_context_tokens"] = defaults.get("contextTokens", 0)
+    # Model-level params (temperature, num_predict, vb.)
+    model_key = safe_config.get("model", "")
+    models_catalog = defaults.get("models", {})
+    # model_key "ollama/X" formatında, config'de "openai/X" olarak yazılıyor (wrapper)
+    # Her iki formatta da ara
+    model_id_only = model_key.split("/", 1)[1] if "/" in model_key else model_key
+    model_entry = (
+        models_catalog.get(model_key, {})
+        or models_catalog.get(f"openai/{model_id_only}", {})
+        or models_catalog.get(f"ollama/{model_id_only}", {})
+    )
+    model_params = model_entry.get("params", {})
+    # UI için JSON string olarak döndür
+    safe_config["ollama_model_params"] = json.dumps(model_params, ensure_ascii=False) if model_params else ""
 
     return {"code": 200, "msg": "success", "data": safe_config}
 
@@ -226,7 +263,15 @@ async def save_openclaw_config(
             agents = config.setdefault("agents", {})
             defaults = agents.setdefault("defaults", {})
             model_cfg = defaults.setdefault("model", {})
-            model_cfg["primary"] = data["model"]
+            raw_model = data["model"]  # örn: "ollama/llama3.1:8b"
+            # openai-responses wrapper kullanan Ollama modelleri için
+            # primary key'i provider ile eşleşmeli: "openai/llama3.1:8b"
+            if raw_model.startswith("ollama/"):
+                model_id_only = raw_model.split("/", 1)[1]
+                model_cfg["primary"] = f"openai/{model_id_only}"
+            else:
+                model_cfg["primary"] = raw_model
+            model_cfg.setdefault("fallbacks", [])
             # Eski format varsa temizle
             if "agent" in config and "model" in config.get("agent", {}):
                 config["agent"].pop("model", None)
@@ -334,12 +379,14 @@ async def save_openclaw_config(
             ollama_key = str(data.get("ollama_api_key", "")).strip() or "ollama-local"
             model_id = model_str.split("/", 1)[1] if "/" in model_str else model_str
 
-            # Explicit provider ayarı (remote için gerekli, local için de zararı yok)
+            # Explicit provider ayarı — openai-responses wrapper (fetch-failed bug fix)
             models_section = config.setdefault("models", {})
             providers_section = models_section.setdefault("providers", {})
-            providers_section["ollama"] = {
+            providers_section.pop("ollama", None)  # Eskisini temizle
+            providers_section["openai"] = {
                 "apiKey": ollama_key,
-                "api": "ollama",
+                "api": "openai-responses",
+                "baseUrl": f"{ollama_url.rstrip('/')}/v1" if ollama_url else "http://host.docker.internal:11434/v1",
                 "models": [
                     {
                         "id": model_id,
@@ -352,15 +399,13 @@ async def save_openclaw_config(
                     }
                 ],
             }
-            if ollama_url:
-                providers_section["ollama"]["baseUrl"] = ollama_url
 
             # Env section
             env_cfg = config.setdefault("env", {})
             env_cfg["OLLAMA_API_KEY"] = ollama_key
             if ollama_url:
                 env_cfg["OLLAMA_BASE_URL"] = ollama_url
-            
+
             # .env dosyası
             dotenv_path = os.path.join(OPENCLAW_CONFIG_DIR, ".env")
             try:
@@ -371,6 +416,45 @@ async def save_openclaw_config(
                         f.write(f'OLLAMA_BASE_URL="{ollama_url}"\n')
             except Exception as e:
                 logger.error(f"OpenClaw .env write error: {e}")
+
+            # ── Ollama Model Parametreleri ──────────────────────────────────
+            # agents.defaults.contextTokens  →  context penceresi (tokens)
+            # agents.defaults.models["openai/<id>"]["params"]  →  temperature, num_predict vb.
+            # Bu path OpenClaw Zod şemasına göre tamamen geçerlidir.
+            agents_def = config.setdefault("agents", {}).setdefault("defaults", {})
+            # Eski hatalı key'i temizle (önceki oturumdan kalmış olabilir)
+            agents_def.pop("params", None)
+
+            # context_tokens
+            context_tokens_raw = data.get("ollama_context_tokens", 0)
+            try:
+                context_tokens = int(context_tokens_raw)
+            except (TypeError, ValueError):
+                context_tokens = 0
+            if context_tokens > 0:
+                agents_def["contextTokens"] = context_tokens
+            else:
+                agents_def.pop("contextTokens", None)
+
+            # model-level params (temperature, num_predict, num_ctx vb.)
+            params_raw = str(data.get("ollama_model_params", "")).strip()
+            model_full_key = f"openai/{model_id}"  # provider/model formatı
+            models_catalog = agents_def.setdefault("models", {})
+            if params_raw:
+                try:
+                    extra_params = json.loads(params_raw)
+                    if isinstance(extra_params, dict) and extra_params:
+                        models_catalog[model_full_key] = {"params": extra_params}
+                    else:
+                        models_catalog.pop(model_full_key, None)
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"ollama_model_params parse hatası, atlanıyor: {e}")
+                    models_catalog.pop(model_full_key, None)
+            else:
+                models_catalog.pop(model_full_key, None)
+            # Boş katalog varsa temizle
+            if not models_catalog:
+                agents_def.pop("models", None)
 
         # API Key — provider'a göre docker/env olarak set etmek isterseniz (opsiyonel)
         # Buraları dokunmuyoruz.

@@ -225,6 +225,39 @@
                       </el-form-item>
                     </el-col>
                   </el-row>
+
+                  <!-- Ollama Model Parametreleri -->
+                  <el-row :gutter="20" v-if="openclawConfig.model_provider === 'ollama'">
+                    <el-col :span="8">
+                      <el-form-item :label="$t('ollamaContextTokens')">
+                        <el-input-number
+                          v-model="openclawConfig.ollama_context_tokens"
+                          :min="0"
+                          :step="512"
+                          :placeholder="$t('ollamaContextTokensPlaceholder')"
+                          style="width: 100%"
+                          controls-position="right"
+                        />
+                        <div class="form-hint">{{ $t('ollamaContextTokensHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="16">
+                      <el-form-item :label="$t('ollamaModelParams')">
+                        <el-input
+                          v-model="openclawConfig.ollama_model_params"
+                          type="textarea"
+                          :rows="3"
+                          :placeholder="$t('ollamaModelParamsPlaceholder')"
+                          :class="{ 'is-error': openclawConfig.ollama_model_params_error }"
+                          @input="openclawConfig.ollama_model_params_error = ''"
+                        />
+                        <div class="form-hint" :style="openclawConfig.ollama_model_params_error ? 'color:#f56c6c' : ''">
+                          <span v-if="openclawConfig.ollama_model_params_error">⚠ {{ openclawConfig.ollama_model_params_error }}</span>
+                          <span v-else>{{ $t('ollamaModelParamsHint') }}</span>
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
                 </div>
               </Transition>
             </div>
@@ -956,6 +989,9 @@ const openclawConfig = reactive({
   ollama_url: '',
   ollama_api_key: '',
   ollama_api_key_set: false,
+  ollama_context_tokens: 0,
+  ollama_model_params: '',
+  ollama_model_params_error: '',
   telegram_enabled: false,
   telegram_token: '',
   telegram_token_set: false,
@@ -1051,6 +1087,9 @@ const fetchOpenclawConfig = async () => {
       openclawConfig.ollama_url = d.ollama_url || ''
       openclawConfig.ollama_api_key_set = d.ollama_api_key_set || false
       openclawConfig.ollama_api_key = '' // never returned from backend
+      openclawConfig.ollama_context_tokens = d.ollama_context_tokens || 0
+      openclawConfig.ollama_model_params = d.ollama_model_params || ''
+      openclawConfig.ollama_model_params_error = ''
 
       // Telegram
       openclawConfig.telegram_enabled = d.telegram_enabled || false
@@ -1119,6 +1158,22 @@ const onSaveOpenclaw = async () => {
       payload.ollama_url = openclawConfig.ollama_url
       if (openclawConfig.ollama_api_key) {
         payload.ollama_api_key = openclawConfig.ollama_api_key
+      }
+      payload.ollama_context_tokens = openclawConfig.ollama_context_tokens || 0
+      // Model params JSON doğrulaması
+      const paramsStr = (openclawConfig.ollama_model_params || '').trim()
+      if (paramsStr) {
+        try {
+          JSON.parse(paramsStr)
+          payload.ollama_model_params = paramsStr
+          openclawConfig.ollama_model_params_error = ''
+        } catch (e) {
+          openclawConfig.ollama_model_params_error = t('ollamaModelParamsInvalid')
+          ElMessage.error(t('ollamaModelParamsInvalid'))
+          return
+        }
+      } else {
+        payload.ollama_model_params = ''
       }
     }
 

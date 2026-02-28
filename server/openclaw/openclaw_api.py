@@ -203,6 +203,13 @@ async def get_openclaw_config(
     browser = config.get("browser", {})
     safe_config["browser_enabled"] = browser.get("enabled", False)
 
+    # Ollama — Explicit provider ayarlarından veya env'den oku
+    ollama_provider = config.get("models", {}).get("providers", {}).get("ollama", {})
+    ollama_url = ollama_provider.get("baseUrl", "") or os.environ.get("OLLAMA_BASE_URL", "")
+    ollama_api_key = ollama_provider.get("apiKey", "") or os.environ.get("OLLAMA_API_KEY", "")
+    safe_config["ollama_url"] = ollama_url
+    safe_config["ollama_api_key_set"] = bool(ollama_api_key)
+
     return {"code": 200, "msg": "success", "data": safe_config}
 
 
@@ -315,7 +322,59 @@ async def save_openclaw_config(
         # Browser
         if "browser_enabled" in data:
             config.setdefault("browser", {})["enabled"] = bool(data["browser_enabled"])
+            
+        # SSRF Bypass (Required for local Ollama in Docker networks)
+        browser = config.setdefault("browser", {})
+        browser.setdefault("ssrfPolicy", {})["dangerouslyAllowPrivateNetwork"] = True
 
+        # Ollama
+        model_str = data.get("model", "")
+        if model_str.startswith("ollama/"):
+            ollama_url = str(data.get("ollama_url", "")).strip()
+            ollama_key = str(data.get("ollama_api_key", "")).strip() or "ollama-local"
+            model_id = model_str.split("/", 1)[1] if "/" in model_str else model_str
+
+            # Explicit provider ayarı (remote için gerekli, local için de zararı yok)
+            models_section = config.setdefault("models", {})
+            providers_section = models_section.setdefault("providers", {})
+            providers_section["ollama"] = {
+                "apiKey": ollama_key,
+                "api": "ollama",
+                "models": [
+                    {
+                        "id": model_id,
+                        "name": model_id,
+                        "reasoning": False,
+                        "input": ["text"],
+                        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                        "contextWindow": 131072,
+                        "maxTokens": 1310720,
+                    }
+                ],
+            }
+            if ollama_url:
+                providers_section["ollama"]["baseUrl"] = ollama_url
+
+            # Env section
+            env_cfg = config.setdefault("env", {})
+            env_cfg["OLLAMA_API_KEY"] = ollama_key
+            if ollama_url:
+                env_cfg["OLLAMA_BASE_URL"] = ollama_url
+            
+            # .env dosyası
+            dotenv_path = os.path.join(OPENCLAW_CONFIG_DIR, ".env")
+            try:
+                os.makedirs(os.path.dirname(dotenv_path), exist_ok=True)
+                with open(dotenv_path, "w") as f:
+                    f.write(f'OLLAMA_API_KEY="{ollama_key}"\n')
+                    if ollama_url:
+                        f.write(f'OLLAMA_BASE_URL="{ollama_url}"\n')
+            except Exception as e:
+                logger.error(f"OpenClaw .env write error: {e}")
+
+        # API Key — provider'a göre docker/env olarak set etmek isterseniz (opsiyonel)
+        # Buraları dokunmuyoruz.
+        
         _write_config(config)
         return {"code": 200, "msg": "AI Agent ayarları kaydedildi"}
     except Exception as e:
@@ -421,7 +480,7 @@ async def openclaw_restart(
 _models_cache: dict = {"data": None, "ts": 0}
 _MODELS_CACHE_TTL = 600  # 10 dakika
 
-OPENCLAW_CONTAINER = os.environ.get("OPENCLAW_CONTAINER_NAME", "anomivox-openclaw-1")
+OPENCLAW_CONTAINER = os.environ.get("OPENCLAW_CONTAINER_NAME", "anomivox-ai-agent-1")
 
 
 async def _docker_exec(container: str, cmd: list[str], timeout: int = 30) -> tuple[int, str, str]:

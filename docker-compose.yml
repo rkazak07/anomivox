@@ -22,7 +22,7 @@ services:
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
       # AI Agent Gateway (Docker iç ağ)
-      OPENCLAW_GATEWAY_HOST: openclaw
+      OPENCLAW_GATEWAY_HOST: ai-agent
       OPENCLAW_GATEWAY_PORT: "18789"
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_CONFIG_DIR: /openclaw-config
@@ -205,7 +205,7 @@ services:
   # Daha fazla bilgi: https://docs.openclaw.ai
   # ─────────────────────────────────────────────
 
-  ai-gent:
+  ai-agent:
     build:
       context: .
       dockerfile: Dockerfile.openclaw

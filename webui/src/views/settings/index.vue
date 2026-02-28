@@ -143,7 +143,7 @@
                           <el-option label="Google (Gemini)" value="google" />
                           <el-option label="Groq" value="groq" />
                           <el-option label="DeepSeek" value="deepseek" />
-                          <el-option label="Ollama (Local)" value="ollama" />
+                          <el-option label="Ollama (Local/Remote)" value="ollama" />
                           <el-option label="Amazon Bedrock" value="amazon-bedrock" />
                           <el-option label="OpenRouter" value="openrouter" />
                         </el-select>
@@ -176,7 +176,7 @@
                         <div class="form-hint">{{ $t('openclawModelNameHint') }}</div>
                       </el-form-item>
                     </el-col>
-                    <el-col :span="8">
+                    <el-col :span="8" v-if="openclawConfig.model_provider !== 'ollama'">
                       <el-form-item :label="$t('openclawApiKey')">
                         <el-input
                           v-model="openclawConfig.api_key"
@@ -184,11 +184,43 @@
                           show-password
                           :placeholder="openclawConfig.api_key_set ? $t('tokenSetLeaveBlank') : $t('openclawApiKeyPlaceholder')"
                           clearable
+                          autocomplete="new-password"
                         />
                         <div class="form-hint">
                           <span v-if="openclawConfig.api_key_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
                           <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
                           — {{ $t('openclawApiKeyHint') }}
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- Ollama Özelleştirmeleri -->
+                  <el-row :gutter="20" v-if="openclawConfig.model_provider === 'ollama'">
+                    <el-col :span="12">
+                      <el-form-item :label="$t('ollamaUrl')">
+                        <el-input
+                          v-model="openclawConfig.ollama_url"
+                          :placeholder="$t('ollamaUrlPlaceholder')"
+                          clearable
+                        />
+                        <div class="form-hint">{{ $t('ollamaUrlHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="12">
+                      <el-form-item :label="$t('ollamaApiKey')">
+                        <el-input
+                          v-model="openclawConfig.ollama_api_key"
+                          type="password"
+                          show-password
+                          :placeholder="openclawConfig.ollama_api_key_set ? $t('tokenSetLeaveBlank') : $t('ollamaApiKeyPlaceholder')"
+                          clearable
+                          autocomplete="new-password"
+                        />
+                        <div class="form-hint">
+                          <span v-if="openclawConfig.ollama_api_key_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
+                          <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
+                          — {{ $t('ollamaApiKeyHint') }}
                         </div>
                       </el-form-item>
                     </el-col>
@@ -921,6 +953,9 @@ const openclawConfig = reactive({
   model_name: 'claude-sonnet-4-20250514',
   api_key: '',
   api_key_set: false,
+  ollama_url: '',
+  ollama_api_key: '',
+  ollama_api_key_set: false,
   telegram_enabled: false,
   telegram_token: '',
   telegram_token_set: false,
@@ -1012,6 +1047,11 @@ const fetchOpenclawConfig = async () => {
       openclawConfig.api_key_set = d.api_key_set || false
       openclawConfig.api_key = '' // never returned from backend
 
+      // Ollama status
+      openclawConfig.ollama_url = d.ollama_url || ''
+      openclawConfig.ollama_api_key_set = d.ollama_api_key_set || false
+      openclawConfig.ollama_api_key = '' // never returned from backend
+
       // Telegram
       openclawConfig.telegram_enabled = d.telegram_enabled || false
       openclawConfig.telegram_token = '' // never returned
@@ -1075,6 +1115,13 @@ const onSaveOpenclaw = async () => {
       payload.api_key = openclawConfig.api_key
     }
 
+    if (openclawConfig.model_provider === 'ollama') {
+      payload.ollama_url = openclawConfig.ollama_url
+      if (openclawConfig.ollama_api_key) {
+        payload.ollama_api_key = openclawConfig.ollama_api_key
+      }
+    }
+
     // Telegram
     if (openclawConfig.telegram_enabled) {
       if (openclawConfig.telegram_token) {
@@ -1122,6 +1169,7 @@ const onSaveOpenclaw = async () => {
     if (res.code === 200) {
       ElMessage.success($t('openclawSaveSuccess'))
       openclawConfig.api_key = ''
+      openclawConfig.ollama_api_key = ''
       fetchOpenclawConfig()
     } else {
       ElMessage.error(res.msg || $t('openclawSaveFail'))

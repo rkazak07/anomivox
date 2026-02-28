@@ -74,6 +74,7 @@ export default {
   // Settings & User Management
   settingsTitle: 'Settings',
   userManagement: 'User Management',
+  users: 'users',
   addUser: 'Add User',
   username: 'Username',
   password: 'Password',

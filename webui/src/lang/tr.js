@@ -74,6 +74,7 @@ export default {
   // Settings & User Management
   settingsTitle: 'Ayarlar',
   userManagement: 'Kullanıcı Yönetimi',
+  users: 'kullanıcı',
   addUser: 'Kullanıcı Ekle',
   username: 'Kullanıcı Adı',
   password: 'Şifre',

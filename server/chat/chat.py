@@ -1,4 +1,4 @@
-from fastapi import Body
+from fastapi import Body, Header
 from fastapi.responses import StreamingResponse
 from configs import LLM_MODELS, TEMPERATURE
 from server.utils import wrap_done, get_ChatOpenAI
@@ -31,6 +31,7 @@ async def chat(query: str = Body(..., description="User input", examples=["hello
                temperature: float = Body(TEMPERATURE, description="LLM sampling temperature", ge=0.0, le=1.0),
                max_tokens: Optional[int] = Body(None, description="Limit LLM generated token count, None defaults to model maximum"),
                prompt_name: str = Body("default", description="Prompt template name used (configured in configs/prompt_config.py)"),
+               authorization: Optional[str] = Header(None),
                ):
     async def chat_iterator() -> AsyncIterable[str]:
         nonlocal history, max_tokens
@@ -39,6 +40,43 @@ async def chat(query: str = Body(..., description="User input", examples=["hello
         memory = None
 
         if conversation_id:
+            # Conversation sahibini bagla ve yetki kontrolu yap
+            from server.auth.auth_api import _get_current_user
+            from server.db.repository.conversation_repository import add_conversation_to_db, get_conversation_by_id
+            current_user = _get_current_user(authorization)
+            user_id = current_user["id"] if current_user else None
+            is_admin = current_user.get("is_admin", False) if current_user else False
+
+            existing = get_conversation_by_id(conversation_id)
+            if existing is None:
+                add_conversation_to_db(
+                    chat_type="llm_chat",
+                    name="",
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                )
+            else:
+                conv_owner = existing.get("user_id")
+                # Admin baska kullanicinin sohbetine yazamaz
+                if is_admin and conv_owner is not None and conv_owner != user_id:
+                    import json as _json
+                    yield _json.dumps({
+                        "answer": "[Hata: Yonetici baska kullanicilarin sohbetlerine mesaj yazamaz]",
+                        "conversation_id": conversation_id,
+                        "message_id": ""
+                    }) + "\n"
+                    return
+                # Sahipsiz konusmayi sahiplendir
+                if conv_owner is None and user_id is not None:
+                    from server.db.session import with_session as _ws
+                    from server.db.models.conversation_model import ConversationModel as _CM
+                    @_ws
+                    def _set_owner(session, cid=conversation_id, uid=user_id):
+                        c = session.query(_CM).filter_by(id=cid).first()
+                        if c:
+                            c.user_id = uid
+                    _set_owner()
+
             message_id = add_message_to_db(chat_type="llm_chat", query=query, conversation_id=conversation_id)
             conversation_callback = ConversationCallbackHandler(conversation_id=conversation_id, message_id=message_id,
                                                                 chat_type="llm_chat",

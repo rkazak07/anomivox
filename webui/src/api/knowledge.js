@@ -132,3 +132,26 @@ export const knowledgeUploadDocsReq = (knowledgeBaseName, files, chunkSize = 250
     timeout: 0,
   })
 }
+
+// ── Conversation (Sohbet) API ─────────────────────────────
+
+export const createConversationReq = (name = 'Yeni Sohbet', chatType = 'llm_chat') => {
+  return axiosReq({ url: 'chat/conversations', data: { name, chat_type: chatType }, method: 'post' })
+}
+
+export const listConversationsReq = (targetUserId = null) => {
+  const params = targetUserId !== null ? { target_user_id: targetUserId } : {}
+  return axiosReq({ url: 'chat/conversations', params, method: 'get' })
+}
+
+export const getConversationMessagesReq = (conversationId) => {
+  return axiosReq({ url: `chat/conversations/${conversationId}/messages`, method: 'get' })
+}
+
+export const renameConversationReq = (conversationId, name) => {
+  return axiosReq({ url: 'chat/conversations/rename', data: { conversation_id: conversationId, name }, method: 'post' })
+}
+
+export const deleteConversationReq = (conversationId) => {
+  return axiosReq({ url: 'chat/conversations/delete', data: { conversation_id: conversationId }, method: 'post' })
+}

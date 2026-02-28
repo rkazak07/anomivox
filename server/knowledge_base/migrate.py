@@ -25,6 +25,17 @@ from typing import Literal, List
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    # Mevcut DB'ye user_id kolonu ekle (henüz yoksa)
+    try:
+        with engine.connect() as conn:
+            conn.execute(
+                __import__('sqlalchemy').text(
+                    "ALTER TABLE conversation ADD COLUMN user_id INTEGER"
+                )
+            )
+            conn.commit()
+    except Exception:
+        pass  # Kolon zaten var
 
 
 def reset_tables():

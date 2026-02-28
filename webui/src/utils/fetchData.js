@@ -1,14 +1,20 @@
 import {ref} from 'vue';
+import { useBasicStore } from '@/store/basic'
 
 export function fetchData(url, data = {}) {
   const isDone = ref(false);
   const fetchResult = ref([]);
 
+  // Auth token'ı header'a ekle
+  const headers = { 'Content-Type': 'application/json' }
+  try {
+    const { token } = useBasicStore()
+    if (token) headers['Authorization'] = token
+  } catch (_) {}
+
   fetch(import.meta.env.VITE_APP_BASE_URL + url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers,
     body: JSON.stringify(data)
   })
     .then(response => {

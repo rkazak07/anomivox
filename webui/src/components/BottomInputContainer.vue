@@ -42,11 +42,11 @@ const emit = defineEmits(['send-click'])
 
 const userInput: Ref<string> = ref('')
 
-const sendBtnDisabled = computed(() => userInput.value === '')
+const sendBtnDisabled = computed(() => userInput.value === '' || props.inputDisabled)
 
 const onSendClick = (e?: Event) => {
   if (e && (e as any).isComposing) return
-  if (sendBtnDisabled.value) return
+  if (sendBtnDisabled.value || props.inputDisabled) return
   emit('send-click', userInput.value)
   userInput.value = ''
 }

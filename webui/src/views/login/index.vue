@@ -119,7 +119,7 @@ const loginFunc = async () => {
           elMessage($t('loginSuccess'))
           basicStore.setToken(res.data.token)
           basicStore.setUserInfo({
-            userInfo: { username: res.data.username, avatar: '' },
+            userInfo: { username: res.data.username, avatar: '', id: res.data.user_id },
             roles: res.data.is_admin ? ['admin'] : ['user'],
             codes: []
           })

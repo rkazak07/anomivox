@@ -181,6 +181,17 @@ def mount_auth_routes(app: FastAPI):
     app.post("/auth/delete_user", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcıyı sil (admin)")(api_delete_user)
     app.post("/auth/change_password", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcı şifresini değiştir (admin)")(api_change_password)
 
+    # Conversation yönetimi
+    from server.chat.conversation_api import (
+        api_create_conversation, api_list_conversations,
+        api_conversation_messages, api_rename_conversation, api_delete_conversation,
+    )
+    app.post("/chat/conversations", tags=["Chat"], response_model=BaseResponse, summary="Yeni konuşma oluştur")(api_create_conversation)
+    app.get("/chat/conversations", tags=["Chat"], response_model=BaseResponse, summary="Konuşmaları listele")(api_list_conversations)
+    app.get("/chat/conversations/{conversation_id}/messages", tags=["Chat"], response_model=BaseResponse, summary="Konuşma mesajları")(api_conversation_messages)
+    app.post("/chat/conversations/rename", tags=["Chat"], response_model=BaseResponse, summary="Konuşmayı yeniden adlandır")(api_rename_conversation)
+    app.post("/chat/conversations/delete", tags=["Chat"], response_model=BaseResponse, summary="Konuşmayı sil")(api_delete_conversation)
+
 
 
 

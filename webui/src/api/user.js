@@ -1,5 +1,6 @@
 import axiosReq from '@/utils/axios-req'
 
+// Password is already SHA-256 hashed on the client side before being sent
 export const loginReq = (subForm) => {
   return axiosReq({
     url: 'auth/login',
@@ -24,10 +25,19 @@ export const listUsersReq = () => {
   })
 }
 
-export const createUserReq = (username, password) => {
+const hashPassword = async (password) => {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+export const createUserReq = async (username, password) => {
+  const hashed = await hashPassword(password)
   return axiosReq({
     url: 'auth/create_user',
-    data: { username, password },
+    data: { username, password: hashed },
     method: 'post'
   })
 }
@@ -48,10 +58,11 @@ export const deleteUserReq = (user_id) => {
   })
 }
 
-export const changePasswordReq = (user_id, new_password) => {
+export const changePasswordReq = async (user_id, new_password) => {
+  const hashed = await hashPassword(new_password)
   return axiosReq({
     url: 'auth/change_password',
-    data: { user_id, new_password },
+    data: { user_id, new_password: hashed },
     method: 'post'
   })
 }

@@ -1,6 +1,6 @@
 <template>
   <div class="login-container columnCC">
-    <el-form ref="refLoginForm" class="login-form" :model="subForm" :rules="formRules">
+    <el-form ref="refLoginForm" class="login-form" :model="subForm" :rules="formRules" autocomplete="off">
       <div class="title-container">
         <h3 class="title text-center">{{ settings.title }}</h3>
       </div>
@@ -9,7 +9,7 @@
           <span class="svg-container">
             <svg-icon icon-class="user" />
           </span>
-          <el-input v-model="subForm.keyword" :placeholder="$t('usernamePlaceholder')" />
+          <el-input v-model="subForm.keyword" :placeholder="$t('usernamePlaceholder')" autocomplete="off" />
           <!-- placeholder -->
           <div class="show-pwd" />
         </div>
@@ -26,6 +26,7 @@
               v-model="subForm.password"
               :type="passwordType"
               name="password"
+              autocomplete="new-password"
               :placeholder="$t('passwordPlaceholder')"
               @keyup.enter="handleLogin"
           />
@@ -58,8 +59,8 @@ const { settings } = useBasicStore()
 const formRules = useElement().formRules
 //form
 const subForm = reactive({
-  keyword: 'admin',
-  password: '123456'
+  keyword: '',
+  password: ''
 })
 const state = reactive({
   otherQuery: {},
@@ -102,8 +103,17 @@ const handleLogin = () => {
 const router = useRouter()
 const basicStore = useBasicStore()
 
-const loginFunc = () => {
-  loginReq({ username: subForm.keyword, password: subForm.password })
+const hashPassword = async (password) => {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+const loginFunc = async () => {
+  const hashedPwd = await hashPassword(subForm.password)
+  loginReq({ username: subForm.keyword, password: hashedPwd })
       .then((res) => {
         if (res.code === 200) {
           elMessage($t('loginSuccess'))

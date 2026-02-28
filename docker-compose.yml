@@ -205,7 +205,7 @@ services:
   # Daha fazla bilgi: https://docs.openclaw.ai
   # ─────────────────────────────────────────────
 
-  openclaw:
+  ai-gent:
     build:
       context: .
       dockerfile: Dockerfile.openclaw

@@ -17,7 +17,8 @@ services:
       /bin/sh -c "
       ollama serve &
       sleep 5 &&
-      ollama pull phi3:mini &&
+      ollama pull llama3:8b &&
+      ollama pull sqlserver:latest &&
       wait
       "
 

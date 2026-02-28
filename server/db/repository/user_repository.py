@@ -26,12 +26,21 @@ def init_admin_user(session):
 
 @with_session
 def authenticate_user(session, username: str, password: str) -> Optional[Dict]:
-    """Authenticate user with username and password."""
+    """Authenticate user with username and password.
+    
+    Password comes pre-hashed (SHA-256 hex) from the client.
+    DB stores SHA-256 hex hash, so we compare directly.
+    For backward compatibility, also try hashing the input
+    in case it's a plain text password.
+    """
     user = session.query(UserModel).filter_by(username=username).first()
     if not user:
         return None
-    if user.password_hash != _hash_password(password):
-        return None
+    # Client sends SHA-256 hex hash — compare directly
+    if user.password_hash != password:
+        # Backward compat: maybe it's plain text (old client)
+        if user.password_hash != _hash_password(password):
+            return None
     if not user.is_active:
         return None
     return {
@@ -60,13 +69,20 @@ def list_users(session) -> List[Dict]:
 
 @with_session
 def create_user(session, username: str, password: str) -> Dict:
-    """Create a new user."""
+    """Create a new user.
+    
+    Password comes pre-hashed (SHA-256 hex) from the client.
+    Store directly as password_hash.
+    """
     existing = session.query(UserModel).filter_by(username=username).first()
     if existing:
         return {"success": False, "msg": "Bu kullanıcı adı zaten mevcut"}
+    # Client already sends SHA-256 hex — store directly
+    # If it looks like a hex hash (64 chars), use as-is; otherwise hash it
+    pwd_hash = password if len(password) == 64 else _hash_password(password)
     user = UserModel(
         username=username,
-        password_hash=_hash_password(password),
+        password_hash=pwd_hash,
         is_admin=False,
         is_active=True
     )
@@ -101,9 +117,14 @@ def delete_user(session, user_id: int) -> Dict:
 
 @with_session
 def change_user_password(session, user_id: int, new_password: str) -> Dict:
-    """Change a user's password."""
+    """Change a user's password.
+    
+    Password comes pre-hashed (SHA-256 hex) from the client.
+    """
     user = session.query(UserModel).filter_by(id=user_id).first()
     if not user:
         return {"success": False, "msg": "Kullanıcı bulunamadı"}
-    user.password_hash = _hash_password(new_password)
+    # Client already sends SHA-256 hex — store directly
+    pwd_hash = new_password if len(new_password) == 64 else _hash_password(new_password)
+    user.password_hash = pwd_hash
     return {"success": True, "msg": "Şifre başarıyla değiştirildi"}

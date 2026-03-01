@@ -158,7 +158,7 @@ services:
   # Prometheus anomali alert kayıt uygulaması
   # Ana image kullanılıyor: prometheus_service_docker/app.py,
   # proje kökündeki configs modülünü import ettiği için aynı image gerekli.
-  python_app:
+  notify-worker:
     build: .
     environment:
       APP_MODE: python_app

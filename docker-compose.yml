@@ -30,10 +30,10 @@ services:
       - "7861:7861"
     volumes:
       - ./configs:/app/configs
-      - chroma_data:/app/chroma_db
-      - kb_data:/app/knowledge_base
-      - logs_data:/app/logs
-      - openclaw_data:/openclaw-config
+      - ./chroma_db:/app/chroma_db
+      - ./knowledge_base:/app/knowledge_base
+      - ./logs_data:/app/logs
+      - ./openclaw_data:/openclaw-config
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - agent_network
@@ -67,6 +67,7 @@ services:
     volumes:
       - ./configs:/app/configs
       - logs_data:/app/logs
+      - ./webui/src:/app/webui/src
     networks:
       - agent_network
     depends_on:

@@ -96,9 +96,9 @@
       </Transition>
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════ -->
-    <!-- SECTION 2 — LiteLLM & DBA Agent Management (collapsible) -->
-    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 2 — AI Gateway Agent & DBA Agent Management (collapsible) -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
     <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.litellm }">
       <div class="collapse-card-header" @click="toggleSection('litellm')">
         <div class="collapse-card-title">
@@ -866,7 +866,13 @@
                       </template>
                     </el-table-column>
                     <el-table-column prop="user" :label="$t('username')" width="100" />
-                    <el-table-column :label="'SSH'" width="80" align="center">
+                    <el-table-column :label="'SSL'" width="70" align="center">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.ssl_enabled" type="success" size="small" effect="plain">🔒</el-tag>
+                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="'SSH'" width="70" align="center">
                       <template #default="{ row }">
                         <template v-if="row.ssh_enabled">
                           <el-tag v-if="row.ssh_last_status === 'ok'" type="success" size="small" effect="plain">🖥 ✓</el-tag>
@@ -883,13 +889,16 @@
                         <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
                       </template>
                     </el-table-column>
-                    <el-table-column :label="$t('actions')" width="280" align="center">
+                    <el-table-column :label="$t('actions')" width="320" align="center">
                       <template #default="{ row }">
                         <el-button size="small" type="primary" link :loading="testingDbTarget === row.id" @click="onTestDbTarget(row.id)">
                           {{ $t('testConnection') }}
                         </el-button>
                         <el-button v-if="row.ssh_enabled" size="small" type="info" link :loading="testingSshTarget === row.id" @click="onTestSshTarget(row.id)">
                           SSH Test
+                        </el-button>
+                        <el-button size="small" type="default" link @click="onEditDbTarget(row)">
+                          {{ $t('edit') }}
                         </el-button>
                         <el-button v-if="!row.is_primary" size="small" type="warning" link @click="onSetPrimaryDb(row.id)">
                           {{ $t('dbTargetSetPrimary') }}
@@ -971,16 +980,46 @@
                         </div>
                       </el-form-item>
                     </el-col>
-                    <el-col :span="14" style="display: flex; align-items: flex-end; padding-bottom: 18px;">
-                      <el-button
-                        type="primary"
-                        :loading="addingDbTarget"
-                        @click="onAddDbTarget"
-                        :disabled="!newDbTarget.name || !newDbTarget.host || !newDbTarget.user || !newDbTarget.dbname"
-                      >
-                        <el-icon style="margin-right: 6px;"><Plus /></el-icon>
-                        {{ $t('dbTargetAdd') }}
-                      </el-button>
+                  </el-row>
+
+                  <!-- SSL Bağlantı (Opsiyonel) -->
+                  <el-divider content-position="left">
+                    <span style="font-size: 13px;">🔒 {{ $t('sslSection') }}</span>
+                  </el-divider>
+
+                  <el-row :gutter="16">
+                    <el-col :span="3">
+                      <el-form-item :label="$t('sslEnabled')">
+                        <div class="toggle-item" style="padding: 0;">
+                          <el-switch v-model="newDbTarget.ssl_enabled" />
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('sslMode')">
+                        <el-select v-model="newDbTarget.ssl_mode" :disabled="!newDbTarget.ssl_enabled" style="width: 100%">
+                          <el-option label="require" value="require" />
+                          <el-option label="verify-ca" value="verify-ca" />
+                          <el-option label="verify-full" value="verify-full" />
+                          <el-option label="prefer" value="prefer" />
+                          <el-option label="disable" value="disable" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('sslCaPath')">
+                        <el-input v-model="newDbTarget.ssl_ca_path" :placeholder="$t('sslCaPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sslCertPath')">
+                        <el-input v-model="newDbTarget.ssl_cert_path" :placeholder="$t('sslCertPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sslKeyPath')">
+                        <el-input v-model="newDbTarget.ssl_key_path" :placeholder="$t('sslKeyPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                      </el-form-item>
                     </el-col>
                   </el-row>
 
@@ -1022,6 +1061,36 @@
                       <el-form-item :label="$t('sshKeyPath')">
                         <el-input v-model="newDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
                       </el-form-item>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="16" v-if="newDbTarget.ssh_enabled">
+                    <el-col :span="24">
+                      <el-form-item :label="$t('sshKeyContent')">
+                        <el-input
+                          v-model="newDbTarget.ssh_key_content"
+                          type="textarea"
+                          :rows="4"
+                          :placeholder="$t('sshKeyContentPlaceholder')"
+                          :disabled="!newDbTarget.ssh_enabled"
+                          style="font-family: monospace; font-size: 12px;"
+                        />
+                        <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- Ekle Butonu -->
+                  <el-row :gutter="16" style="margin-top: 8px;">
+                    <el-col :span="24" style="display: flex; justify-content: flex-end;">
+                      <el-button
+                        type="primary"
+                        :loading="addingDbTarget"
+                        @click="onAddDbTarget"
+                        :disabled="!newDbTarget.name || !newDbTarget.host || !newDbTarget.user || !newDbTarget.dbname"
+                      >
+                        <el-icon style="margin-right: 6px;"><Plus /></el-icon>
+                        {{ $t('dbTargetAdd') }}
+                      </el-button>
                     </el-col>
                   </el-row>
                 </div>
@@ -1070,6 +1139,161 @@
       </el-result>
     </div>
 
+    <!-- Edit DB Target Dialog -->
+    <el-dialog v-model="showEditDbDialog" :title="$t('editDbTarget')" width="720px" :close-on-click-modal="false" destroy-on-close>
+      <el-form label-width="130px" size="default">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item :label="$t('name')">
+              <el-input v-model="editDbTarget.name" :placeholder="$t('dbTargetNamePlaceholder')" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('dbTargetType')">
+              <el-select v-model="editDbTarget.db_type" style="width: 100%">
+                <el-option label="🐘 PostgreSQL" value="postgresql" />
+                <el-option label="🐬 MySQL" value="mysql" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="10">
+            <el-form-item :label="$t('dbTargetHost')">
+              <el-input v-model="editDbTarget.host" :placeholder="$t('dbTargetHostPlaceholder')" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item :label="$t('smtpPort')">
+              <el-input-number v-model="editDbTarget.port" :min="1" :max="65535" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item :label="$t('dbTargetDbName')">
+              <el-input v-model="editDbTarget.dbname" :placeholder="$t('dbTargetDbNamePlaceholder')" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="10">
+            <el-form-item :label="$t('username')">
+              <el-input v-model="editDbTarget.user" :placeholder="$t('dbTargetUserPlaceholder')" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="10">
+            <el-form-item :label="$t('password')">
+              <el-input v-model="editDbTarget.password" type="password" show-password :placeholder="$t('editPasswordPlaceholder')" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="4">
+            <el-form-item :label="$t('dbTargetPrimary')">
+              <el-switch v-model="editDbTarget.is_primary" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- SSL Section -->
+        <el-divider content-position="left">
+          <span style="font-size: 13px;">🔒 {{ $t('sslSection') }}</span>
+        </el-divider>
+        <el-row :gutter="16">
+          <el-col :span="4">
+            <el-form-item :label="$t('sslEnabled')">
+              <el-switch v-model="editDbTarget.ssl_enabled" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item :label="$t('sslMode')">
+              <el-select v-model="editDbTarget.ssl_mode" :disabled="!editDbTarget.ssl_enabled" style="width: 100%">
+                <el-option label="require" value="require" />
+                <el-option label="verify-ca" value="verify-ca" />
+                <el-option label="verify-full" value="verify-full" />
+                <el-option label="prefer" value="prefer" />
+                <el-option label="disable" value="disable" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="14">
+            <el-form-item :label="$t('sslCaPath')">
+              <el-input v-model="editDbTarget.ssl_ca_path" :placeholder="$t('sslCaPathPlaceholder')" :disabled="!editDbTarget.ssl_enabled" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16" v-if="editDbTarget.ssl_enabled">
+          <el-col :span="12">
+            <el-form-item :label="$t('sslCertPath')">
+              <el-input v-model="editDbTarget.ssl_cert_path" :placeholder="$t('sslCertPathPlaceholder')" :disabled="!editDbTarget.ssl_enabled" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('sslKeyPath')">
+              <el-input v-model="editDbTarget.ssl_key_path" :placeholder="$t('sslKeyPathPlaceholder')" :disabled="!editDbTarget.ssl_enabled" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- SSH Section -->
+        <el-divider content-position="left">
+          <span style="font-size: 13px;">🖥️ {{ $t('sshAccessOptional') }}</span>
+        </el-divider>
+        <el-row :gutter="16">
+          <el-col :span="4">
+            <el-form-item :label="$t('sshEnabled')">
+              <el-switch v-model="editDbTarget.ssh_enabled" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item :label="$t('sshHost')">
+              <el-input v-model="editDbTarget.ssh_host" :placeholder="$t('sshHostPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="4">
+            <el-form-item :label="$t('sshPort')">
+              <el-input-number v-model="editDbTarget.ssh_port" :min="1" :max="65535" :disabled="!editDbTarget.ssh_enabled" style="width: 100%" controls-position="right" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item :label="$t('sshUser')">
+              <el-input v-model="editDbTarget.ssh_user" :placeholder="$t('sshUserPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16" v-if="editDbTarget.ssh_enabled">
+          <el-col :span="8">
+            <el-form-item :label="$t('sshPassword')">
+              <el-input v-model="editDbTarget.ssh_password" type="password" show-password :placeholder="$t('editPasswordPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="16">
+            <el-form-item :label="$t('sshKeyPath')">
+              <el-input v-model="editDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16" v-if="editDbTarget.ssh_enabled">
+          <el-col :span="24">
+            <el-form-item :label="$t('sshKeyContent')">
+              <el-input
+                v-model="editDbTarget.ssh_key_content"
+                type="textarea"
+                :rows="4"
+                :placeholder="$t('sshKeyContentPlaceholder')"
+                :disabled="!editDbTarget.ssh_enabled"
+                style="font-family: monospace; font-size: 12px;"
+              />
+              <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDbDialog = false">{{ $t('cancel') }}</el-button>
+        <el-button type="primary" :loading="savingEditDb" @click="onSaveEditDbTarget">
+          {{ $t('save') }}
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- Create User Dialog -->
     <el-dialog v-model="showCreateDialog" :title="$t('addUser')" width="420px" :close-on-click-modal="false">
       <el-form ref="refCreateForm" :model="createForm" :rules="createRules" label-width="120px">
@@ -1112,7 +1336,7 @@ import { listUsersReq, createUserReq, toggleUserReq, deleteUserReq, changePasswo
 import { litellmHealthReq, litellmModelsReq, litellmAddModelReq, litellmRemoveModelReq, litellmTestModelReq, dbaAgentHealthReq, litellmUpdateSettingsReq } from '@/api/litellm'
 import { getMailConfigReq, saveMailConfigReq, testMailReq } from '@/api/mail'
 import { getTelegramAlertConfigReq, saveTelegramAlertConfigReq, testTelegramAlertReq, telegramGetChatIdReq } from '@/api/telegram'
-import { listDbTargetsReq, addDbTargetReq, deleteDbTargetReq, testDbTargetReq, testSshTargetReq, setPrimaryDbTargetReq } from '@/api/dbTargets'
+import { listDbTargetsReq, addDbTargetReq, updateDbTargetReq, deleteDbTargetReq, testDbTargetReq, testSshTargetReq, setPrimaryDbTargetReq } from '@/api/dbTargets'
 import { useI18n } from 'vue-i18n'
 
 const { t: $t } = useI18n()
@@ -1588,12 +1812,45 @@ const newDbTarget = reactive({
   password: '',
   dbname: '',
   is_primary: false,
+  ssl_enabled: false,
+  ssl_mode: 'require',
+  ssl_ca_path: '',
+  ssl_cert_path: '',
+  ssl_key_path: '',
   ssh_enabled: false,
   ssh_host: '',
   ssh_port: 22,
   ssh_user: '',
   ssh_password: '',
   ssh_key_path: '',
+  ssh_key_content: '',
+})
+
+// Edit dialog state
+const showEditDbDialog = ref(false)
+const savingEditDb = ref(false)
+const editingDbTargetId = ref('')
+const editDbTarget = reactive({
+  name: '',
+  db_type: 'postgresql',
+  host: '',
+  port: 5432,
+  user: '',
+  password: '',
+  dbname: '',
+  is_primary: false,
+  ssl_enabled: false,
+  ssl_mode: 'require',
+  ssl_ca_path: '',
+  ssl_cert_path: '',
+  ssl_key_path: '',
+  ssh_enabled: false,
+  ssh_host: '',
+  ssh_port: 22,
+  ssh_user: '',
+  ssh_password: '',
+  ssh_key_path: '',
+  ssh_key_content: '',
 })
 
 const fetchDbTargets = async () => {
@@ -1622,12 +1879,18 @@ const onAddDbTarget = async () => {
       password: newDbTarget.password,
       dbname: newDbTarget.dbname,
       is_primary: newDbTarget.is_primary,
+      ssl_enabled: newDbTarget.ssl_enabled,
+      ssl_mode: newDbTarget.ssl_mode,
+      ssl_ca_path: newDbTarget.ssl_ca_path,
+      ssl_cert_path: newDbTarget.ssl_cert_path,
+      ssl_key_path: newDbTarget.ssl_key_path,
       ssh_enabled: newDbTarget.ssh_enabled,
       ssh_host: newDbTarget.ssh_host,
       ssh_port: newDbTarget.ssh_port,
       ssh_user: newDbTarget.ssh_user,
       ssh_password: newDbTarget.ssh_password,
       ssh_key_path: newDbTarget.ssh_key_path,
+      ssh_key_content: newDbTarget.ssh_key_content,
     })
     if (res.code === 200) {
       ElMessage.success(res.msg)
@@ -1638,12 +1901,18 @@ const onAddDbTarget = async () => {
       newDbTarget.password = ''
       newDbTarget.dbname = ''
       newDbTarget.is_primary = false
+      newDbTarget.ssl_enabled = false
+      newDbTarget.ssl_mode = 'require'
+      newDbTarget.ssl_ca_path = ''
+      newDbTarget.ssl_cert_path = ''
+      newDbTarget.ssl_key_path = ''
       newDbTarget.ssh_enabled = false
       newDbTarget.ssh_host = ''
       newDbTarget.ssh_port = 22
       newDbTarget.ssh_user = ''
       newDbTarget.ssh_password = ''
       newDbTarget.ssh_key_path = ''
+      newDbTarget.ssh_key_content = ''
       fetchDbTargets()
     } else {
       ElMessage.error(res.msg || 'Error')
@@ -1731,6 +2000,74 @@ const onTestSshTarget = async (id) => {
     ElMessage.error($t('sshTestFail'))
   } finally {
     testingSshTarget.value = ''
+  }
+}
+
+const onEditDbTarget = (row) => {
+  editingDbTargetId.value = row.id
+  editDbTarget.name = row.name || ''
+  editDbTarget.db_type = row.db_type || 'postgresql'
+  editDbTarget.host = row.host || ''
+  editDbTarget.port = row.port || 5432
+  editDbTarget.user = row.user || ''
+  editDbTarget.password = ''
+  editDbTarget.dbname = row.dbname || ''
+  editDbTarget.is_primary = row.is_primary || false
+  editDbTarget.ssl_enabled = row.ssl_enabled || false
+  editDbTarget.ssl_mode = row.ssl_mode || 'require'
+  editDbTarget.ssl_ca_path = row.ssl_ca_path || ''
+  editDbTarget.ssl_cert_path = row.ssl_cert_path || ''
+  editDbTarget.ssl_key_path = row.ssl_key_path || ''
+  editDbTarget.ssh_enabled = row.ssh_enabled || false
+  editDbTarget.ssh_host = row.ssh_host || ''
+  editDbTarget.ssh_port = row.ssh_port || 22
+  editDbTarget.ssh_user = row.ssh_user || ''
+  editDbTarget.ssh_password = ''
+  editDbTarget.ssh_key_path = row.ssh_key_path || ''
+  editDbTarget.ssh_key_content = ''
+  showEditDbDialog.value = true
+}
+
+const onSaveEditDbTarget = async () => {
+  savingEditDb.value = true
+  try {
+    const payload = {
+      id: editingDbTargetId.value,
+      name: editDbTarget.name,
+      db_type: editDbTarget.db_type,
+      host: editDbTarget.host,
+      port: editDbTarget.port,
+      user: editDbTarget.user,
+      dbname: editDbTarget.dbname,
+      is_primary: editDbTarget.is_primary,
+      ssl_enabled: editDbTarget.ssl_enabled,
+      ssl_mode: editDbTarget.ssl_mode,
+      ssl_ca_path: editDbTarget.ssl_ca_path,
+      ssl_cert_path: editDbTarget.ssl_cert_path,
+      ssl_key_path: editDbTarget.ssl_key_path,
+      ssh_enabled: editDbTarget.ssh_enabled,
+      ssh_host: editDbTarget.ssh_host,
+      ssh_port: editDbTarget.ssh_port,
+      ssh_user: editDbTarget.ssh_user,
+      ssh_key_path: editDbTarget.ssh_key_path,
+    }
+    // Only send password fields if user actually typed something
+    if (editDbTarget.password) payload.password = editDbTarget.password
+    if (editDbTarget.ssh_password) payload.ssh_password = editDbTarget.ssh_password
+    if (editDbTarget.ssh_key_content) payload.ssh_key_content = editDbTarget.ssh_key_content
+
+    const res = await updateDbTargetReq(payload)
+    if (res.code === 200) {
+      ElMessage.success(res.msg)
+      showEditDbDialog.value = false
+      fetchDbTargets()
+    } else {
+      ElMessage.error(res.msg || 'Error')
+    }
+  } catch (e) {
+    ElMessage.error(e?.msg || 'Error')
+  } finally {
+    savingEditDb.value = false
   }
 }
 

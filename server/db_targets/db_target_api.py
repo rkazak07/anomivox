@@ -82,26 +82,48 @@ def _safe_target(t: dict) -> dict:
     else:
         safe["ssh_password_set"] = False
         safe["ssh_password"] = ""
+    # SSH key content gizle
+    if safe.get("ssh_key_content"):
+        safe["ssh_key_content_set"] = True
+        safe["ssh_key_content"] = ""
+    else:
+        safe["ssh_key_content_set"] = False
+        safe["ssh_key_content"] = ""
     return safe
 
 
 def _test_pg_connection(t: dict) -> dict:
-    """PostgreSQL bağlantı testi."""
+    """PostgreSQL bağlantı testi (SSL destekli)."""
     try:
         import psycopg2
-        conn = psycopg2.connect(
-            host=t.get("host", "localhost"),
-            port=int(t.get("port", 5432)),
-            user=t.get("user", ""),
-            password=t.get("password", ""),
-            dbname=t.get("dbname", "postgres"),
-            connect_timeout=10,
-        )
+        connect_kwargs = {
+            "host": t.get("host", "localhost"),
+            "port": int(t.get("port", 5432)),
+            "user": t.get("user", ""),
+            "password": t.get("password", ""),
+            "dbname": t.get("dbname", "postgres"),
+            "connect_timeout": 10,
+        }
+        # SSL konfigürasyonu
+        if t.get("ssl_enabled"):
+            ssl_mode = t.get("ssl_mode", "require")
+            connect_kwargs["sslmode"] = ssl_mode
+            if t.get("ssl_ca_path"):
+                connect_kwargs["sslrootcert"] = t["ssl_ca_path"]
+            if t.get("ssl_cert_path"):
+                connect_kwargs["sslcert"] = t["ssl_cert_path"]
+            if t.get("ssl_key_path"):
+                connect_kwargs["sslkey"] = t["ssl_key_path"]
+
+        conn = psycopg2.connect(**connect_kwargs)
         cur = conn.cursor()
         cur.execute("SELECT version()")
         version = cur.fetchone()[0]
         cur.execute("SELECT current_database(), current_user, pg_size_pretty(pg_database_size(current_database()))")
         db_info = cur.fetchone()
+        # SSL durumunu kontrol et
+        cur.execute("SHOW ssl")
+        ssl_status = cur.fetchone()[0]
         cur.close()
         conn.close()
         return {
@@ -110,6 +132,7 @@ def _test_pg_connection(t: dict) -> dict:
             "database": db_info[0],
             "user": db_info[1],
             "size": db_info[2],
+            "ssl": ssl_status,
         }
     except ImportError:
         return {"ok": False, "error": "psycopg2 not installed"}
@@ -118,22 +141,39 @@ def _test_pg_connection(t: dict) -> dict:
 
 
 def _test_mysql_connection(t: dict) -> dict:
-    """MySQL bağlantı testi."""
+    """MySQL bağlantı testi (SSL destekli)."""
     try:
         import pymysql
-        conn = pymysql.connect(
-            host=t.get("host", "localhost"),
-            port=int(t.get("port", 3306)),
-            user=t.get("user", ""),
-            password=t.get("password", ""),
-            database=t.get("dbname", ""),
-            connect_timeout=10,
-        )
+        connect_kwargs = {
+            "host": t.get("host", "localhost"),
+            "port": int(t.get("port", 3306)),
+            "user": t.get("user", ""),
+            "password": t.get("password", ""),
+            "database": t.get("dbname", ""),
+            "connect_timeout": 10,
+        }
+        # SSL konfigürasyonu
+        if t.get("ssl_enabled"):
+            ssl_dict = {}
+            if t.get("ssl_ca_path"):
+                ssl_dict["ca"] = t["ssl_ca_path"]
+            if t.get("ssl_cert_path"):
+                ssl_dict["cert"] = t["ssl_cert_path"]
+            if t.get("ssl_key_path"):
+                ssl_dict["key"] = t["ssl_key_path"]
+            if ssl_dict:
+                connect_kwargs["ssl"] = ssl_dict
+
+        conn = pymysql.connect(**connect_kwargs)
         cur = conn.cursor()
         cur.execute("SELECT VERSION()")
         version = cur.fetchone()[0]
         cur.execute("SELECT DATABASE(), USER()")
         db_info = cur.fetchone()
+        # SSL durumunu kontrol et
+        cur.execute("SHOW STATUS LIKE 'Ssl_cipher'")
+        ssl_row = cur.fetchone()
+        ssl_cipher = ssl_row[1] if ssl_row else ""
         cur.close()
         conn.close()
         return {
@@ -141,6 +181,7 @@ def _test_mysql_connection(t: dict) -> dict:
             "version": version,
             "database": db_info[0],
             "user": db_info[1],
+            "ssl": ssl_cipher if ssl_cipher else "off",
         }
     except ImportError:
         return {"ok": False, "error": "pymysql not installed"}
@@ -149,9 +190,10 @@ def _test_mysql_connection(t: dict) -> dict:
 
 
 def _test_ssh_connection(t: dict) -> dict:
-    """SSH bağlantı testi."""
+    """SSH bağlantı testi (key path + inline key content destekli)."""
     try:
         import paramiko
+        import io
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -162,10 +204,22 @@ def _test_ssh_connection(t: dict) -> dict:
             "timeout": 10,
         }
 
-        # Key dosyası veya password
+        # Key content (inline PEM), key dosyası veya password
+        ssh_key_content = t.get("ssh_key_content", "").strip()
         ssh_key = t.get("ssh_key_path", "").strip()
         ssh_password = t.get("ssh_password", "").strip()
-        if ssh_key:
+
+        if ssh_key_content:
+            # Inline PEM key
+            try:
+                pkey = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key_content))
+            except paramiko.SSHException:
+                try:
+                    pkey = paramiko.Ed25519Key.from_private_key(io.StringIO(ssh_key_content))
+                except paramiko.SSHException:
+                    pkey = paramiko.ECDSAKey.from_private_key(io.StringIO(ssh_key_content))
+            connect_kwargs["pkey"] = pkey
+        elif ssh_key:
             from pathlib import Path
             key_path = Path(ssh_key).expanduser()
             if key_path.exists():
@@ -175,7 +229,7 @@ def _test_ssh_connection(t: dict) -> dict:
         elif ssh_password:
             connect_kwargs["password"] = ssh_password
         else:
-            return {"ok": False, "error": "SSH key veya password gerekli"}
+            return {"ok": False, "error": "SSH key, key content veya password gerekli"}
 
         client.connect(**connect_kwargs)
 
@@ -234,6 +288,12 @@ async def add_db_target(
             "password": data.get("password", ""),
             "dbname": data["dbname"].strip(),
             "is_primary": data.get("is_primary", False),
+            # SSL
+            "ssl_enabled": bool(data.get("ssl_enabled", False)),
+            "ssl_mode": data.get("ssl_mode", "require"),  # disable, allow, prefer, require, verify-ca, verify-full
+            "ssl_ca_path": data.get("ssl_ca_path", "").strip(),
+            "ssl_cert_path": data.get("ssl_cert_path", "").strip(),
+            "ssl_key_path": data.get("ssl_key_path", "").strip(),
             # SSH / OS erişimi (opsiyonel)
             "ssh_enabled": bool(data.get("ssh_enabled", False)),
             "ssh_host": data.get("ssh_host", "").strip(),
@@ -241,6 +301,7 @@ async def add_db_target(
             "ssh_user": data.get("ssh_user", "").strip(),
             "ssh_password": data.get("ssh_password", ""),
             "ssh_key_path": data.get("ssh_key_path", "").strip(),
+            "ssh_key_content": data.get("ssh_key_content", ""),  # Inline PEM key
             "ssh_last_tested": None,
             "ssh_last_status": None,
             # Meta
@@ -294,6 +355,13 @@ async def update_db_target(
         if data.get("password"):
             t["password"] = data["password"]
 
+        # SSL alanları
+        if "ssl_enabled" in data:
+            t["ssl_enabled"] = bool(data["ssl_enabled"])
+        for ssl_field in ["ssl_mode", "ssl_ca_path", "ssl_cert_path", "ssl_key_path"]:
+            if ssl_field in data:
+                t[ssl_field] = str(data[ssl_field]).strip()
+
         # SSH alanları
         if "ssh_enabled" in data:
             t["ssh_enabled"] = bool(data["ssh_enabled"])
@@ -304,6 +372,8 @@ async def update_db_target(
             t["ssh_port"] = int(data["ssh_port"])
         if data.get("ssh_password"):
             t["ssh_password"] = data["ssh_password"]
+        if "ssh_key_content" in data:
+            t["ssh_key_content"] = data["ssh_key_content"]
 
         # is_primary ise diğerlerini sıfırla
         if t.get("is_primary"):

@@ -264,13 +264,7 @@ async def save_openclaw_config(
             defaults = agents.setdefault("defaults", {})
             model_cfg = defaults.setdefault("model", {})
             raw_model = data["model"]  # örn: "ollama/llama3.1:8b"
-            # openai-responses wrapper kullanan Ollama modelleri için
-            # primary key'i provider ile eşleşmeli: "openai/llama3.1:8b"
-            if raw_model.startswith("ollama/"):
-                model_id_only = raw_model.split("/", 1)[1]
-                model_cfg["primary"] = f"openai/{model_id_only}"
-            else:
-                model_cfg["primary"] = raw_model
+            model_cfg["primary"] = raw_model
             model_cfg.setdefault("fallbacks", [])
             # Eski format varsa temizle
             if "agent" in config and "model" in config.get("agent", {}):
@@ -303,9 +297,17 @@ async def save_openclaw_config(
                 tg["botToken"] = data["telegram_bot_token"]
             if "telegram_allow_from" in data:
                 allow_list = data["telegram_allow_from"]
-                tg["allowFrom"] = allow_list
-                # allowFrom doluysa allowlist, boşsa open — böylece herkes yazabilir
-                tg["dmPolicy"] = "allowlist" if allow_list else "open"
+                if allow_list:
+                    tg["allowFrom"] = allow_list
+                    tg["dmPolicy"] = "allowlist"
+                else:
+                    # dmPolicy=open ise allowFrom=["*"] zorunlu (openclaw validation)
+                    tg["allowFrom"] = ["*"]
+                    tg["dmPolicy"] = "open"
+            else:
+                # allowFrom yoksa default: herkese açık
+                tg.setdefault("allowFrom", ["*"])
+                tg.setdefault("dmPolicy", "open")
             # Varsayılanları koru
             tg.setdefault("groupPolicy", "allowlist")
             tg.setdefault("streaming", "off")
@@ -379,25 +381,14 @@ async def save_openclaw_config(
             ollama_key = str(data.get("ollama_api_key", "")).strip() or "ollama-local"
             model_id = model_str.split("/", 1)[1] if "/" in model_str else model_str
 
-            # Explicit provider ayarı — openai-responses wrapper (fetch-failed bug fix)
+            # Native ollama provider — openai-responses wrapper kullanma (tool calling bozar)
             models_section = config.setdefault("models", {})
             providers_section = models_section.setdefault("providers", {})
-            providers_section.pop("ollama", None)  # Eskisini temizle
-            providers_section["openai"] = {
-                "apiKey": ollama_key,
-                "api": "openai-responses",
-                "baseUrl": f"{ollama_url.rstrip('/')}/v1" if ollama_url else "http://host.docker.internal:11434/v1",
-                "models": [
-                    {
-                        "id": model_id,
-                        "name": model_id,
-                        "reasoning": False,
-                        "input": ["text"],
-                        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-                        "contextWindow": 131072,
-                        "maxTokens": 1310720,
-                    }
-                ],
+            providers_section.pop("openai", None)  # Eski wrapper'ı temizle
+            providers_section["ollama"] = {
+                "baseUrl": ollama_url if ollama_url else "http://host.docker.internal:11434",
+                "api": "ollama",
+                "models": [],
             }
 
             # Env section
@@ -438,8 +429,9 @@ async def save_openclaw_config(
 
             # model-level params (temperature, num_predict, num_ctx vb.)
             params_raw = str(data.get("ollama_model_params", "")).strip()
-            model_full_key = f"openai/{model_id}"  # provider/model formatı
+            model_full_key = f"ollama/{model_id}"  # native ollama formatı
             models_catalog = agents_def.setdefault("models", {})
+            models_catalog.pop(f"openai/{model_id}", None)  # Eski wrapper key'ini temizle
             if params_raw:
                 try:
                     extra_params = json.loads(params_raw)

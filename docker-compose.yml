@@ -32,8 +32,8 @@ services:
       - ./configs:/app/configs
       - ./chroma_db:/app/chroma_db
       - ./knowledge_base:/app/knowledge_base
-      - ./logs_data:/app/logs
-      - ./openclaw_data:/openclaw-config
+      - logs_data:/app/logs
+      - openclaw_data:/openclaw-config
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - agent_network

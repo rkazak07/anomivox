@@ -16,10 +16,9 @@ app = FastAPI()
 logger = logging.getLogger("alert_app")
 logging.basicConfig(level=logging.INFO)
 
-# ── AI Agent Gateway entegrasyonu ──────────────────────────
-OPENCLAW_GATEWAY_URL = os.environ.get("OPENCLAW_GATEWAY_URL", "http://openclaw:18789")
-OPENCLAW_GATEWAY_TOKEN = os.environ.get("OPENCLAW_GATEWAY_TOKEN", "")
-OPENCLAW_NOTIFY_ENABLED = os.environ.get("OPENCLAW_NOTIFY_ENABLED", "true").lower() == "true"
+# ── DBA Agent entegrasyonu ──────────────────────────
+DBA_AGENT_URL = os.environ.get("DBA_AGENT_URL", "http://dba-agent:8100")
+DBA_AGENT_NOTIFY_ENABLED = os.environ.get("DBA_AGENT_NOTIFY_ENABLED", "true").lower() == "true"
 
 # Telegram Bot API — alert bildirimleri doğrudan
 # Env'den veya configs/telegram_alert_config.py'den okunur.
@@ -398,18 +397,18 @@ def _diag_mssql(cur, diag):
 # Alert Formatlama & AI Agent Bildirim
 # ═══════════════════════════════════════════════════════════
 
-def notify_openclaw(message: str):
+def notify_dba_agent(message: str):
     """
     Alert bildirimini Telegram'a gönder.
 
     Strateji:
       1. TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID varsa → doğrudan Telegram Bot API
-      2. Yoksa AI Agent Gateway API dene (fallback)
+      2. Yoksa DBA Agent API'ye alert gönder (fallback)
 
-    Kullanıcı Telegram'dan yanıt verdiğinde AI Agent otomatik olarak
-    AI agent üzerinden cevap üretir.
+    Kullanıcı Telegram'dan yanıt verdiğinde DBA Agent otomatik olarak
+    teşhis başlatır.
     """
-    if not OPENCLAW_NOTIFY_ENABLED:
+    if not DBA_AGENT_NOTIFY_ENABLED:
         return
 
     # Her çağrıda config'i yeniden oku (UI'dan değiştirilebilir)
@@ -444,22 +443,18 @@ def notify_openclaw(message: str):
         except Exception as e:
             logger.error(f"Telegram Bot API error: {e}")
 
-    # ── 2. Fallback: AI Agent Gateway ──
+    # ── 2. Fallback: DBA Agent API ──
     if not sent:
         try:
-            headers = {"Content-Type": "application/json"}
-            if OPENCLAW_GATEWAY_TOKEN:
-                headers["Authorization"] = f"Bearer {OPENCLAW_GATEWAY_TOKEN}"
-
             resp = requests.post(
-                f"{OPENCLAW_GATEWAY_URL}/api/v1/chat",
-                json={"message": message},
-                headers=headers,
+                f"{DBA_AGENT_URL}/api/agent/alert",
+                json={"message": message, "source": "prometheus"},
+                headers={"Content-Type": "application/json"},
                 timeout=30,
             )
-            logger.info(f"AI Agent notify response: {resp.status_code}")
+            logger.info(f"DBA Agent notify response: {resp.status_code}")
         except Exception as e:
-            logger.error(f"AI Agent notify failed: {e}")
+            logger.error(f"DBA Agent notify failed: {e}")
 
 
 def query_prometheus_instant(query: str) -> dict:
@@ -595,7 +590,7 @@ async def test_alert():
             }]
         }
         message = format_alert_message(test_args, diagnostics)
-        notify_openclaw(message)
+        notify_dba_agent(message)
         return {"code": 0, "msg": "success", "data": "test alert sent",
                 "diagnostics": diagnostics, "chat_id": TELEGRAM_ADMIN_CHAT_ID}
     except Exception as e:
@@ -615,7 +610,7 @@ async def alert(request: Request):
         status = args.get("status", "unknown")
 
         # Her alert'te Telegram'a bildirim gönder
-        if OPENCLAW_NOTIFY_ENABLED:
+        if DBA_AGENT_NOTIFY_ENABLED:
             thread_notify = threading.Thread(
                 target=_send_alert_notification, args=(args,), daemon=True
             )
@@ -641,7 +636,7 @@ def _send_alert_notification(args):
     try:
         diagnostics = get_db_diagnostics()
         message = format_alert_message(args, diagnostics)
-        notify_openclaw(message)
+        notify_dba_agent(message)
     except Exception as e:
         logger.error(f"Alert notification error: {e}")
 

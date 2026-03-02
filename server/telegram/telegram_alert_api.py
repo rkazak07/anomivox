@@ -21,7 +21,7 @@ CONFIG_PATH = os.path.join(
 
 def _read_config() -> dict:
     """telegram_alert_config.py'den mevcut ayarları oku.
-    Token bulunamazsa openclaw.json'dan da dener."""
+    Token bulunamazsa .env'den de dener."""
     config = {
         "enabled": True,
         "bot_token": "",
@@ -34,8 +34,8 @@ def _read_config() -> dict:
         "bot_username": "",
     }
     if not os.path.exists(CONFIG_PATH):
-        # Config dosyası yoksa, OpenClaw'dan token almayı dene
-        token = _get_token_from_openclaw()
+        # Config dosyası yoksa, .env'den token almayı dene
+        token = _get_token_from_env()
         if token:
             config["bot_token"] = token
             config["bot_token_set"] = True
@@ -56,9 +56,9 @@ def _read_config() -> dict:
             return default
 
         token = extract("TELEGRAM_BOT_TOKEN", "")
-        # Token yoksa OpenClaw'dan al
+        # Token yoksa .env'den al
         if not token:
-            token = _get_token_from_openclaw()
+            token = _get_token_from_env()
         config["bot_token"] = token
         config["bot_token_set"] = bool(token)
         config["enabled"] = extract("TELEGRAM_ALERT_ENABLED", True)
@@ -82,22 +82,9 @@ def _read_config() -> dict:
     return config
 
 
-def _get_token_from_openclaw() -> str:
-    """openclaw.json'dan Telegram bot token'ı al"""
-    try:
-        openclaw_dir = os.environ.get(
-            "OPENCLAW_CONFIG_DIR",
-            os.path.join(os.path.expanduser("~"), ".openclaw")
-        )
-        openclaw_path = os.path.join(openclaw_dir, "openclaw.json")
-        if os.path.exists(openclaw_path):
-            import json
-            with open(openclaw_path, "r") as f:
-                oc = json.load(f)
-            return oc.get("channels", {}).get("telegram", {}).get("botToken", "")
-    except Exception as e:
-        logger.warning(f"OpenClaw config read for token: {e}")
-    return ""
+def _get_token_from_env() -> str:
+    """Environment variable'dan Telegram bot token'ı al"""
+    return os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 
 def _write_config(config: dict):
@@ -258,7 +245,7 @@ async def telegram_get_chat_id(
     authorization: Optional[str] = Header(None)
 ):
     """Bot'a gelen son mesajlardan chat_id bul.
-    OpenClaw polling yapıyorsa, önce webhook'u kontrol et ve
+    Polling yapılıyorsa, önce webhook'u kontrol et ve
     geçici olarak getUpdates'e izin ver."""
     config = _read_config()
     if not config.get("bot_token"):

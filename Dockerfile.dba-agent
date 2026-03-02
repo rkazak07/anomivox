@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════
+# DBA Agent Container — Anomivox AI DBA Agent
+# ═══════════════════════════════════════════════════════════
+# Python tabanlı otonom DBA agent.
+# LiteLLM proxy üzerinden Ollama'ya bağlanır.
+# Mevcut sisteme (API, WebUI, KB) DOKUNMAZ — ayrı çalışır.
+# ═══════════════════════════════════════════════════════════
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Sistem bağımlılıkları
+RUN apt-get update && apt-get install -y \
+    curl \
+    libpq-dev \
+    gcc \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python bağımlılıkları
+COPY requirements_dba_agent.txt .
+RUN pip install --no-cache-dir -r requirements_dba_agent.txt
+
+# Uygulama kodu
+COPY dba_agent/ ./dba_agent/
+COPY configs/ ./configs/
+
+# Health check endpoint
+EXPOSE 8100
+
+# Entry point
+CMD ["python", "-m", "dba_agent.main"]

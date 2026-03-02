@@ -97,462 +97,205 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════ -->
-    <!-- SECTION 2 — OpenClaw AI Gateway (collapsible)            -->
+    <!-- SECTION 2 — LiteLLM & DBA Agent Management (collapsible) -->
     <!-- ══════════════════════════════════════════════════════════ -->
-    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.openclaw }">
-      <div class="collapse-card-header" @click="toggleSection('openclaw')">
+    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.litellm }">
+      <div class="collapse-card-header" @click="toggleSection('litellm')">
         <div class="collapse-card-title">
           <div class="collapse-card-icon ai-icon">
             <span style="font-size: 20px;">🤖</span>
           </div>
           <div>
-            <h3>{{ $t('openclawSettings') }}</h3>
-            <span class="collapse-card-subtitle">{{ $t('openclawDesc') }}</span>
+            <h3>{{ $t('litellmSettings') }}</h3>
+            <span class="collapse-card-subtitle">{{ $t('litellmDesc') }}</span>
           </div>
         </div>
         <div class="collapse-card-right">
-          <el-tag :type="openclawOnline ? 'success' : 'info'" size="default" effect="plain" round>
-            <el-icon style="margin-right: 4px;"><CircleCheck v-if="openclawOnline" /><WarningFilled v-else /></el-icon>
-            {{ openclawOnline ? $t('openclawGatewayOnline') : $t('openclawGatewayOffline') }}
+          <el-tag :type="litellmOnline ? 'success' : 'info'" size="default" effect="plain" round>
+            <el-icon style="margin-right: 4px;"><CircleCheck v-if="litellmOnline" /><WarningFilled v-else /></el-icon>
+            {{ litellmOnline ? $t('litellmProxyOnline') : $t('litellmProxyOffline') }}
           </el-tag>
-          <div class="collapse-chevron" :class="{ rotated: sections.openclaw }">
+          <el-tag :type="dbaAgentOnline ? 'success' : 'info'" size="default" effect="plain" round style="margin-left: 4px;">
+            <el-icon style="margin-right: 4px;"><CircleCheck v-if="dbaAgentOnline" /><WarningFilled v-else /></el-icon>
+            {{ dbaAgentOnline ? 'DBA Agent ✓' : 'DBA Agent ✗' }}
+          </el-tag>
+          <div class="collapse-chevron" :class="{ rotated: sections.litellm }">
             <el-icon :size="18"><ArrowDown /></el-icon>
           </div>
         </div>
       </div>
       <Transition name="collapse-body">
-        <div v-show="sections.openclaw" class="collapse-card-body">
-          <el-form label-position="top" class="telegram-form" v-loading="openclawLoading">
+        <div v-show="sections.litellm" class="collapse-card-body">
+          <el-form label-position="top" class="telegram-form" v-loading="litellmLoading">
 
-            <!-- ═══ AI Model ═══ -->
+            <!-- ═══ Model Listesi ═══ -->
             <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('model')">
-                <span>🧠 {{ $t('openclawModel') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.model }">
+              <div class="inner-card-header" @click="toggleInner('models')">
+                <span>🧠 {{ $t('litellmModels') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.models }">
                   <el-icon :size="14"><ArrowDown /></el-icon>
                 </div>
               </div>
               <Transition name="collapse-body">
-                <div v-show="innerSections.model" class="inner-card-body">
+                <div v-show="innerSections.models" class="inner-card-body">
+
+                  <!-- Mevcut modeller tablosu -->
+                  <el-table :data="litellmModels" stripe size="small" style="margin-bottom: 16px;" empty-text="Henüz model eklenmemiş">
+                    <el-table-column prop="model_name" :label="$t('litellmModelName')" min-width="140" />
+                    <el-table-column prop="litellm_model" :label="$t('litellmModelId')" min-width="180" />
+                    <el-table-column prop="api_base" :label="$t('litellmApiBase')" min-width="200">
+                      <template #default="{ row }">
+                        <span>{{ row.api_base || '—' }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('litellmRole')" width="100">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.model_info?.role" size="small" type="info">{{ row.model_info.role }}</el-tag>
+                        <span v-else>—</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('status')" width="90" align="center">
+                      <template #default="{ row }">
+                        <el-tag :type="row.is_active ? 'success' : 'info'" size="small" effect="plain">
+                          {{ row.is_active ? '●' : '○' }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('actions')" width="160" align="center">
+                      <template #default="{ row }">
+                        <el-button size="small" type="primary" link :loading="testingModel === row.model_name" @click="onTestModel(row.model_name)">
+                          {{ $t('litellmTest') }}
+                        </el-button>
+                        <el-button size="small" type="danger" link @click="onRemoveModel(row.model_name)">
+                          {{ $t('delete') }}
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+
+                  <!-- Test sonucu -->
+                  <div v-if="testResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 500; margin-bottom: 6px;">🧪 {{ $t('litellmTestResult') }}:</div>
+                    <div style="font-size: 13px; color: var(--el-text-color-secondary);">
+                      <strong>{{ $t('litellmModelName') }}:</strong> {{ testResult.model }}<br>
+                      <strong>{{ $t('litellmResponse') }}:</strong> {{ testResult.response?.substring(0, 200) }}<br>
+                      <strong>Tokens:</strong> {{ testResult.tokens }} (prompt: {{ testResult.prompt_tokens }}, completion: {{ testResult.completion_tokens }})
+                    </div>
+                  </div>
+
+                  <!-- Yeni model ekleme formu -->
+                  <el-divider content-position="left">
+                    <span style="font-size: 13px;">➕ {{ $t('litellmAddModel') }}</span>
+                  </el-divider>
+
+                  <el-row :gutter="16">
+                    <el-col :span="6">
+                      <el-form-item :label="$t('litellmModelName')">
+                        <el-input v-model="newModel.model_name" placeholder="llama3.1:8b" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('litellmModelId')">
+                        <el-input v-model="newModel.litellm_model" placeholder="ollama/llama3.1:8b" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('litellmApiBase')">
+                        <el-input v-model="newModel.api_base" placeholder="http://192.168.1.202:11434" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('litellmRole')">
+                        <el-select v-model="newModel.role" style="width: 100%" clearable>
+                          <el-option label="Reasoning" value="reasoning" />
+                          <el-option label="SQL" value="sql" />
+                          <el-option label="Triage" value="triage" />
+                          <el-option label="Fallback" value="fallback" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="16">
+                    <el-col :span="4">
+                      <el-form-item label="Timeout (s)">
+                        <el-input-number v-model="newModel.timeout" :min="30" :max="600" :step="30" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item label="Context (num_ctx)">
+                        <el-input-number v-model="newModel.num_ctx" :min="256" :max="32768" :step="512" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item label="Max Output">
+                        <el-input-number v-model="newModel.num_predict" :min="32" :max="4096" :step="64" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="12" style="display: flex; align-items: flex-end; padding-bottom: 18px;">
+                      <el-button type="primary" :loading="addingModel" @click="onAddModel" :disabled="!newModel.model_name || !newModel.litellm_model">
+                        <el-icon style="margin-right: 6px;"><Plus /></el-icon>
+                        {{ $t('litellmAddModel') }}
+                      </el-button>
+                    </el-col>
+                  </el-row>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Genel Ayarlar ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('litellmSettings')">
+                <span>⚙️ {{ $t('litellmGeneralSettings') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.litellmSettings }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.litellmSettings" class="inner-card-body">
                   <el-row :gutter="20">
                     <el-col :span="8">
-                      <el-form-item :label="$t('openclawModelProvider')">
-                        <el-select v-model="openclawConfig.model_provider" style="width: 100%" @change="onProviderChange">
-                          <el-option label="Anthropic (Claude)" value="anthropic" />
-                          <el-option label="OpenAI (GPT)" value="openai" />
-                          <el-option label="Google (Gemini)" value="google" />
-                          <el-option label="Groq" value="groq" />
-                          <el-option label="DeepSeek" value="deepseek" />
-                          <el-option label="Ollama (Local/Remote)" value="ollama" />
-                          <el-option label="Amazon Bedrock" value="amazon-bedrock" />
-                          <el-option label="OpenRouter" value="openrouter" />
-                        </el-select>
+                      <el-form-item :label="$t('litellmTimeout')">
+                        <el-input-number v-model="litellmSettings.request_timeout" :min="30" :max="600" :step="30" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('litellmTimeoutHint') }}</div>
                       </el-form-item>
                     </el-col>
                     <el-col :span="8">
-                      <el-form-item :label="$t('openclawModelName')">
-                        <el-select
-                          v-model="openclawConfig.model_name"
-                          filterable
-                          allow-create
-                          default-first-option
-                          :placeholder="$t('openclawModelNamePlaceholder')"
-                          :loading="modelCatalogLoading"
-                          style="width: 100%"
-                        >
-                          <el-option
-                            v-for="m in filteredModels"
-                            :key="m.key"
-                            :label="`${m.name}  (${m.context_window >= 1000 ? Math.round(m.context_window/1000) + 'K' : m.context_window})`"
-                            :value="m.key.substring(m.key.indexOf('/') + 1)"
-                          >
-                            <span style="float: left">{{ m.name }}</span>
-                            <span style="float: right; color: var(--el-text-color-secondary); font-size: 12px; margin-left: 12px;">
-                              {{ m.context_window >= 1000 ? Math.round(m.context_window/1000) + 'K' : m.context_window }} ctx
-                              <el-tag v-if="m.available" size="small" type="success" style="margin-left: 6px;">✓</el-tag>
-                            </span>
-                          </el-option>
-                        </el-select>
-                        <div class="form-hint">{{ $t('openclawModelNameHint') }}</div>
+                      <el-form-item :label="$t('litellmRetries')">
+                        <el-input-number v-model="litellmSettings.num_retries" :min="0" :max="5" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('litellmRetriesHint') }}</div>
                       </el-form-item>
                     </el-col>
-                    <el-col :span="8" v-if="openclawConfig.model_provider !== 'ollama'">
-                      <el-form-item :label="$t('openclawApiKey')">
-                        <el-input
-                          v-model="openclawConfig.api_key"
-                          type="password"
-                          show-password
-                          :placeholder="openclawConfig.api_key_set ? $t('tokenSetLeaveBlank') : $t('openclawApiKeyPlaceholder')"
-                          clearable
-                          autocomplete="new-password"
-                        />
-                        <div class="form-hint">
-                          <span v-if="openclawConfig.api_key_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
-                          <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
-                          — {{ $t('openclawApiKeyHint') }}
-                        </div>
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-
-                  <!-- Ollama Özelleştirmeleri -->
-                  <el-row :gutter="20" v-if="openclawConfig.model_provider === 'ollama'">
-                    <el-col :span="12">
-                      <el-form-item :label="$t('ollamaUrl')">
-                        <el-input
-                          v-model="openclawConfig.ollama_url"
-                          :placeholder="$t('ollamaUrlPlaceholder')"
-                          clearable
-                        />
-                        <div class="form-hint">{{ $t('ollamaUrlHint') }}</div>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="12">
-                      <el-form-item :label="$t('ollamaApiKey')">
-                        <el-input
-                          v-model="openclawConfig.ollama_api_key"
-                          type="password"
-                          show-password
-                          :placeholder="openclawConfig.ollama_api_key_set ? $t('tokenSetLeaveBlank') : $t('ollamaApiKeyPlaceholder')"
-                          clearable
-                          autocomplete="new-password"
-                        />
-                        <div class="form-hint">
-                          <span v-if="openclawConfig.ollama_api_key_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
-                          <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
-                          — {{ $t('ollamaApiKeyHint') }}
-                        </div>
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-
-                  <!-- Ollama Model Parametreleri -->
-                  <el-row :gutter="20" v-if="openclawConfig.model_provider === 'ollama'">
                     <el-col :span="8">
-                      <el-form-item :label="$t('ollamaContextTokens')">
-                        <el-input-number
-                          v-model="openclawConfig.ollama_context_tokens"
-                          :min="0"
-                          :step="512"
-                          :placeholder="$t('ollamaContextTokensPlaceholder')"
-                          style="width: 100%"
-                          controls-position="right"
-                        />
-                        <div class="form-hint">{{ $t('ollamaContextTokensHint') }}</div>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="16">
-                      <el-form-item :label="$t('ollamaModelParams')">
-                        <el-input
-                          v-model="openclawConfig.ollama_model_params"
-                          type="textarea"
-                          :rows="3"
-                          :placeholder="$t('ollamaModelParamsPlaceholder')"
-                          :class="{ 'is-error': openclawConfig.ollama_model_params_error }"
-                          @input="openclawConfig.ollama_model_params_error = ''"
-                        />
-                        <div class="form-hint" :style="openclawConfig.ollama_model_params_error ? 'color:#f56c6c' : ''">
-                          <span v-if="openclawConfig.ollama_model_params_error">⚠ {{ openclawConfig.ollama_model_params_error }}</span>
-                          <span v-else>{{ $t('ollamaModelParamsHint') }}</span>
+                      <el-form-item :label="$t('litellmCache')">
+                        <div class="toggle-item" style="padding: 0;">
+                          <el-switch v-model="litellmSettings.cache" />
+                          <div class="toggle-info">
+                            <span class="toggle-hint">{{ $t('litellmCacheHint') }}</span>
+                          </div>
                         </div>
                       </el-form-item>
                     </el-col>
                   </el-row>
-                </div>
-              </Transition>
-            </div>
-
-            <!-- ═══ Channels ═══ -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('channels')">
-                <span>📡 {{ $t('openclawChannels') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.channels }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
-                </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.channels" class="inner-card-body">
-
-                  <!-- Telegram -->
-                  <div class="channel-card">
-                    <div class="channel-header">
-                      <div class="channel-name">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                        </svg>
-                        {{ $t('openclawTelegram') }}
-                      </div>
-                      <el-switch v-model="openclawConfig.telegram_enabled" size="small" />
-                    </div>
-                    <div v-if="openclawConfig.telegram_enabled" class="channel-body">
-                      <!-- Bot Token -->
-                      <el-form-item :label="$t('openclawTelegramToken')">
-                        <el-input
-                          v-model="openclawConfig.telegram_token"
-                          type="password"
-                          show-password
-                          :placeholder="openclawConfig.telegram_token_set ? $t('tokenSetLeaveBlank') : $t('openclawTelegramTokenPlaceholder')"
-                          clearable
-                        />
-                        <div class="form-hint">
-                          <span v-if="openclawConfig.telegram_token_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
-                          <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
-                          <span v-if="openclawConfig.telegram_bot_username"> — @{{ openclawConfig.telegram_bot_username }}</span>
-                          <span v-else> — {{ $t('openclawTelegramTokenHint') }}</span>
-                        </div>
-                      </el-form-item>
-
-                      <!-- Allow From -->
-                      <el-form-item :label="$t('openclawAllowFrom')">
-                        <el-input
-                          v-model="openclawConfig.telegram_allow_from"
-                          :placeholder="$t('openclawAllowFromPlaceholder')"
-                          clearable
-                        />
-                        <div class="form-hint">{{ $t('openclawAllowFromHint') }}</div>
-                      </el-form-item>
-
-                      <!-- ── Alert Bildirimleri ── -->
-                      <el-divider content-position="left">
-                        <span style="font-size: 13px;">🔔 {{ $t('telegramAlertSettings') }}</span>
-                      </el-divider>
-
-                      <!-- Admin Chat ID + Find Chat ID -->
-                      <el-row :gutter="16">
-                        <el-col :span="14">
-                          <el-form-item :label="$t('telegramAdminChatId')">
-                            <el-input
-                              v-model="openclawConfig.telegram_admin_chat_id"
-                              :placeholder="$t('telegramAdminChatIdPlaceholder')"
-                              clearable
-                            />
-                            <div class="form-hint">{{ $t('telegramAdminChatIdHint') }}</div>
-                          </el-form-item>
-                        </el-col>
-                        <el-col :span="10">
-                          <el-form-item :label="$t('telegramFindChatId')">
-                            <el-button
-                              type="default"
-                              size="default"
-                              style="width: 100%"
-                              :loading="findingChatId"
-                              @click="onFindChatId"
-                            >
-                              🔍 {{ $t('telegramFindChatId') }}
-                            </el-button>
-                          </el-form-item>
-                        </el-col>
-                      </el-row>
-
-                      <!-- Chat ID sonuçları -->
-                      <div v-if="foundChats.length > 0" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                        <div style="margin-bottom: 8px; font-weight: 500;">📋 {{ $t('telegramFoundChats') }}:</div>
-                        <div v-for="c in foundChats" :key="c.chat_id" style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                          <el-tag size="small" type="info">{{ c.type }}</el-tag>
-                          <span>{{ c.first_name || c.title || c.username }} — </span>
-                          <code style="background: var(--el-fill-color); padding: 2px 6px; border-radius: 4px;">{{ c.chat_id }}</code>
-                          <el-button size="small" type="primary" link @click="openclawConfig.telegram_admin_chat_id = String(c.chat_id)">{{ $t('use') }}</el-button>
-                        </div>
-                      </div>
-
-                      <!-- Ek alıcılar -->
-                      <el-form-item :label="$t('telegramExtraChatIds')">
-                        <el-input
-                          v-model="openclawConfig.telegram_extra_chat_ids"
-                          :placeholder="$t('telegramExtraChatIdsPlaceholder')"
-                          clearable
-                        />
-                        <div class="form-hint">{{ $t('telegramExtraChatIdsHint') }}</div>
-                      </el-form-item>
-
-                      <!-- Bildirim Tercihleri -->
-                      <el-row :gutter="16" style="margin-top: 8px;">
-                        <el-col :span="8">
-                          <div class="toggle-item">
-                            <el-switch v-model="openclawConfig.telegram_notify_alert" size="small" />
-                            <div class="toggle-info">
-                              <span class="toggle-label">{{ $t('telegramNotifyAlert') }}</span>
-                            </div>
-                          </div>
-                        </el-col>
-                        <el-col :span="8">
-                          <div class="toggle-item">
-                            <el-switch v-model="openclawConfig.telegram_notify_resolved" size="small" />
-                            <div class="toggle-info">
-                              <span class="toggle-label">{{ $t('telegramNotifyResolved') }}</span>
-                            </div>
-                          </div>
-                        </el-col>
-                        <el-col :span="8">
-                          <div class="toggle-item">
-                            <el-switch v-model="openclawConfig.telegram_notify_diagnosis" size="small" />
-                            <div class="toggle-info">
-                              <span class="toggle-label">{{ $t('telegramNotifyDiagnosis') }}</span>
-                            </div>
-                          </div>
-                        </el-col>
-                      </el-row>
-
-                      <!-- Telegram Test Mesajı -->
-                      <div style="margin-top: 12px;">
-                        <el-button
-                          size="small"
-                          :loading="testingTgAlert"
-                          :disabled="!openclawConfig.telegram_token_set && !openclawConfig.telegram_token"
-                          @click="onTestTgAlert"
-                        >
-                          📨 {{ $t('telegramTestSend') }}
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- WhatsApp -->
-                  <div class="channel-card">
-                    <div class="channel-header">
-                      <div class="channel-name">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                        {{ $t('openclawWhatsapp') }}
-                      </div>
-                      <el-switch v-model="openclawConfig.whatsapp_enabled" size="small" />
-                    </div>
-                    <div v-if="openclawConfig.whatsapp_enabled" class="channel-body">
-                      <div class="form-hint" style="margin-bottom: 8px;">{{ $t('openclawWhatsappHint') }}</div>
-                      <el-form-item :label="$t('openclawAllowFrom')">
-                        <el-input
-                          v-model="openclawConfig.whatsapp_allow_from"
-                          :placeholder="$t('openclawAllowFromPlaceholder')"
-                          clearable
-                        />
-                        <div class="form-hint">{{ $t('openclawAllowFromHint') }}</div>
-                      </el-form-item>
-                    </div>
-                  </div>
-
-                  <!-- Discord -->
-                  <div class="channel-card">
-                    <div class="channel-header">
-                      <div class="channel-name">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286z"/>
-                        </svg>
-                        {{ $t('openclawDiscord') }}
-                      </div>
-                      <el-switch v-model="openclawConfig.discord_enabled" size="small" />
-                    </div>
-                    <div v-if="openclawConfig.discord_enabled" class="channel-body">
-                      <el-form-item :label="$t('openclawDiscordToken')">
-                        <el-input
-                          v-model="openclawConfig.discord_token"
-                          type="password"
-                          show-password
-                          :placeholder="openclawConfig.discord_token_set ? $t('tokenSetLeaveBlank') : $t('openclawDiscordTokenPlaceholder')"
-                          clearable
-                        />
-                        <div class="form-hint">
-                          <span v-if="openclawConfig.discord_token_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
-                          <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
-                          — {{ $t('openclawDiscordTokenHint') }}
-                        </div>
-                      </el-form-item>
-                      <el-form-item :label="$t('openclawAllowFrom')">
-                        <el-input
-                          v-model="openclawConfig.discord_allow_from"
-                          :placeholder="$t('openclawAllowFromPlaceholder')"
-                          clearable
-                        />
-                        <div class="form-hint">{{ $t('openclawAllowFromHint') }}</div>
-                      </el-form-item>
-                    </div>
-                  </div>
-
-                  <!-- Slack -->
-                  <div class="channel-card">
-                    <div class="channel-header">
-                      <div class="channel-name">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
-                        </svg>
-                        {{ $t('openclawSlack') }}
-                      </div>
-                      <el-switch v-model="openclawConfig.slack_enabled" size="small" />
-                    </div>
-                    <div v-if="openclawConfig.slack_enabled" class="channel-body">
-                      <el-row :gutter="16">
-                        <el-col :span="12">
-                          <el-form-item :label="$t('openclawSlackBotToken')">
-                            <el-input
-                              v-model="openclawConfig.slack_bot_token"
-                              type="password"
-                              show-password
-                              :placeholder="openclawConfig.slack_token_set ? $t('tokenSetLeaveBlank') : $t('openclawSlackBotTokenPlaceholder')"
-                              clearable
-                            />
-                          </el-form-item>
-                        </el-col>
-                        <el-col :span="12">
-                          <el-form-item :label="$t('openclawSlackAppToken')">
-                            <el-input
-                              v-model="openclawConfig.slack_app_token"
-                              type="password"
-                              show-password
-                              :placeholder="$t('openclawSlackAppTokenPlaceholder')"
-                              clearable
-                            />
-                          </el-form-item>
-                        </el-col>
-                      </el-row>
-                      <div class="form-hint">
-                        <span v-if="openclawConfig.slack_token_set" class="token-status token-set">✓ {{ $t('tokenSet') }}</span>
-                        <span v-else class="token-status token-not-set">○ {{ $t('tokenNotSet') }}</span>
-                        — {{ $t('openclawSlackHint') }}
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </Transition>
-            </div>
-
-            <!-- ═══ Browser ═══ -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('browser')">
-                <span>🌐 {{ $t('openclawBrowser') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.browser }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
-                </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.browser" class="inner-card-body">
-                  <div class="toggle-item">
-                    <el-switch v-model="openclawConfig.browser_enabled" />
-                    <div class="toggle-info">
-                      <span class="toggle-label">{{ $t('openclawBrowserEnabled') }}</span>
-                      <span class="toggle-hint">{{ $t('openclawBrowserHint') }}</span>
-                    </div>
-                  </div>
                 </div>
               </Transition>
             </div>
 
             <!-- ═══ Setup Guide ═══ -->
             <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('setupGuide')">
-                <span>📖 {{ $t('openclawSetupGuide') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.setupGuide }">
+              <div class="inner-card-header" @click="toggleInner('litellmGuide')">
+                <span>📖 {{ $t('litellmSetupGuide') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.litellmGuide }">
                   <el-icon :size="14"><ArrowDown /></el-icon>
                 </div>
               </div>
               <Transition name="collapse-body">
-                <div v-show="innerSections.setupGuide" class="inner-card-body">
+                <div v-show="innerSections.litellmGuide" class="inner-card-body">
                   <div class="guide-steps">
-                    <p>{{ $t('openclawStep1') }}</p>
-                    <p>{{ $t('openclawStep2') }}</p>
-                    <p>{{ $t('openclawStep3') }}</p>
-                    <p>{{ $t('openclawStep4') }}</p>
-                    <p>{{ $t('openclawStep5') }}</p>
+                    <p>{{ $t('litellmStep1') }}</p>
+                    <p>{{ $t('litellmStep2') }}</p>
+                    <p>{{ $t('litellmStep3') }}</p>
+                    <p>{{ $t('litellmStep4') }}</p>
+                    <p>{{ $t('litellmStep5') }}</p>
                   </div>
                 </div>
               </Transition>
@@ -560,23 +303,11 @@
 
             <!-- Action buttons -->
             <div class="telegram-actions">
-              <el-button
-                type="default"
-                :loading="testingOpenclaw"
-                @click="onTestOpenclaw"
-              >
-                <el-icon style="margin-right: 6px;"><Connection /></el-icon>
-                {{ $t('testConnection') }}
+              <el-button type="default" :loading="refreshingLitellm" @click="onRefreshLitellm">
+                <el-icon style="margin-right: 6px;"><Refresh /></el-icon>
+                {{ $t('litellmRefresh') }}
               </el-button>
-              <el-button
-                type="warning"
-                :loading="restartingOpenclaw"
-                @click="onRestartOpenclaw"
-              >
-                <el-icon style="margin-right: 6px;"><RefreshRight /></el-icon>
-                {{ $t('openclawRestart') }}
-              </el-button>
-              <el-button type="primary" :loading="savingOpenclaw" @click="onSaveOpenclaw">
+              <el-button type="primary" :loading="savingLitellm" @click="onSaveLitellmSettings">
                 <el-icon style="margin-right: 6px;"><Check /></el-icon>
                 {{ $t('save') }}
               </el-button>
@@ -866,6 +597,470 @@
       </Transition>
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- SECTION 4 — Telegram Notifications (collapsible)         -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.telegram }">
+      <div class="collapse-card-header" @click="toggleSection('telegram')">
+        <div class="collapse-card-title">
+          <div class="collapse-card-icon telegram-icon">
+            <span style="font-size: 20px;">✈️</span>
+          </div>
+          <div>
+            <h3>{{ $t('telegramAlertSettings') }}</h3>
+            <span class="collapse-card-subtitle">{{ $t('telegramAlertDesc') }}</span>
+          </div>
+        </div>
+        <div class="collapse-card-right">
+          <el-tag :type="telegramConfig.bot_token_set ? 'success' : 'info'" size="default" effect="plain" round>
+            <el-icon style="margin-right: 4px;"><CircleCheck v-if="telegramConfig.bot_token_set" /><WarningFilled v-else /></el-icon>
+            {{ telegramConfig.bot_token_set ? $t('telegramBotConnected') : $t('telegramBotNotConnected') }}
+          </el-tag>
+          <div class="collapse-chevron" :class="{ rotated: sections.telegram }">
+            <el-icon :size="18"><ArrowDown /></el-icon>
+          </div>
+        </div>
+      </div>
+      <Transition name="collapse-body">
+        <div v-show="sections.telegram" class="collapse-card-body">
+          <el-form label-position="top" class="telegram-form" v-loading="telegramLoading">
+
+            <!-- ═══ Bot Settings ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('telegramBot')">
+                <span>🤖 {{ $t('telegramBotToken') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramBot }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.telegramBot" class="inner-card-body">
+                  <div class="form-group">
+                    <el-row :gutter="20">
+                      <el-col :span="16">
+                        <el-form-item :label="$t('telegramBotToken')">
+                          <el-input
+                            v-model="telegramConfig.bot_token"
+                            :placeholder="$t('telegramBotTokenPlaceholder')"
+                            clearable
+                            type="password"
+                            show-password
+                          />
+                          <div class="form-hint">
+                            {{ $t('telegramBotTokenHint') }}
+                            <span v-if="telegramConfig.bot_token_set" class="token-status token-set"> — {{ $t('tokenSetLeaveBlank') }}</span>
+                          </div>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="8">
+                        <el-form-item label="Status">
+                          <div v-if="telegramConfig.bot_username" style="display:flex; align-items:center; gap:8px; padding-top: 4px;">
+                            <el-tag type="success" effect="plain" round>
+                              <span>@{{ telegramConfig.bot_username }}</span>
+                            </el-tag>
+                          </div>
+                          <div v-else style="padding-top: 8px; color: var(--el-text-color-placeholder); font-size: 13px;">
+                            {{ $t('telegramBotNotConnected') }}
+                          </div>
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                  </div>
+
+                  <div class="form-group">
+                    <el-row :gutter="20">
+                      <el-col :span="8">
+                        <el-form-item :label="$t('telegramAdminChatId')">
+                          <el-input
+                            v-model="telegramConfig.admin_chat_id"
+                            :placeholder="$t('telegramAdminChatIdPlaceholder')"
+                            clearable
+                          />
+                          <div class="form-hint">{{ $t('telegramAdminChatIdHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="8">
+                        <el-form-item :label="$t('telegramExtraChatIds')">
+                          <el-input
+                            v-model="telegramConfig.extra_chat_ids"
+                            :placeholder="$t('telegramExtraChatIdsPlaceholder')"
+                            clearable
+                          />
+                          <div class="form-hint">{{ $t('telegramExtraChatIdsHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="8" style="display: flex; align-items: flex-end; padding-bottom: 18px;">
+                        <el-button
+                          type="default"
+                          :loading="findingChatId"
+                          @click="onFindChatId"
+                          :disabled="!telegramConfig.bot_token_set && !telegramConfig.bot_token"
+                        >
+                          <el-icon style="margin-right: 6px;"><Search /></el-icon>
+                          {{ $t('telegramFindChatId') }}
+                        </el-button>
+                      </el-col>
+                    </el-row>
+                  </div>
+
+                  <!-- Chat ID Sonuçları -->
+                  <div v-if="foundChats.length > 0" style="margin-bottom: 16px;">
+                    <div class="form-group-title">{{ $t('telegramFoundChats') }}</div>
+                    <div v-for="chat in foundChats" :key="chat.chat_id" style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
+                      <el-tag type="info" size="small">{{ chat.type }}</el-tag>
+                      <code style="font-size: 13px; font-weight: 600;">{{ chat.chat_id }}</code>
+                      <span style="font-size: 13px; color: var(--el-text-color-secondary);">
+                        {{ chat.first_name || chat.title || chat.username || '' }}
+                      </span>
+                      <el-button size="small" type="primary" link @click="telegramConfig.admin_chat_id = String(chat.chat_id)">
+                        {{ $t('use') }}
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Notification Toggles ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('telegramNotify')">
+                <span>🔔 {{ $t('telegramEnabled') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramNotify }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.telegramNotify" class="inner-card-body">
+                  <div class="form-group">
+                    <el-row :gutter="20">
+                      <el-col :span="8">
+                        <div class="toggle-item">
+                          <el-switch v-model="telegramConfig.notify_on_alert" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('telegramNotifyAlert') }}</span>
+                            <span class="toggle-hint">{{ $t('telegramNotifyAlertHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                      <el-col :span="8">
+                        <div class="toggle-item">
+                          <el-switch v-model="telegramConfig.notify_on_resolved" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('telegramNotifyResolved') }}</span>
+                            <span class="toggle-hint">{{ $t('telegramNotifyResolvedHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                      <el-col :span="8">
+                        <div class="toggle-item">
+                          <el-switch v-model="telegramConfig.notify_on_diagnosis" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('telegramNotifyDiagnosis') }}</span>
+                            <span class="toggle-hint">{{ $t('telegramNotifyDiagnosisHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                    </el-row>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Setup Guide ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('telegramGuide')">
+                <span>📖 {{ $t('telegramSetupGuide') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramGuide }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.telegramGuide" class="inner-card-body">
+                  <div class="guide-steps">
+                    <p>{{ $t('telegramStep1') }}</p>
+                    <p>{{ $t('telegramStep2') }}</p>
+                    <p>{{ $t('telegramStep3') }}</p>
+                    <p>{{ $t('telegramStep4') }}</p>
+                    <p>{{ $t('telegramStep5') }}</p>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="telegram-actions">
+              <el-button
+                type="default"
+                :loading="testingTelegram"
+                @click="onTestTelegram"
+                :disabled="!telegramConfig.bot_token_set && !telegramConfig.bot_token"
+              >
+                <el-icon style="margin-right: 6px;"><Connection /></el-icon>
+                {{ $t('telegramTestSend') }}
+              </el-button>
+              <el-button type="primary" :loading="savingTelegram" @click="onSaveTelegram">
+                <el-icon style="margin-right: 6px;"><Check /></el-icon>
+                {{ $t('save') }}
+              </el-button>
+            </div>
+          </el-form>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- SECTION 5 — DB Connection Management (collapsible)       -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.dbTargets }">
+      <div class="collapse-card-header" @click="toggleSection('dbTargets')">
+        <div class="collapse-card-title">
+          <div class="collapse-card-icon db-icon">
+            <el-icon :size="20"><Coin /></el-icon>
+          </div>
+          <div>
+            <h3>{{ $t('dbTargetSettings') }}</h3>
+            <span class="collapse-card-subtitle">{{ $t('dbTargetDesc') }}</span>
+          </div>
+        </div>
+        <div class="collapse-card-right">
+          <el-tag :type="dbTargets.length > 0 ? 'success' : 'info'" size="default" effect="plain" round>
+            {{ dbTargets.length }} {{ $t('dbTargetCount') }}
+          </el-tag>
+          <div class="collapse-chevron" :class="{ rotated: sections.dbTargets }">
+            <el-icon :size="18"><ArrowDown /></el-icon>
+          </div>
+        </div>
+      </div>
+      <Transition name="collapse-body">
+        <div v-show="sections.dbTargets" class="collapse-card-body">
+          <el-form label-position="top" class="telegram-form" v-loading="dbTargetsLoading">
+
+            <!-- ═══ DB Target Listesi ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('dbTargetList')">
+                <span>🗄️ {{ $t('dbTargetList') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.dbTargetList }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.dbTargetList" class="inner-card-body">
+
+                  <el-table :data="dbTargets" stripe size="small" style="margin-bottom: 16px;" :empty-text="$t('dbTargetNoTargets')">
+                    <el-table-column :label="$t('dbTargetPrimary')" width="70" align="center">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.is_primary" type="warning" size="small" effect="dark" round>★</el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="name" :label="$t('name')" min-width="120" />
+                    <el-table-column prop="db_type" :label="$t('dbTargetType')" width="110">
+                      <template #default="{ row }">
+                        <el-tag :type="row.db_type === 'postgresql' ? 'primary' : 'success'" size="small" effect="plain">
+                          {{ row.db_type === 'postgresql' ? '🐘 PostgreSQL' : '🐬 MySQL' }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('dbTargetHost')" min-width="200">
+                      <template #default="{ row }">
+                        <code style="font-size: 12px;">{{ row.host }}:{{ row.port }}/{{ row.dbname }}</code>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="user" :label="$t('username')" width="100" />
+                    <el-table-column :label="'SSH'" width="80" align="center">
+                      <template #default="{ row }">
+                        <template v-if="row.ssh_enabled">
+                          <el-tag v-if="row.ssh_last_status === 'ok'" type="success" size="small" effect="plain">🖥 ✓</el-tag>
+                          <el-tag v-else-if="row.ssh_last_status === 'error'" type="danger" size="small" effect="plain">🖥 ✗</el-tag>
+                          <el-tag v-else type="info" size="small" effect="plain">🖥</el-tag>
+                        </template>
+                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('status')" width="90" align="center">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.last_status === 'ok'" type="success" size="small" effect="plain">✓</el-tag>
+                        <el-tag v-else-if="row.last_status === 'error'" type="danger" size="small" effect="plain">✗</el-tag>
+                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('actions')" width="280" align="center">
+                      <template #default="{ row }">
+                        <el-button size="small" type="primary" link :loading="testingDbTarget === row.id" @click="onTestDbTarget(row.id)">
+                          {{ $t('testConnection') }}
+                        </el-button>
+                        <el-button v-if="row.ssh_enabled" size="small" type="info" link :loading="testingSshTarget === row.id" @click="onTestSshTarget(row.id)">
+                          SSH Test
+                        </el-button>
+                        <el-button v-if="!row.is_primary" size="small" type="warning" link @click="onSetPrimaryDb(row.id)">
+                          {{ $t('dbTargetSetPrimary') }}
+                        </el-button>
+                        <el-button size="small" type="danger" link @click="onDeleteDbTarget(row)">
+                          {{ $t('delete') }}
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+
+                  <!-- Test Sonucu -->
+                  <div v-if="dbTestResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 500; margin-bottom: 6px;">🧪 {{ $t('dbTargetTestResult') }}:</div>
+                    <div style="font-size: 13px; color: var(--el-text-color-secondary);">
+                      <strong>Version:</strong> {{ dbTestResult.version }}<br>
+                      <strong>Database:</strong> {{ dbTestResult.database }}<br>
+                      <strong>User:</strong> {{ dbTestResult.user }}
+                      <template v-if="dbTestResult.size"><br><strong>Size:</strong> {{ dbTestResult.size }}</template>
+                    </div>
+                  </div>
+
+                  <!-- SSH Test Sonucu -->
+                  <div v-if="sshTestResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 500; margin-bottom: 6px;">🖥️ {{ $t('sshTestResult') }}:</div>
+                    <pre style="font-size: 12px; color: var(--el-text-color-secondary); white-space: pre-wrap; margin: 0;">{{ sshTestResult.output || sshTestResult.error_output || '' }}</pre>
+                  </div>
+
+                  <!-- Yeni DB Bağlantısı Ekleme Formu -->
+                  <el-divider content-position="left">
+                    <span style="font-size: 13px;">➕ {{ $t('dbTargetAdd') }}</span>
+                  </el-divider>
+
+                  <el-row :gutter="16">
+                    <el-col :span="5">
+                      <el-form-item :label="$t('name')">
+                        <el-input v-model="newDbTarget.name" :placeholder="$t('dbTargetNamePlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('dbTargetType')">
+                        <el-select v-model="newDbTarget.db_type" style="width: 100%">
+                          <el-option label="🐘 PostgreSQL" value="postgresql" />
+                          <el-option label="🐬 MySQL" value="mysql" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('dbTargetHost')">
+                        <el-input v-model="newDbTarget.host" :placeholder="$t('dbTargetHostPlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="3">
+                      <el-form-item :label="$t('smtpPort')">
+                        <el-input-number v-model="newDbTarget.port" :min="1" :max="65535" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('username')">
+                        <el-input v-model="newDbTarget.user" :placeholder="$t('dbTargetUserPlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="3">
+                      <el-form-item :label="$t('password')">
+                        <el-input v-model="newDbTarget.password" type="password" show-password placeholder="••••" clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="16">
+                    <el-col :span="6">
+                      <el-form-item :label="$t('dbTargetDbName')">
+                        <el-input v-model="newDbTarget.dbname" :placeholder="$t('dbTargetDbNamePlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('dbTargetPrimary')">
+                        <div class="toggle-item" style="padding: 0;">
+                          <el-switch v-model="newDbTarget.is_primary" />
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="14" style="display: flex; align-items: flex-end; padding-bottom: 18px;">
+                      <el-button
+                        type="primary"
+                        :loading="addingDbTarget"
+                        @click="onAddDbTarget"
+                        :disabled="!newDbTarget.name || !newDbTarget.host || !newDbTarget.user || !newDbTarget.dbname"
+                      >
+                        <el-icon style="margin-right: 6px;"><Plus /></el-icon>
+                        {{ $t('dbTargetAdd') }}
+                      </el-button>
+                    </el-col>
+                  </el-row>
+
+                  <!-- SSH / OS Erişimi (Opsiyonel) -->
+                  <el-divider content-position="left">
+                    <span style="font-size: 13px;">🖥️ {{ $t('sshAccessOptional') }}</span>
+                  </el-divider>
+                  <div class="form-hint" style="margin-bottom: 12px;">{{ $t('sshAccessHint') }}</div>
+
+                  <el-row :gutter="16">
+                    <el-col :span="3">
+                      <el-form-item :label="$t('sshEnabled')">
+                        <div class="toggle-item" style="padding: 0;">
+                          <el-switch v-model="newDbTarget.ssh_enabled" />
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sshHost')">
+                        <el-input v-model="newDbTarget.ssh_host" :placeholder="$t('sshHostPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="3">
+                      <el-form-item :label="$t('sshPort')">
+                        <el-input-number v-model="newDbTarget.ssh_port" :min="1" :max="65535" :disabled="!newDbTarget.ssh_enabled" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('sshUser')">
+                        <el-input v-model="newDbTarget.ssh_user" :placeholder="$t('sshUserPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('sshPassword')">
+                        <el-input v-model="newDbTarget.ssh_password" type="password" show-password placeholder="••••" :disabled="!newDbTarget.ssh_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sshKeyPath')">
+                        <el-input v-model="newDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Setup Guide ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('dbTargetGuide')">
+                <span>📖 {{ $t('dbTargetSetupGuide') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.dbTargetGuide }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.dbTargetGuide" class="inner-card-body">
+                  <div class="guide-steps">
+                    <p>{{ $t('dbTargetStep1') }}</p>
+                    <p>{{ $t('dbTargetStep2') }}</p>
+                    <p>{{ $t('dbTargetStep3') }}</p>
+                    <p>{{ $t('dbTargetStep4') }}</p>
+                    <p>{{ $t('dbTargetStep5') }}</p>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="telegram-actions">
+              <el-button type="default" :loading="refreshingDbTargets" @click="onRefreshDbTargets">
+                <el-icon style="margin-right: 6px;"><Refresh /></el-icon>
+                {{ $t('litellmRefresh') }}
+              </el-button>
+            </div>
+          </el-form>
+        </div>
+      </Transition>
+    </div>
+
     <!-- Non-admin users see info message -->
     <div v-else class="collapse-card">
       <el-result icon="info" :title="$t('noPermission')" :sub-title="$t('noPermissionDesc')">
@@ -914,9 +1109,10 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useBasicStore } from '@/store/basic'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listUsersReq, createUserReq, toggleUserReq, deleteUserReq, changePasswordReq } from '@/api/user'
-import { openclawHealthReq, getOpenclawConfigReq, saveOpenclawConfigReq, openclawRestartReq, openclawModelsReq } from '@/api/openclaw'
+import { litellmHealthReq, litellmModelsReq, litellmAddModelReq, litellmRemoveModelReq, litellmTestModelReq, dbaAgentHealthReq, litellmUpdateSettingsReq } from '@/api/litellm'
 import { getMailConfigReq, saveMailConfigReq, testMailReq } from '@/api/mail'
-import { testTelegramAlertReq, telegramGetChatIdReq } from '@/api/telegram'
+import { getTelegramAlertConfigReq, saveTelegramAlertConfigReq, testTelegramAlertReq, telegramGetChatIdReq } from '@/api/telegram'
+import { listDbTargetsReq, addDbTargetReq, deleteDbTargetReq, testDbTargetReq, testSshTargetReq, setPrimaryDbTargetReq } from '@/api/dbTargets'
 import { useI18n } from 'vue-i18n'
 
 const { t: $t } = useI18n()
@@ -926,17 +1122,23 @@ const isAdmin = computed(() => basicStore.roles.includes('admin'))
 // Collapsible sections state
 const sections = reactive({
   users: true,
-  openclaw: true,
+  litellm: true,
   mail: false,
+  telegram: false,
+  dbTargets: false,
 })
 const innerSections = reactive({
-  model: true,
-  channels: true,
-  browser: false,
-  setupGuide: false,
+  models: true,
+  litellmSettings: false,
+  litellmGuide: false,
   smtpServer: true,
   mailNotify: false,
   mailGuide: false,
+  telegramBot: true,
+  telegramNotify: false,
+  telegramGuide: false,
+  dbTargetList: true,
+  dbTargetGuide: false,
 })
 const toggleSection = (key) => { sections[key] = !sections[key] }
 const toggleInner = (key) => { innerSections[key] = !innerSections[key] }
@@ -961,351 +1163,173 @@ const fetchUsers = async () => {
 onMounted(() => {
   if (isAdmin.value) {
     fetchUsers()
-    fetchOpenclawConfig()
+    fetchLitellmData()
     fetchMailConfig()
+    fetchTelegramConfig()
+    fetchDbTargets()
   }
 })
 
-// ========== OpenClaw Config ==========
-const openclawLoading = ref(false)
-const savingOpenclaw = ref(false)
-const testingOpenclaw = ref(false)
-const restartingOpenclaw = ref(false)
-const openclawOnline = ref(false)
+// ========== LiteLLM & DBA Agent ==========
+const litellmLoading = ref(false)
+const savingLitellm = ref(false)
+const refreshingLitellm = ref(false)
+const litellmOnline = ref(false)
+const dbaAgentOnline = ref(false)
+const litellmModels = ref([])
+const testingModel = ref('')
+const testResult = ref(null)
+const addingModel = ref(false)
 
-// Model kataloğu
-const modelCatalog = ref({})       // { provider: [ {key, name, ...} ] }
-const modelCatalogLoading = ref(false)
-const filteredModels = computed(() => {
-  const p = openclawConfig.model_provider
-  return modelCatalog.value[p] || []
+// Yeni model formu
+const newModel = reactive({
+  model_name: '',
+  litellm_model: '',
+  api_base: '',
+  role: '',
+  timeout: 300,
+  num_ctx: 2048,
+  num_predict: 256,
 })
 
-const openclawConfig = reactive({
-  model_provider: 'anthropic',
-  model_name: 'claude-sonnet-4-20250514',
-  api_key: '',
-  api_key_set: false,
-  ollama_url: '',
-  ollama_api_key: '',
-  ollama_api_key_set: false,
-  ollama_context_tokens: 0,
-  ollama_model_params: '',
-  ollama_model_params_error: '',
-  telegram_enabled: false,
-  telegram_token: '',
-  telegram_token_set: false,
-  telegram_allow_from: '',
-  telegram_bot_username: '',
-  telegram_admin_chat_id: '',
-  telegram_extra_chat_ids: '',
-  telegram_notify_alert: true,
-  telegram_notify_resolved: true,
-  telegram_notify_diagnosis: true,
-  whatsapp_enabled: false,
-  whatsapp_allow_from: '',
-  discord_enabled: false,
-  discord_token: '',
-  discord_token_set: false,
-  discord_allow_from: '',
-  slack_enabled: false,
-  slack_bot_token: '',
-  slack_app_token: '',
-  slack_token_set: false,
-  browser_enabled: false,
+// Genel ayarlar
+const litellmSettings = reactive({
+  request_timeout: 300,
+  num_retries: 0,
+  cache: true,
 })
 
-// Telegram alert helpers
-const testingTgAlert = ref(false)
-const findingChatId = ref(false)
-const foundChats = ref([])
-
-// Model kataloğunu yükle
-const fetchModelCatalog = async () => {
-  modelCatalogLoading.value = true
+const fetchLitellmData = async () => {
+  litellmLoading.value = true
   try {
-    const res = await openclawModelsReq()
-    if (res.code === 200 && res.data?.providers) {
-      modelCatalog.value = res.data.providers
+    // Health check — paralel
+    const [healthRes, dbaRes, modelsRes] = await Promise.allSettled([
+      litellmHealthReq(),
+      dbaAgentHealthReq(),
+      litellmModelsReq(),
+    ])
+
+    // LiteLLM proxy durumu
+    if (healthRes.status === 'fulfilled') {
+      litellmOnline.value = healthRes.value?.code === 200 && healthRes.value?.data?.status === 'online'
+    } else {
+      litellmOnline.value = false
+    }
+
+    // DBA Agent durumu
+    if (dbaRes.status === 'fulfilled') {
+      const d = dbaRes.value?.data
+      dbaAgentOnline.value = d?.status === 'healthy' || d?.status === 'online'
+    } else {
+      dbaAgentOnline.value = false
+    }
+
+    // Model listesi
+    if (modelsRes.status === 'fulfilled' && modelsRes.value?.code === 200) {
+      litellmModels.value = modelsRes.value.data?.models || []
     }
   } catch (e) {
-    console.error('Failed to load model catalog:', e)
+    console.error('LiteLLM data fetch error:', e)
   } finally {
-    modelCatalogLoading.value = false
+    litellmLoading.value = false
   }
 }
 
-// Provider değiştiğinde mevcut model_name geçerliliğini kontrol et
-const onProviderChange = () => {
-  const models = filteredModels.value
-  if (models.length > 0) {
-    const fullKey = openclawConfig.model_provider + '/' + openclawConfig.model_name
-    const exists = models.some(m => m.key === fullKey)
-    if (!exists) {
-      // İlk modeli seç
-      const firstKey = models[0].key
-      openclawConfig.model_name = firstKey.substring(firstKey.indexOf('/') + 1)
-    }
-  }
-}
-
-const fetchOpenclawConfig = async () => {
-  openclawLoading.value = true
-  // Model kataloğunu paralel yükle
-  fetchModelCatalog()
+const onAddModel = async () => {
+  addingModel.value = true
   try {
-    // Check health
-    try {
-      const healthRes = await openclawHealthReq()
-      openclawOnline.value = healthRes.code === 200 && healthRes.data?.status === 'online'
-    } catch (e) {
-      openclawOnline.value = false
+    const res = await litellmAddModelReq({
+      model_name: newModel.model_name,
+      litellm_model: newModel.litellm_model,
+      api_base: newModel.api_base,
+      role: newModel.role,
+      timeout: newModel.timeout,
+      num_ctx: newModel.num_ctx,
+      num_predict: newModel.num_predict,
+      stream_timeout: newModel.timeout,
+    })
+    if (res.code === 200) {
+      ElMessage.success(res.msg || $t('litellmModelAdded'))
+      // Formu temizle
+      newModel.model_name = ''
+      newModel.litellm_model = ''
+      newModel.api_base = ''
+      newModel.role = ''
+      newModel.timeout = 300
+      newModel.num_ctx = 2048
+      newModel.num_predict = 256
+      fetchLitellmData()
+    } else {
+      ElMessage.error(res.msg || $t('litellmModelAddFail'))
     }
+  } catch (e) {
+    ElMessage.error($t('litellmModelAddFail'))
+  } finally {
+    addingModel.value = false
+  }
+}
 
-    // Get config — backend returns FLAT structure
-    const res = await getOpenclawConfigReq()
+const onRemoveModel = async (modelName) => {
+  try {
+    await ElMessageBox.confirm(
+      `'${modelName}' modelini silmek istediğinize emin misiniz?`,
+      $t('warning'),
+      { confirmButtonText: $t('delete'), cancelButtonText: $t('cancel'), type: 'warning' }
+    )
+    const res = await litellmRemoveModelReq({ model_name: modelName })
+    if (res.code === 200) {
+      ElMessage.success(res.msg)
+      fetchLitellmData()
+    } else {
+      ElMessage.error(res.msg)
+    }
+  } catch (e) {
+    // cancelled
+  }
+}
+
+const onTestModel = async (modelName) => {
+  testingModel.value = modelName
+  testResult.value = null
+  try {
+    const res = await litellmTestModelReq({ model_name: modelName, prompt: 'Say hello in 5 words.' })
     if (res.code === 200 && res.data) {
-      const d = res.data
-
-      // Model — flat "model" field like "anthropic/claude-opus-4-6"
-      if (d.model) {
-        const model = d.model
-        if (model.includes('/')) {
-          const idx = model.indexOf('/')
-          openclawConfig.model_provider = model.substring(0, idx)
-          openclawConfig.model_name = model.substring(idx + 1)
-        } else {
-          openclawConfig.model_name = model
-        }
-      }
-
-      // API Key status
-      openclawConfig.api_key_set = d.api_key_set || false
-      openclawConfig.api_key = '' // never returned from backend
-
-      // Ollama status
-      openclawConfig.ollama_url = d.ollama_url || ''
-      openclawConfig.ollama_api_key_set = d.ollama_api_key_set || false
-      openclawConfig.ollama_api_key = '' // never returned from backend
-      openclawConfig.ollama_context_tokens = d.ollama_context_tokens || 0
-      openclawConfig.ollama_model_params = d.ollama_model_params || ''
-      openclawConfig.ollama_model_params_error = ''
-
-      // Telegram
-      openclawConfig.telegram_enabled = d.telegram_enabled || false
-      openclawConfig.telegram_token = '' // never returned
-      openclawConfig.telegram_token_set = d.telegram_bot_token_set || false
-      openclawConfig.telegram_allow_from = Array.isArray(d.telegram_allow_from)
-        ? d.telegram_allow_from.join(', ')
-        : (d.telegram_allow_from || '')
-      openclawConfig.telegram_bot_username = d.telegram_bot_username || ''
-      openclawConfig.telegram_admin_chat_id = d.telegram_admin_chat_id || ''
-      openclawConfig.telegram_extra_chat_ids = d.telegram_extra_chat_ids || ''
-      openclawConfig.telegram_notify_alert = d.telegram_notify_alert ?? true
-      openclawConfig.telegram_notify_resolved = d.telegram_notify_resolved ?? true
-      openclawConfig.telegram_notify_diagnosis = d.telegram_notify_diagnosis ?? true
-
-      // WhatsApp
-      openclawConfig.whatsapp_enabled = d.whatsapp_enabled || false
-      openclawConfig.whatsapp_allow_from = Array.isArray(d.whatsapp_allow_from)
-        ? d.whatsapp_allow_from.join(', ')
-        : (d.whatsapp_allow_from || '')
-
-      // Discord
-      openclawConfig.discord_enabled = d.discord_enabled || false
-      openclawConfig.discord_token = '' // never returned
-      openclawConfig.discord_token_set = d.discord_bot_token_set || false
-      openclawConfig.discord_allow_from = Array.isArray(d.discord_allow_from)
-        ? d.discord_allow_from.join(', ')
-        : (d.discord_allow_from || '')
-
-      // Slack
-      openclawConfig.slack_enabled = d.slack_enabled || false
-      openclawConfig.slack_bot_token = '' // never returned
-      openclawConfig.slack_app_token = '' // never returned
-      openclawConfig.slack_token_set = d.slack_bot_token_set || false
-
-      // Browser
-      openclawConfig.browser_enabled = d.browser_enabled || false
+      testResult.value = res.data
+      ElMessage.success($t('litellmTestSuccess'))
+    } else {
+      ElMessage.error(res.msg || $t('litellmTestFail'))
     }
   } catch (e) {
-    console.error('Failed to load OpenClaw config:', e)
+    ElMessage.error($t('litellmTestFail'))
   } finally {
-    openclawLoading.value = false
+    testingModel.value = ''
   }
 }
 
-const onSaveOpenclaw = async () => {
-  savingOpenclaw.value = true
+const onRefreshLitellm = async () => {
+  refreshingLitellm.value = true
+  await fetchLitellmData()
+  refreshingLitellm.value = false
+  ElMessage.success($t('litellmRefreshed'))
+}
+
+const onSaveLitellmSettings = async () => {
+  savingLitellm.value = true
   try {
-    // Build FLAT payload matching backend expectations
-    const payload = {
-      model: openclawConfig.model_provider + '/' + openclawConfig.model_name,
-      browser_enabled: openclawConfig.browser_enabled,
-      // Channel enable flags
-      telegram_enabled: openclawConfig.telegram_enabled,
-      whatsapp_enabled: openclawConfig.whatsapp_enabled,
-      discord_enabled: openclawConfig.discord_enabled,
-      slack_enabled: openclawConfig.slack_enabled,
-    }
-
-    // API Key
-    if (openclawConfig.api_key) {
-      payload.api_key = openclawConfig.api_key
-    }
-
-    if (openclawConfig.model_provider === 'ollama') {
-      payload.ollama_url = openclawConfig.ollama_url
-      if (openclawConfig.ollama_api_key) {
-        payload.ollama_api_key = openclawConfig.ollama_api_key
-      }
-      payload.ollama_context_tokens = openclawConfig.ollama_context_tokens || 0
-      // Model params JSON doğrulaması
-      const paramsStr = (openclawConfig.ollama_model_params || '').trim()
-      if (paramsStr) {
-        try {
-          JSON.parse(paramsStr)
-          payload.ollama_model_params = paramsStr
-          openclawConfig.ollama_model_params_error = ''
-        } catch (e) {
-          openclawConfig.ollama_model_params_error = t('ollamaModelParamsInvalid')
-          ElMessage.error(t('ollamaModelParamsInvalid'))
-          return
-        }
-      } else {
-        payload.ollama_model_params = ''
-      }
-    }
-
-    // Telegram
-    if (openclawConfig.telegram_enabled) {
-      if (openclawConfig.telegram_token) {
-        payload.telegram_bot_token = openclawConfig.telegram_token
-      }
-      payload.telegram_allow_from = openclawConfig.telegram_allow_from
-        ? openclawConfig.telegram_allow_from.split(',').map(s => s.trim()).filter(Boolean)
-        : []
-      // Alert bildirim ayarları
-      payload.telegram_admin_chat_id = openclawConfig.telegram_admin_chat_id
-      payload.telegram_extra_chat_ids = openclawConfig.telegram_extra_chat_ids
-      payload.telegram_notify_alert = openclawConfig.telegram_notify_alert
-      payload.telegram_notify_resolved = openclawConfig.telegram_notify_resolved
-      payload.telegram_notify_diagnosis = openclawConfig.telegram_notify_diagnosis
-    }
-
-    // WhatsApp
-    if (openclawConfig.whatsapp_enabled) {
-      payload.whatsapp_allow_from = openclawConfig.whatsapp_allow_from
-        ? openclawConfig.whatsapp_allow_from.split(',').map(s => s.trim()).filter(Boolean)
-        : []
-    }
-
-    // Discord
-    if (openclawConfig.discord_enabled) {
-      if (openclawConfig.discord_token) {
-        payload.discord_bot_token = openclawConfig.discord_token
-      }
-      payload.discord_allow_from = openclawConfig.discord_allow_from
-        ? openclawConfig.discord_allow_from.split(',').map(s => s.trim()).filter(Boolean)
-        : []
-    }
-
-    // Slack
-    if (openclawConfig.slack_enabled) {
-      if (openclawConfig.slack_bot_token) {
-        payload.slack_bot_token = openclawConfig.slack_bot_token
-      }
-      if (openclawConfig.slack_app_token) {
-        payload.slack_app_token = openclawConfig.slack_app_token
-      }
-    }
-
-    const res = await saveOpenclawConfigReq(payload)
+    const res = await litellmUpdateSettingsReq({
+      request_timeout: litellmSettings.request_timeout,
+      num_retries: litellmSettings.num_retries,
+      cache: litellmSettings.cache,
+    })
     if (res.code === 200) {
-      ElMessage.success($t('openclawSaveSuccess'))
-      openclawConfig.api_key = ''
-      openclawConfig.ollama_api_key = ''
-      fetchOpenclawConfig()
-    } else {
-      ElMessage.error(res.msg || $t('openclawSaveFail'))
-    }
-  } catch (e) {
-    ElMessage.error($t('openclawSaveFail'))
-  } finally {
-    savingOpenclaw.value = false
-  }
-}
-
-const onTestOpenclaw = async () => {
-  testingOpenclaw.value = true
-  try {
-    const res = await openclawHealthReq()
-    if (res.code === 200 && res.data?.status === 'online') {
-      openclawOnline.value = true
-      ElMessage.success($t('openclawTestSuccess'))
-    } else {
-      openclawOnline.value = false
-      ElMessage.error($t('openclawTestFail'))
-    }
-  } catch (e) {
-    openclawOnline.value = false
-    ElMessage.error($t('openclawTestFail'))
-  } finally {
-    testingOpenclaw.value = false
-  }
-}
-
-const onRestartOpenclaw = async () => {
-  restartingOpenclaw.value = true
-  try {
-    const res = await openclawRestartReq()
-    if (res.code === 200) {
-      ElMessage.success($t('openclawRestartSuccess'))
-      setTimeout(() => fetchOpenclawConfig(), 3000)
-    } else {
-      ElMessage.error($t('openclawRestartFail'))
-    }
-  } catch (e) {
-    ElMessage.error($t('openclawRestartFail'))
-  } finally {
-    restartingOpenclaw.value = false
-  }
-}
-
-// ========== Telegram Alert (OpenClaw entegre) ==========
-const onTestTgAlert = async () => {
-  testingTgAlert.value = true
-  try {
-    const res = await testTelegramAlertReq()
-    if (res.code === 200) {
-      ElMessage.success($t('telegramTestSuccess'))
-    } else {
-      ElMessage.error(res.msg || $t('telegramTestFail'))
-    }
-  } catch (e) {
-    ElMessage.error($t('telegramTestFail'))
-  } finally {
-    testingTgAlert.value = false
-  }
-}
-
-const onFindChatId = async () => {
-  findingChatId.value = true
-  foundChats.value = []
-  try {
-    const res = await telegramGetChatIdReq()
-    if (res.code === 200 && res.data?.chats) {
-      foundChats.value = res.data.chats
-      if (res.data.chats.length === 0) {
-        ElMessage.info($t('telegramNoChatFound'))
-      }
+      ElMessage.success($t('saveSuccess'))
     } else {
       ElMessage.error(res.msg || 'Error')
     }
   } catch (e) {
-    ElMessage.error('Error fetching chat IDs')
+    ElMessage.error('Error saving settings')
   } finally {
-    findingChatId.value = false
+    savingLitellm.value = false
   }
 }
 
@@ -1436,6 +1460,277 @@ const applySmtpPreset = (preset) => {
     mailConfig.smtp_port = p.port
     mailConfig.use_tls = p.tls
     mailConfig.use_ssl = p.ssl
+  }
+}
+
+// ========== Telegram Config ==========
+const telegramLoading = ref(false)
+const savingTelegram = ref(false)
+const testingTelegram = ref(false)
+const findingChatId = ref(false)
+const foundChats = ref([])
+const telegramConfig = reactive({
+  bot_token: '',
+  bot_token_set: false,
+  bot_username: '',
+  admin_chat_id: '',
+  extra_chat_ids: '',
+  enabled: true,
+  notify_on_alert: true,
+  notify_on_resolved: true,
+  notify_on_diagnosis: true,
+})
+
+const fetchTelegramConfig = async () => {
+  telegramLoading.value = true
+  try {
+    const res = await getTelegramAlertConfigReq()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      telegramConfig.bot_token = ''
+      telegramConfig.bot_token_set = d.bot_token_set || false
+      telegramConfig.bot_username = d.bot_username || ''
+      telegramConfig.admin_chat_id = d.admin_chat_id || ''
+      telegramConfig.extra_chat_ids = d.extra_chat_ids || ''
+      telegramConfig.enabled = d.enabled ?? true
+      telegramConfig.notify_on_alert = d.notify_on_alert ?? true
+      telegramConfig.notify_on_resolved = d.notify_on_resolved ?? true
+      telegramConfig.notify_on_diagnosis = d.notify_on_diagnosis ?? true
+    }
+  } catch (e) {
+    console.error('Failed to load Telegram config:', e)
+  } finally {
+    telegramLoading.value = false
+  }
+}
+
+const onSaveTelegram = async () => {
+  savingTelegram.value = true
+  try {
+    const payload = {
+      enabled: telegramConfig.enabled,
+      admin_chat_id: telegramConfig.admin_chat_id,
+      extra_chat_ids: telegramConfig.extra_chat_ids,
+      notify_on_alert: telegramConfig.notify_on_alert,
+      notify_on_resolved: telegramConfig.notify_on_resolved,
+      notify_on_diagnosis: telegramConfig.notify_on_diagnosis,
+    }
+    if (telegramConfig.bot_token) {
+      payload.bot_token = telegramConfig.bot_token
+    }
+    const res = await saveTelegramAlertConfigReq(payload)
+    if (res.code === 200) {
+      ElMessage.success($t('saveSuccess'))
+      fetchTelegramConfig()
+    } else {
+      ElMessage.error(res.msg || 'Error')
+    }
+  } catch (e) {
+    ElMessage.error(e?.msg || 'Error')
+  } finally {
+    savingTelegram.value = false
+  }
+}
+
+const onTestTelegram = async () => {
+  testingTelegram.value = true
+  try {
+    const res = await testTelegramAlertReq()
+    if (res.code === 200) {
+      ElMessage.success($t('telegramTestSuccess'))
+    } else {
+      ElMessage.error($t('telegramTestFail') + ': ' + (res.msg || ''))
+    }
+  } catch (e) {
+    ElMessage.error($t('telegramTestFail'))
+  } finally {
+    testingTelegram.value = false
+  }
+}
+
+const onFindChatId = async () => {
+  findingChatId.value = true
+  foundChats.value = []
+  try {
+    const res = await telegramGetChatIdReq()
+    if (res.code === 200 && res.data) {
+      foundChats.value = res.data.chats || []
+      if (foundChats.value.length === 0) {
+        ElMessage.warning($t('telegramNoChatFound'))
+      }
+    } else {
+      ElMessage.error(res.msg || 'Error')
+    }
+  } catch (e) {
+    ElMessage.error('Error finding chat ID')
+  } finally {
+    findingChatId.value = false
+  }
+}
+
+// ========== DB Targets ==========
+const dbTargetsLoading = ref(false)
+const refreshingDbTargets = ref(false)
+const addingDbTarget = ref(false)
+const testingDbTarget = ref('')
+const dbTargets = ref([])
+const dbTestResult = ref(null)
+
+const testingSshTarget = ref('')
+const sshTestResult = ref(null)
+
+const newDbTarget = reactive({
+  name: '',
+  db_type: 'postgresql',
+  host: '',
+  port: 5432,
+  user: '',
+  password: '',
+  dbname: '',
+  is_primary: false,
+  ssh_enabled: false,
+  ssh_host: '',
+  ssh_port: 22,
+  ssh_user: '',
+  ssh_password: '',
+  ssh_key_path: '',
+})
+
+const fetchDbTargets = async () => {
+  dbTargetsLoading.value = true
+  try {
+    const res = await listDbTargetsReq()
+    if (res.code === 200) {
+      dbTargets.value = res.data || []
+    }
+  } catch (e) {
+    console.error('Failed to load DB targets:', e)
+  } finally {
+    dbTargetsLoading.value = false
+  }
+}
+
+const onAddDbTarget = async () => {
+  addingDbTarget.value = true
+  try {
+    const res = await addDbTargetReq({
+      name: newDbTarget.name,
+      db_type: newDbTarget.db_type,
+      host: newDbTarget.host,
+      port: newDbTarget.port,
+      user: newDbTarget.user,
+      password: newDbTarget.password,
+      dbname: newDbTarget.dbname,
+      is_primary: newDbTarget.is_primary,
+      ssh_enabled: newDbTarget.ssh_enabled,
+      ssh_host: newDbTarget.ssh_host,
+      ssh_port: newDbTarget.ssh_port,
+      ssh_user: newDbTarget.ssh_user,
+      ssh_password: newDbTarget.ssh_password,
+      ssh_key_path: newDbTarget.ssh_key_path,
+    })
+    if (res.code === 200) {
+      ElMessage.success(res.msg)
+      newDbTarget.name = ''
+      newDbTarget.host = ''
+      newDbTarget.port = newDbTarget.db_type === 'postgresql' ? 5432 : 3306
+      newDbTarget.user = ''
+      newDbTarget.password = ''
+      newDbTarget.dbname = ''
+      newDbTarget.is_primary = false
+      newDbTarget.ssh_enabled = false
+      newDbTarget.ssh_host = ''
+      newDbTarget.ssh_port = 22
+      newDbTarget.ssh_user = ''
+      newDbTarget.ssh_password = ''
+      newDbTarget.ssh_key_path = ''
+      fetchDbTargets()
+    } else {
+      ElMessage.error(res.msg || 'Error')
+    }
+  } catch (e) {
+    ElMessage.error(e?.msg || 'Error')
+  } finally {
+    addingDbTarget.value = false
+  }
+}
+
+const onDeleteDbTarget = (row) => {
+  ElMessageBox.confirm(
+    `'${row.name}' bağlantısını silmek istediğinize emin misiniz?`,
+    $t('warning'),
+    { confirmButtonText: $t('delete'), cancelButtonText: $t('cancel'), type: 'warning' }
+  ).then(async () => {
+    try {
+      const res = await deleteDbTargetReq({ id: row.id })
+      if (res.code === 200) {
+        ElMessage.success(res.msg)
+        fetchDbTargets()
+      } else {
+        ElMessage.error(res.msg)
+      }
+    } catch (e) {
+      ElMessage.error(e?.msg || 'Error')
+    }
+  }).catch(() => {})
+}
+
+const onTestDbTarget = async (id) => {
+  testingDbTarget.value = id
+  dbTestResult.value = null
+  try {
+    const res = await testDbTargetReq({ id })
+    if (res.code === 200 && res.data) {
+      dbTestResult.value = res.data
+      ElMessage.success($t('dbTargetTestSuccess'))
+      fetchDbTargets()
+    } else {
+      ElMessage.error(res.msg || $t('dbTargetTestFail'))
+    }
+  } catch (e) {
+    ElMessage.error($t('dbTargetTestFail'))
+  } finally {
+    testingDbTarget.value = ''
+  }
+}
+
+const onSetPrimaryDb = async (id) => {
+  try {
+    const res = await setPrimaryDbTargetReq({ id })
+    if (res.code === 200) {
+      ElMessage.success(res.msg)
+      fetchDbTargets()
+    } else {
+      ElMessage.error(res.msg)
+    }
+  } catch (e) {
+    ElMessage.error(e?.msg || 'Error')
+  }
+}
+
+const onRefreshDbTargets = async () => {
+  refreshingDbTargets.value = true
+  await fetchDbTargets()
+  refreshingDbTargets.value = false
+  ElMessage.success($t('litellmRefreshed'))
+}
+
+const onTestSshTarget = async (id) => {
+  testingSshTarget.value = id
+  sshTestResult.value = null
+  try {
+    const res = await testSshTargetReq({ id })
+    if (res.code === 200 && res.data) {
+      sshTestResult.value = res.data
+      ElMessage.success($t('sshTestSuccess'))
+      fetchDbTargets()
+    } else {
+      ElMessage.error(res.msg || $t('sshTestFail'))
+    }
+  } catch (e) {
+    ElMessage.error($t('sshTestFail'))
+  } finally {
+    testingSshTarget.value = ''
   }
 }
 
@@ -1654,6 +1949,16 @@ const onSubmitPassword = () => {
   &.mail-icon {
     background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
     color: #db2777;
+  }
+
+  &.telegram-icon {
+    background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
+    color: #2563eb;
+  }
+
+  &.db-icon {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    color: #059669;
   }
 }
 

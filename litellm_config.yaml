@@ -1,0 +1,79 @@
+# ═════════════════════════════════════════════════════════════
+# LiteLLM Proxy Konfigürasyonu — Anomivox DBA Agent
+# ═════════════════════════════════════════════════════════════
+# Bu dosya LiteLLM proxy'nin model routing, fallback, retry
+# ve timeout ayarlarını tanımlar.
+#
+# Ollama modelleri LiteLLM üzerinden erişilir:
+#   Python → LiteLLM (:4000) → Ollama (:11434)
+# ═════════════════════════════════════════════════════════════
+
+model_list:
+  # ── Ana Model: Genel DBA Reasoning ────────────────────────
+  - model_name: "llama3.1:8b"
+    litellm_params:
+      model: "ollama/llama3.1:8b"
+      api_base: "http://192.168.1.202:11434"
+      stream: false
+      timeout: 300
+      num_ctx: 2048
+      num_predict: 256
+      temperature: 0.1
+
+  # ── SQL Özel Model ────────────────────────────────────────
+  - model_name: "sqlcoder:latest"
+    litellm_params:
+      model: "ollama/sqlcoder:latest"
+      api_base: "http://192.168.1.202:11434"
+      stream: false
+      timeout: 300
+      num_ctx: 2048
+      num_predict: 256
+      temperature: 0.0
+
+  # ── Hızlı Triage Model ───────────────────────────────────
+  - model_name: "llama3.2:1b"
+    litellm_params:
+      model: "ollama/llama3.2:1b"
+      api_base: "http://192.168.1.202:11434"
+      stream: false
+      timeout: 120
+      num_ctx: 2048
+      num_predict: 128
+      temperature: 0.0
+
+  # ── Fallback Model ───────────────────────────────────────
+  - model_name: "llama3:8b"
+    litellm_params:
+      model: "ollama/llama3:8b"
+      api_base: "http://192.168.1.202:11434"
+      stream: false
+      timeout: 300
+      num_ctx: 2048
+      num_predict: 256
+      temperature: 0.1
+
+# ── Genel Ayarlar ──────────────────────────────────────────
+general_settings:
+  master_key: "sk-anomivox-local"
+  # Completion modeller için fallback zinciri
+  # llama3.1 fail → llama3 → llama3.2 (en son çare)
+  fallbacks:
+    - model: "llama3.1:8b"
+      fallback: ["llama3:8b", "llama3.2:1b"]
+    - model: "sqlcoder:latest"
+      fallback: ["llama3.1:8b"]
+
+litellm_settings:
+  # Timeout (saniye) — CPU-only Ollama için yüksek
+  request_timeout: 300
+  # Retry
+  num_retries: 0
+  retry_after: 0
+  # Logging
+  set_verbose: false
+  # Cache (tekrarlanan sorguları cache'le)
+  cache: true
+  cache_params:
+    type: "local"
+    ttl: 300  # 5 dakika

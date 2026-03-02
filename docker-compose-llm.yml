@@ -13,12 +13,18 @@ services:
       - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_MAX_LOADED_MODELS=1
       - OLLAMA_KEEP_ALIVE=5m
+      - OLLAMA_NUM_CTX=2048
+      - OLLAMA_MAX_QUEUE=4
+      # CPU-only: flash attention kapalı, düşük context
+      - OLLAMA_FLASH_ATTENTION=false
+      - OLLAMA_RUNNERS_DIR=/tmp/ollama_runners
     entrypoint: >
       /bin/sh -c "
       ollama serve &
       sleep 5 &&
       ollama pull llama3.1:8b &&
       ollama pull sqlcoder:latest &&
+      ollama pull llama3.2:1b &&
       wait
       "
 

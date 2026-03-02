@@ -21,11 +21,11 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
-      # AI Agent Gateway (Docker iç ağ)
-      OPENCLAW_GATEWAY_HOST: ai-agent
-      OPENCLAW_GATEWAY_PORT: "18789"
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
-      OPENCLAW_CONFIG_DIR: /openclaw-config
+      # LiteLLM Proxy bağlantısı (model yönetim UI için)
+      LITELLM_BASE_URL: http://litellm-proxy:4000
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
+      # DBA Agent bağlantısı
+      DBA_AGENT_URL: http://dba-agent:8100
     ports:
       - "7861:7861"
     volumes:
@@ -33,8 +33,7 @@ services:
       - ./chroma_db:/app/chroma_db
       - ./knowledge_base:/app/knowledge_base
       - logs_data:/app/logs
-      - openclaw_data:/openclaw-config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./litellm_config.yaml:/app/litellm_config.yaml
     networks:
       - agent_network
     depends_on:
@@ -163,10 +162,9 @@ services:
     environment:
       APP_MODE: python_app
       PYTHONPATH: /app
-      # AI Agent entegrasyonu — alert bildirimleri
-      OPENCLAW_GATEWAY_URL: http://openclaw:18789
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
-      OPENCLAW_NOTIFY_ENABLED: "true"
+      # DBA Agent entegrasyonu — alert bildirimleri
+      DBA_AGENT_URL: http://dba-agent:8100
+      DBA_AGENT_NOTIFY_ENABLED: "true"
       # Telegram Bot API — alert bildirimleri
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
@@ -199,51 +197,84 @@ services:
     restart: unless-stopped
 
   # ─────────────────────────────────────────────
-  # AI Agent — Kişisel AI Asistanı (Gateway)
+  # LiteLLM Proxy — Model Routing & Fallback
   # ─────────────────────────────────────────────
-  # Telegram, WhatsApp, Discord, Slack vb. tüm
-  # kanal yönetimi AI Agent Gateway üzerinden yapılır.
-  # Daha fazla bilgi: https://docs.openclaw.ai
+  # LLM çağrılarını Ollama'ya yönlendirir.
+  # Retry, fallback, timeout, cache yönetimi sağlar.
   # ─────────────────────────────────────────────
 
-  ai-agent:
-    build:
-      context: .
-      dockerfile: Dockerfile.openclaw
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-latest
     environment:
-      NODE_ENV: production
-      # ── AI Agent Paths ──
-      OPENCLAW_HOME: /home/node/.openclaw
-      OPENCLAW_STATE_DIR: /home/node/.openclaw
-      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
-      # ── Gateway Ayarları ──
-      OPENCLAW_GATEWAY_PORT: "18789"
-      OPENCLAW_GATEWAY_BIND: ${OPENCLAW_GATEWAY_BIND:-lan}
-      OPENCLAW_GATEWAY_MODE: ${OPENCLAW_GATEWAY_MODE:-local}
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
-      # ── Model ──
-      OPENCLAW_MODEL: ${OPENCLAW_MODEL:-groq/llama-3.3-70b-versatile}
-      # ── LLM Provider API Keys ──
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      # ── Kanal Tokenları (ilk kurulumda config'e yazılır) ──
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
-      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
-      SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
-    ports:
-      - "18789:18789"
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
+      LITELLM_LOG_LEVEL: INFO
     volumes:
-      - openclaw_data:/home/node/.openclaw
-      - openclaw_workspace:/home/node/.openclaw/workspace
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    ports:
+      - "4000:4000"
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
     networks:
       - agent_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:18789/api/health"]
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1',4000)); s.close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────────
+  # DBA Agent — Otonom Veritabanı Yönetim Agent'ı
+  # ─────────────────────────────────────────────
+  # Python tabanlı, LiteLLM üzerinden Ollama ile çalışır.
+  # Mevcut sisteme (API, WebUI, KB) DOKUNMAZ.
+  # ─────────────────────────────────────────────
+
+  dba-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.dba-agent
+    environment:
+      # ── Inference ──
+      LITELLM_BASE_URL: http://litellm-proxy:4000
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
+      OLLAMA_BASE_URL: http://192.168.1.202:11434
+      DBA_REASONING_MODEL: ollama/llama3.1:8b
+      DBA_SQL_MODEL: ollama/sqlcoder:latest
+      DBA_TRIAGE_MODEL: ollama/llama3.2:1b
+      DBA_FALLBACK_MODEL: ollama/llama3:8b
+      # ── Veritabanı (monitör edilen) ──
+      DB_TYPE: ${DB_TYPE:-postgresql}
+      DB_HOST: postgres_db
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-test}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-Test123_456}
+      DB_NAME: ${POSTGRES_DB:-anomivox}
+      # ── Telegram ──
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+      TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS:-}
+      # ── Prometheus ──
+      PROMETHEUS_URL: http://prometheus:9090
+      # ── Agent Ayarları ──
+      DBA_AGENT_LANGUAGE: tr
+      DBA_LOG_LEVEL: INFO
+      DBA_AUTO_DIAGNOSE: "true"
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./configs:/app/configs:ro
+      - logs_data:/app/logs
+    networks:
+      - agent_network
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      litellm-proxy:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8100/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -257,8 +288,6 @@ volumes:
   kb_data:
   logs_data:
   pg_data:
-  openclaw_data:
-  openclaw_workspace:
 
 # ─────────────────────────────────────────────
 # Ağ

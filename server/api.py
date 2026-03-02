@@ -99,7 +99,8 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     mount_diagnose_routes(app)
     mount_mail_routes(app)
     mount_telegram_alert_routes(app)
-    mount_openclaw_routes(app)
+    mount_litellm_routes(app)
+    mount_db_target_routes(app)
 
     from server.utils import all_embed_models
 
@@ -216,19 +217,35 @@ def mount_telegram_alert_routes(app: FastAPI):
     app.get("/telegram/chatid", tags=["Telegram"], response_model=BaseResponse, summary="Telegram chat ID bul")(telegram_get_chat_id)
 
 
-def mount_openclaw_routes(app: FastAPI):
-    from server.openclaw.openclaw_api import (
-        openclaw_health, get_openclaw_config, save_openclaw_config,
-        openclaw_send_message, openclaw_channels, openclaw_restart,
-        openclaw_models,
+def mount_litellm_routes(app: FastAPI):
+    from server.litellm.litellm_api import (
+        litellm_health, litellm_list_models, litellm_add_model,
+        litellm_remove_model, litellm_test_model, dba_agent_health,
+        litellm_get_config, litellm_update_settings,
     )
-    app.get("/openclaw/health", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent Gateway durumu")(openclaw_health)
-    app.get("/openclaw/config", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent ayarlarını getir")(get_openclaw_config)
-    app.post("/openclaw/config", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent ayarlarını kaydet")(save_openclaw_config)
-    app.post("/openclaw/send", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent mesaj gönder")(openclaw_send_message)
-    app.get("/openclaw/channels", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent kanal listesi")(openclaw_channels)
-    app.post("/openclaw/restart", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent Gateway restart")(openclaw_restart)
-    app.get("/openclaw/models", tags=["AI Agent"], response_model=BaseResponse, summary="AI Agent model kataloğu")(openclaw_models)
+    app.get("/litellm/health", tags=["LiteLLM"], response_model=BaseResponse, summary="LiteLLM Proxy durumu")(litellm_health)
+    app.get("/litellm/models", tags=["LiteLLM"], response_model=BaseResponse, summary="Model listesi")(litellm_list_models)
+    app.post("/litellm/models/add", tags=["LiteLLM"], response_model=BaseResponse, summary="Model ekle/güncelle")(litellm_add_model)
+    app.post("/litellm/models/remove", tags=["LiteLLM"], response_model=BaseResponse, summary="Model sil")(litellm_remove_model)
+    app.post("/litellm/models/test", tags=["LiteLLM"], response_model=BaseResponse, summary="Model test et")(litellm_test_model)
+    app.get("/litellm/config", tags=["LiteLLM"], response_model=BaseResponse, summary="LiteLLM config getir")(litellm_get_config)
+    app.post("/litellm/settings", tags=["LiteLLM"], response_model=BaseResponse, summary="Genel ayarları güncelle")(litellm_update_settings)
+    app.get("/litellm/dba-agent/health", tags=["LiteLLM"], response_model=BaseResponse, summary="DBA Agent durumu")(dba_agent_health)
+
+
+def mount_db_target_routes(app: FastAPI):
+    from server.db_targets.db_target_api import (
+        list_db_targets, add_db_target, update_db_target,
+        delete_db_target, test_db_target, set_primary_db_target,
+        test_ssh_target,
+    )
+    app.get("/db-targets/list", tags=["DB Targets"], response_model=BaseResponse, summary="DB bağlantılarını listele")(list_db_targets)
+    app.post("/db-targets/add", tags=["DB Targets"], response_model=BaseResponse, summary="DB bağlantısı ekle")(add_db_target)
+    app.post("/db-targets/update", tags=["DB Targets"], response_model=BaseResponse, summary="DB bağlantısı güncelle")(update_db_target)
+    app.post("/db-targets/delete", tags=["DB Targets"], response_model=BaseResponse, summary="DB bağlantısı sil")(delete_db_target)
+    app.post("/db-targets/test", tags=["DB Targets"], response_model=BaseResponse, summary="DB bağlantısını test et")(test_db_target)
+    app.post("/db-targets/test-ssh", tags=["DB Targets"], response_model=BaseResponse, summary="SSH bağlantısını test et")(test_ssh_target)
+    app.post("/db-targets/set-primary", tags=["DB Targets"], response_model=BaseResponse, summary="Primary DB ayarla")(set_primary_db_target)
 
 
 def mount_diagnose_routes(app: FastAPI):

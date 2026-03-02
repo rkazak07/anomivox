@@ -4,6 +4,9 @@ DB Targets — Veritabanı Bağlantı Yönetimi API
 Settings UI'dan DBA Agent'ın bağlanacağı veritabanı
 hedeflerini (PostgreSQL, MySQL) CRUD ile yönetir.
 Bağlantı bilgileri configs/db_targets.json dosyasında saklanır.
+
+DB target değişikliklerinde DBA Agent'a otomatik sync
+sinyali gönderilir (POST /api/agent/sync-config).
 """
 import os
 import json
@@ -19,6 +22,27 @@ CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "configs", "db_targets.json"
 )
+
+# DBA Agent sync URL
+DBA_AGENT_URL = os.getenv("DBA_AGENT_URL", "http://dba-agent:8100")
+
+
+async def _notify_dba_agent():
+    """DB target değişikliğini DBA Agent'a bildir."""
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.post(f"{DBA_AGENT_URL}/api/agent/sync-config")
+            if resp.status_code == 200:
+                data = resp.json()
+                logger.info(
+                    f"DBA Agent config sync OK — "
+                    f"DB: {data.get('db_count', '?')}, SSH: {data.get('ssh_count', '?')}"
+                )
+            else:
+                logger.warning(f"DBA Agent sync başarısız: HTTP {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"DBA Agent'a sync sinyali gönderilemedi: {e}")
 
 
 def _read_targets() -> list:
@@ -233,6 +257,9 @@ async def add_db_target(
         targets.append(target)
         _write_targets(targets)
 
+        # DBA Agent'a config sync sinyali gönder
+        await _notify_dba_agent()
+
         return {"code": 200, "msg": f"'{target['name']}' bağlantısı eklendi", "data": _safe_target(target)}
     except Exception as e:
         return {"code": 500, "msg": f"Ekleme hatası: {str(e)[:200]}"}
@@ -285,6 +312,7 @@ async def update_db_target(
                     other["is_primary"] = False
 
         _write_targets(targets)
+        await _notify_dba_agent()
         return {"code": 200, "msg": f"'{t['name']}' bağlantısı güncellendi", "data": _safe_target(t)}
     except Exception as e:
         return {"code": 500, "msg": f"Güncelleme hatası: {str(e)[:200]}"}
@@ -306,6 +334,7 @@ async def delete_db_target(
             return {"code": 404, "msg": "Bağlantı bulunamadı"}
 
         _write_targets(new_targets)
+        await _notify_dba_agent()
         return {"code": 200, "msg": "Bağlantı silindi"}
     except Exception as e:
         return {"code": 500, "msg": f"Silme hatası: {str(e)[:200]}"}
@@ -387,6 +416,7 @@ async def set_primary_db_target(
             return {"code": 404, "msg": "Bağlantı bulunamadı"}
 
         _write_targets(targets)
+        await _notify_dba_agent()
         return {"code": 200, "msg": "Primary bağlantı güncellendi"}
     except Exception as e:
         return {"code": 500, "msg": f"Güncelleme hatası: {str(e)[:200]}"}

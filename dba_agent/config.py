@@ -4,13 +4,27 @@ DBA Agent Konfigürasyonu
 Tüm ayarlar env variable'lardan okunur, varsayılan değerler
 mevcut configs/ modülüyle uyumludur.
 
+UI'dan girilen DB bağlantıları configs/db_targets.json'a yazılır.
+Bu dosya mevcutsa, ENV değişkenlerine göre ÖNCELİKLİ olarak okunur.
+
 NOT: Mevcut configs/model_config.py, diagnose_config.py vb.
      dosyalara DOKUNMAZ. Kendi konfigürasyonunu yönetir.
 """
 
+import json
+import logging
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional
+
+logger = logging.getLogger("dba_agent.config")
+
+# ── db_targets.json yolu (Settings UI ile paylaşılan) ────
+DB_TARGETS_JSON = os.getenv(
+    "DB_TARGETS_JSON",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "configs", "db_targets.json"),
+)
 
 
 # ─────────────────────────────────────────────
@@ -75,10 +89,71 @@ class DatabaseTarget:
     ssl: bool = False
     readonly_user: str = ""
     readonly_password: str = ""
+    # SSH bilgileri — db_targets.json'dan gelir
+    ssh_enabled: bool = False
+    ssh_host: str = ""
+    ssh_port: int = 22
+    ssh_user: str = ""
+    ssh_password: str = ""
+    ssh_key_path: str = ""
+    # Meta
+    target_id: str = ""  # db_targets.json ID
+    is_primary: bool = False
 
     @property
     def display_name(self) -> str:
         return f"{self.name} ({self.db_type}@{self.host}:{self.port}/{self.database})"
+
+
+def _load_db_targets_json() -> list:
+    """configs/db_targets.json dosyasından UI kayıtlı target'ları yükle."""
+    json_path = DB_TARGETS_JSON
+    if not os.path.exists(json_path):
+        return []
+    try:
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return []
+        return data
+    except Exception as e:
+        logger.warning(f"db_targets.json okunamadı: {e}")
+        return []
+
+
+def _json_targets_to_database_targets(json_list: list) -> List[DatabaseTarget]:
+    """
+    db_targets.json formatındaki dict listesini
+    DatabaseTarget dataclass listesine çevirir.
+    Primary target'ı listenin başına koyar.
+    """
+    targets = []
+    for t in json_list:
+        try:
+            dt = DatabaseTarget(
+                name=t.get("name", "unnamed"),
+                db_type=t.get("db_type", "postgresql"),
+                host=t.get("host", "localhost"),
+                port=int(t.get("port", 5432)),
+                user=t.get("user", ""),
+                password=t.get("password", ""),
+                database=t.get("dbname", t.get("database", "")),
+                ssh_enabled=bool(t.get("ssh_enabled", False)),
+                ssh_host=t.get("ssh_host", ""),
+                ssh_port=int(t.get("ssh_port", 22)),
+                ssh_user=t.get("ssh_user", ""),
+                ssh_password=t.get("ssh_password", ""),
+                ssh_key_path=t.get("ssh_key_path", ""),
+                target_id=t.get("id", ""),
+                is_primary=bool(t.get("is_primary", False)),
+            )
+            targets.append(dt)
+        except Exception as e:
+            logger.warning(f"Target parse hatası ({t.get('name', '?')}): {e}")
+
+    # Primary olanı başa al
+    targets.sort(key=lambda x: (not x.is_primary, x.name))
+    return targets
 
 
 @dataclass
@@ -99,8 +174,25 @@ class DatabaseConfig:
     )
 
     def __post_init__(self):
-        """Env'den varsayılan target oluştur (mevcut configs ile uyumlu)."""
+        """
+        Öncelik sırası:
+        1. configs/db_targets.json (UI'dan girilen)
+        2. ENV değişkenleri (Docker compose default)
+        """
         if not self.targets:
+            # ── 1) db_targets.json'dan yükle ────
+            json_targets = _json_targets_to_database_targets(
+                _load_db_targets_json()
+            )
+            if json_targets:
+                self.targets = json_targets
+                logger.info(
+                    f"db_targets.json'dan {len(json_targets)} DB target yüklendi: "
+                    f"{[t.display_name for t in json_targets]}"
+                )
+                return
+
+            # ── 2) Env fallback — Docker compose default ────
             self.targets = [
                 DatabaseTarget(
                     name=os.getenv("DB_NAME", os.getenv("POSTGRES_DB", "anomivox")),
@@ -112,6 +204,18 @@ class DatabaseConfig:
                     database=os.getenv("DB_NAME", os.getenv("POSTGRES_DB", "anomivox")),
                 ),
             ]
+            logger.info("ENV'den varsayılan DB target oluşturuldu (db_targets.json bulunamadı)")
+
+    def reload_from_json(self):
+        """db_targets.json değişince runtime'da yeniden yükle."""
+        json_targets = _json_targets_to_database_targets(
+            _load_db_targets_json()
+        )
+        if json_targets:
+            self.targets = json_targets
+            logger.info(f"DB targets yeniden yüklendi: {len(json_targets)} target")
+            return True
+        return False
 
 
 # ─────────────────────────────────────────────
@@ -126,6 +230,7 @@ class SSHTarget:
     user: str = "anomivox"
     port: int = 22
     key_path: str = ""  # Boşsa default ~/.ssh/id_rsa
+    password: str = ""  # SSH password (key yoksa)
     role: str = "database"  # database, application, monitoring
     allowed_services: List[str] = field(default_factory=list)
 
@@ -139,6 +244,78 @@ class SSHConfig:
     """Tüm SSH hedefleri."""
     targets: List[SSHTarget] = field(default_factory=list)
     command_timeout: int = int(os.getenv("DBA_SSH_TIMEOUT", "30"))
+
+    def __post_init__(self):
+        """
+        SSH target'ları yükle.
+        Öncelik sırası:
+        1. db_targets.json'daki ssh_enabled=true olan kayıtlar
+        2. ENV değişkenleri (DBA_SSH_HOST vb.)
+        """
+        if not self.targets:
+            # ── 1) db_targets.json'daki SSH bilgileri ────
+            json_list = _load_db_targets_json()
+            for t in json_list:
+                if t.get("ssh_enabled") and t.get("ssh_host"):
+                    allowed_str = os.getenv("DBA_SSH_ALLOWED_SERVICES", "postgresql,mysql,nginx,docker")
+                    allowed = [s.strip() for s in allowed_str.split(",") if s.strip()]
+                    self.targets.append(SSHTarget(
+                        name=t.get("name", "unknown"),
+                        host=t["ssh_host"],
+                        user=t.get("ssh_user", "root"),
+                        port=int(t.get("ssh_port", 22)),
+                        key_path=t.get("ssh_key_path", ""),
+                        password=t.get("ssh_password", ""),
+                        role="database",
+                        allowed_services=allowed,
+                    ))
+
+            if self.targets:
+                logger.info(
+                    f"db_targets.json'dan {len(self.targets)} SSH target yüklendi: "
+                    f"{[t.display_name for t in self.targets]}"
+                )
+                return
+
+            # ── 2) Env fallback ────
+            ssh_host = os.getenv("DBA_SSH_HOST", "")
+            if ssh_host:
+                allowed_str = os.getenv("DBA_SSH_ALLOWED_SERVICES", "postgresql,mysql,nginx,docker")
+                allowed = [s.strip() for s in allowed_str.split(",") if s.strip()]
+
+                self.targets.append(SSHTarget(
+                    name=os.getenv("DBA_SSH_NAME", "db-server"),
+                    host=ssh_host,
+                    user=os.getenv("DBA_SSH_USER", "anomivox"),
+                    port=int(os.getenv("DBA_SSH_PORT", "22")),
+                    key_path=os.getenv("DBA_SSH_KEY_PATH", ""),
+                    role=os.getenv("DBA_SSH_ROLE", "database"),
+                    allowed_services=allowed,
+                ))
+
+    def reload_from_json(self):
+        """db_targets.json değişince SSH target'ları yeniden yükle."""
+        new_targets = []
+        json_list = _load_db_targets_json()
+        for t in json_list:
+            if t.get("ssh_enabled") and t.get("ssh_host"):
+                allowed_str = os.getenv("DBA_SSH_ALLOWED_SERVICES", "postgresql,mysql,nginx,docker")
+                allowed = [s.strip() for s in allowed_str.split(",") if s.strip()]
+                new_targets.append(SSHTarget(
+                    name=t.get("name", "unknown"),
+                    host=t["ssh_host"],
+                    user=t.get("ssh_user", "root"),
+                    port=int(t.get("ssh_port", 22)),
+                    key_path=t.get("ssh_key_path", ""),
+                    password=t.get("ssh_password", ""),
+                    role="database",
+                    allowed_services=allowed,
+                ))
+        if new_targets:
+            self.targets = new_targets
+            logger.info(f"SSH targets yeniden yüklendi: {len(new_targets)} target")
+            return True
+        return False
 
 
 # ─────────────────────────────────────────────
@@ -256,4 +433,22 @@ def reload_config() -> AgentConfig:
     """Config'i yeniden yükler (runtime config değişikliği için)."""
     global _config
     _config = AgentConfig.from_env()
+    logger.info(
+        f"Config yeniden yüklendi — "
+        f"DB targets: {len(_config.database.targets)}, "
+        f"SSH targets: {len(_config.ssh.targets)}"
+    )
+    return _config
+
+
+def sync_from_json() -> AgentConfig:
+    """
+    db_targets.json değişince çağrılır.
+    Sadece DB ve SSH target'ları günceller, diğer config'leri korur.
+    """
+    global _config
+    if _config is None:
+        _config = AgentConfig.from_env()
+    _config.database.reload_from_json()
+    _config.ssh.reload_from_json()
     return _config

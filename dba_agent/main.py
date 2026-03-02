@@ -13,7 +13,7 @@ import time
 import uvicorn
 from fastapi import FastAPI, HTTPException
 
-from dba_agent.config import get_config
+from dba_agent.config import get_config, reload_config, sync_from_json
 
 # ── Logging ──────────────────────────────────
 logging.basicConfig(
@@ -73,6 +73,7 @@ async def health():
         "version": "0.2.0",
         "language": config.agent_language,
         "db_targets": [t.display_name for t in config.database.targets],
+        "ssh_targets": [t.display_name for t in config.ssh.targets],
         "llm_stats": llm.stats,
     }
 
@@ -263,6 +264,74 @@ async def test_llm(request: dict):
         "task": task_type.value,
         "response": response,
         "stats": client.stats,
+    }
+
+
+@app.post("/api/agent/sync-config")
+async def sync_config():
+    """
+    UI'dan DB bağlantısı değiştiğinde config'i yeniden yükle.
+    db_targets.json dosyasını okuyup DBA Agent config'ini günceller.
+    Böylece yeni eklenen DB/SSH bilgileri hemen aktif olur.
+    """
+    try:
+        config = sync_from_json()
+        return {
+            "status": "ok",
+            "db_targets": [t.display_name for t in config.database.targets],
+            "ssh_targets": [t.display_name for t in config.ssh.targets],
+            "db_count": len(config.database.targets),
+            "ssh_count": len(config.ssh.targets),
+        }
+    except Exception as e:
+        logger.error(f"Config sync hatası: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/agent/reload-config")
+async def reload_config_endpoint():
+    """Config'i tamamen yeniden yükle (env + json)."""
+    try:
+        config = reload_config()
+        return {
+            "status": "ok",
+            "db_targets": [t.display_name for t in config.database.targets],
+            "ssh_targets": [t.display_name for t in config.ssh.targets],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/agent/config-status")
+async def config_status():
+    """Aktif config durumunu göster — hangi DB'lere bağlı, SSH var mı."""
+    config = get_config()
+    return {
+        "db_targets": [
+            {
+                "name": t.name,
+                "db_type": t.db_type,
+                "host": t.host,
+                "port": t.port,
+                "user": t.user,
+                "database": t.database,
+                "is_primary": t.is_primary,
+                "ssh_enabled": t.ssh_enabled,
+                "ssh_host": t.ssh_host if t.ssh_enabled else None,
+            }
+            for t in config.database.targets
+        ],
+        "ssh_targets": [
+            {
+                "name": t.name,
+                "host": t.host,
+                "user": t.user,
+                "port": t.port,
+                "role": t.role,
+            }
+            for t in config.ssh.targets
+        ],
+        "config_source": "db_targets.json" if config.database.targets and getattr(config.database.targets[0], 'target_id', '') else "env",
     }
 
 

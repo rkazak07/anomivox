@@ -254,6 +254,15 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
       TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS:-}
+      # ── SSH (OS Monitoring) ──
+      DBA_SSH_HOST: ${DBA_SSH_HOST:-}
+      DBA_SSH_USER: ${DBA_SSH_USER:-anomivox}
+      DBA_SSH_PORT: ${DBA_SSH_PORT:-22}
+      DBA_SSH_KEY_PATH: ${DBA_SSH_KEY_PATH:-}
+      DBA_SSH_NAME: ${DBA_SSH_NAME:-db-server}
+      DBA_SSH_ROLE: ${DBA_SSH_ROLE:-database}
+      DBA_SSH_ALLOWED_SERVICES: ${DBA_SSH_ALLOWED_SERVICES:-postgresql,mysql,nginx,docker}
+      DBA_SSH_TIMEOUT: ${DBA_SSH_TIMEOUT:-30}
       # ── Prometheus ──
       PROMETHEUS_URL: http://prometheus:9090
       # ── Agent Ayarları ──
@@ -265,6 +274,7 @@ services:
     volumes:
       - ./configs:/app/configs:ro
       - logs_data:/app/logs
+      - ${DBA_SSH_KEY_DIR:-~/.ssh}:/root/.ssh:ro
     networks:
       - agent_network
     depends_on:

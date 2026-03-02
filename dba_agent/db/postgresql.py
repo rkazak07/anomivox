@@ -364,7 +364,8 @@ class PostgreSQLAdapter(DatabaseAdapter):
     def execute_action(self, sql: str, risk: RiskLevel) -> ActionResult:
         """
         Yazma işlemi — onay sonrası çağrılır.
-        Transaction wrapper ile çalışır.
+        VACUUM ve REINDEX autocommit gerektirir.
+        Diğer işlemler transaction wrapper ile çalışır.
         """
         self.ensure_connected()
 
@@ -375,15 +376,29 @@ class PostgreSQLAdapter(DatabaseAdapter):
             )
 
         start = time.time()
-        try:
-            # Autocommit kapatıp transaction başlat
-            self._connection.autocommit = False
-            cur = self._connection.cursor()
-            cur.execute(sql)
-            elapsed_ms = (time.time() - start) * 1000
+        sql_upper = sql.strip().upper()
 
-            self._connection.commit()
-            self._connection.autocommit = True
+        # VACUUM, REINDEX, CREATE INDEX CONCURRENTLY → autocommit gerektirir
+        needs_autocommit = any(
+            sql_upper.startswith(cmd)
+            for cmd in ("VACUUM", "REINDEX", "CREATE INDEX CONCURRENTLY", "SELECT PG_")
+        )
+
+        try:
+            cur = self._connection.cursor()
+
+            if needs_autocommit:
+                # Autocommit modunda çalıştır (transaction olmadan)
+                self._connection.autocommit = True
+                cur.execute(sql)
+                elapsed_ms = (time.time() - start) * 1000
+            else:
+                # Transaction wrapper
+                self._connection.autocommit = False
+                cur.execute(sql)
+                elapsed_ms = (time.time() - start) * 1000
+                self._connection.commit()
+                self._connection.autocommit = True
 
             return ActionResult(
                 success=True,
@@ -392,7 +407,11 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 affected_rows=cur.rowcount or 0,
             )
         except Exception as e:
-            self._connection.rollback()
+            if not needs_autocommit:
+                try:
+                    self._connection.rollback()
+                except Exception:
+                    pass
             self._connection.autocommit = True
             elapsed_ms = (time.time() - start) * 1000
             logger.error(f"Action error: {e}")

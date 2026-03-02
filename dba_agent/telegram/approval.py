@@ -198,14 +198,83 @@ async def _execute_approved_actions(
             )
 
             # TODO: Faz 5 — Executor üzerinden gerçek SQL/OS komutu çalıştır
-            results.append(f"  {i}. ⏳ {action_desc} — (henüz uygulanmadı)")
+            # Aksiyon türüne göre çalıştır
+            action_type = action.get("type", "")
+            sql = action.get("sql", "")
+            os_cmd = action.get("os_command", "")
+
+            if sql:
+                try:
+                    from dba_agent.tools.db_action_tools import _check_sql_forbidden
+                    from dba_agent.db import get_adapter
+                    from dba_agent.db.adapter import RiskLevel
+
+                    # Güvenlik kontrolü
+                    forbidden = _check_sql_forbidden(sql)
+                    if forbidden:
+                        results.append(f"  {i}. ❌ {action_desc} — {forbidden}")
+                        audit.log(
+                            action_type="approved_action",
+                            target=alert_id,
+                            command=sql,
+                            risk_level=risk,
+                            result="forbidden",
+                        )
+                        continue
+
+                    risk_level = getattr(RiskLevel, risk.upper(), RiskLevel.MEDIUM)
+                    with get_adapter() as adapter:
+                        action_result = adapter.execute_action(sql, risk_level)
+
+                    if action_result.success:
+                        results.append(f"  {i}. ✅ {action_desc} — {action_result.message}")
+                    else:
+                        results.append(f"  {i}. ❌ {action_desc} — {action_result.message}")
+
+                    audit.log(
+                        action_type="approved_action",
+                        target=alert_id,
+                        command=sql,
+                        risk_level=risk,
+                        result="success" if action_result.success else "failed",
+                    )
+
+                except Exception as e:
+                    results.append(f"  {i}. ❌ {action_desc} — Hata: {str(e)[:100]}")
+
+            elif os_cmd:
+                try:
+                    from dba_agent.tools.ssh_executor import SSHExecutor
+                    from dba_agent.tools.os_tools import _get_ssh_target
+
+                    target = _get_ssh_target()
+                    executor = SSHExecutor(target)
+                    ssh_result = executor.run(os_cmd)
+
+                    if ssh_result.success:
+                        results.append(f"  {i}. ✅ {action_desc}")
+                    else:
+                        results.append(f"  {i}. ❌ {action_desc} — {ssh_result.stderr[:100]}")
+
+                    audit.log(
+                        action_type="approved_action",
+                        target=alert_id,
+                        command=os_cmd,
+                        risk_level=risk,
+                        result="success" if ssh_result.success else "failed",
+                    )
+
+                except Exception as e:
+                    results.append(f"  {i}. ❌ {action_desc} — SSH Hata: {str(e)[:100]}")
+
+            else:
+                results.append(f"  {i}. ⏳ {action_desc} — (çalıştırılabilir komut bulunamadı)")
 
         result_text = (
             f"📋 *Aksiyon Sonuçları*\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
             f"🏷️ Alert: `{alert_id}`\n\n"
             + "\n".join(results)
-            + "\n\n⚠️ _Not: Otomatik aksiyon uygulama Faz 5'te aktif edilecek._"
         )
 
         await bot.send_message(chat_id, result_text, parse_mode=ParseMode.MARKDOWN)

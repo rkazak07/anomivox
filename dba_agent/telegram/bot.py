@@ -103,6 +103,10 @@ class DBABot:
         self.app.add_handler(CommandHandler("query", self._cmd_sql))  # alias
         self.app.add_handler(CommandHandler("run", self._cmd_run))
         self.app.add_handler(CommandHandler("cancel", self._cmd_cancel))
+        self.app.add_handler(CommandHandler("service", self._cmd_service))
+        self.app.add_handler(CommandHandler("kill", self._cmd_kill))
+        self.app.add_handler(CommandHandler("vacuum", self._cmd_vacuum))
+        self.app.add_handler(CommandHandler("ssh", self._cmd_ssh))
 
         # ── Callback handler (inline keyboard) ─
         self.app.add_handler(CallbackQueryHandler(self._callback_handler))
@@ -122,6 +126,10 @@ class DBABot:
             BotCommand("db", "Veritabanı durumu"),
             BotCommand("sql", "SQL sorgusu çalıştır"),
             BotCommand("run", "DBA aracı çalıştır"),
+            BotCommand("service", "Servis durumu kontrol (SSH)"),
+            BotCommand("kill", "Oturum/sorgu öldür"),
+            BotCommand("vacuum", "Tablo VACUUM"),
+            BotCommand("ssh", "SSH sistem bilgisi"),
             BotCommand("cancel", "Tanıyı iptal et"),
         ]
 
@@ -246,6 +254,17 @@ class DBABot:
             "  /run get\\_health — DBA aracı çalıştır\n"
             "  /run get\\_slow\\_queries limit=5\n"
             "  /tools — Kullanılabilir araçlar\n\n"
+            "*DB Aksiyon Komutları:*\n"
+            "  /kill 12345 — Oturumu sonlandır\n"
+            "  /kill 12345 cancel — Sorguyu iptal et\n"
+            "  /vacuum users — VACUUM ANALYZE\n"
+            "  /vacuum users full — VACUUM FULL ⚠️\n\n"
+            "*OS / SSH Komutları:*\n"
+            "  /service postgresql — Servis durumu\n"
+            "  /ssh info — Sistem bilgisi\n"
+            "  /ssh disk — Disk durumu\n"
+            "  /ssh ps — Process listesi\n"
+            "  /ssh port 5432 — Port kontrolü\n\n"
             "*Sunucu Metrikleri:*\n"
             "  /status — Genel sistem durumu\n\n"
             "*Serbest Metin (Akıllı DBA):*\n"
@@ -254,6 +273,8 @@ class DBABot:
             '  _"Aktif bağlantıları göster"_\n'
             '  _"Yavaş sorguları listele"_\n'
             '  _"CPU ve disk durumu nedir?"_\n'
+            '  _"PostgreSQL servisi çalışıyor mu?"_\n'
+            '  _"Sistem bilgisi göster"_\n'
             '  _"SELECT count(*) FROM users"_\n\n'
             "💡 Mesajınız otomatik analiz edilir,\n"
             "  ilgili DBA aracı çalıştırılır ve\n"
@@ -490,9 +511,7 @@ class DBABot:
                 finally:
                     adapter.disconnect()
 
-            await update.message.reply_text(
-                "\n".join(lines), parse_mode=ParseMode.MARKDOWN
-            )
+            await self.send_message(update.effective_chat.id, "\n".join(lines))
 
         except Exception as e:
             await update.message.reply_text(f"❌ DB durumu alınamadı:\n{str(e)[:200]}")
@@ -536,7 +555,7 @@ class DBABot:
             from dba_agent.telegram.smart_handler import execute_tool, format_tool_result
             result = await execute_tool("execute_diagnostic_query", {"sql": sql})
             formatted = format_tool_result("execute_diagnostic_query", result)
-            await update.message.reply_text(formatted, parse_mode=ParseMode.MARKDOWN)
+            await self.send_message(update.effective_chat.id, formatted)
         except Exception as e:
             await update.message.reply_text(f"❌ SQL hatası: {str(e)[:300]}")
 
@@ -587,9 +606,206 @@ class DBABot:
             from dba_agent.telegram.smart_handler import execute_tool, format_tool_result
             result = await execute_tool(tool_name, tool_args)
             formatted = format_tool_result(tool_name, result)
-            await update.message.reply_text(formatted, parse_mode=ParseMode.MARKDOWN)
+            await self.send_message(update.effective_chat.id, formatted)
         except Exception as e:
             await update.message.reply_text(f"❌ Araç hatası: {str(e)[:300]}")
+
+    async def _cmd_service(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Servis durumu kontrol et (SSH üzerinden)."""
+        if not self._is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Yetkisiz erişim.")
+            return
+
+        service_name = context.args[0] if context.args else ""
+        if not service_name:
+            await update.message.reply_text(
+                "❓ *Servis adı gerekli*\n\n"
+                "Kullanım:\n"
+                "  /service postgresql\n"
+                "  /service mysql\n"
+                "  /service nginx\n"
+                "  /service docker\n\n"
+                "📋 Servis durumunu SSH ile kontrol eder.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        ssh_target = context.args[1] if len(context.args) > 1 else None
+        await update.message.reply_text(f"🔄 `{service_name}` kontrol ediliyor...", parse_mode=ParseMode.MARKDOWN)
+
+        try:
+            from dba_agent.telegram.smart_handler import execute_tool, format_tool_result
+            result = await execute_tool("check_service_status", {
+                "service_name": service_name,
+                "ssh_target": ssh_target,
+            })
+            formatted = format_tool_result("check_service_status", result)
+            await self.send_message(update.effective_chat.id, formatted)
+
+            # Servis down ise logları da göster
+            if result.get("success") and not result.get("result", {}).get("active"):
+                log_result = await execute_tool("read_service_logs", {
+                    "service_name": service_name,
+                    "lines": 30,
+                    "since": "30m",
+                    "ssh_target": ssh_target,
+                })
+                log_formatted = format_tool_result("read_service_logs", log_result)
+                await self.send_message(
+                    update.effective_chat.id,
+                    f"📋 *Son loglar ({service_name} down):*\n\n{log_formatted}",
+                )
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ SSH hatası: {str(e)[:300]}")
+
+    async def _cmd_kill(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Oturum veya sorgu öldür."""
+        if not self._is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Yetkisiz erişim.")
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "❓ *PID gerekli*\n\n"
+                "Kullanım:\n"
+                "  /kill 12345 — Oturumu sonlandır\n"
+                "  /kill 12345 cancel — Sadece sorguyu iptal et\n\n"
+                "⚠️ `cancel` → nazik iptal (pg\\_cancel\\_backend)\n"
+                "⚠️ PID alone → terminate (pg\\_terminate\\_backend)\n\n"
+                "PID'leri görmek için: \"aktif bağlantılar\" yazın",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        try:
+            pid = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("❌ PID sayı olmalıdır.")
+            return
+
+        mode = context.args[1] if len(context.args) > 1 else "terminate"
+        db_name = context.args[2] if len(context.args) > 2 else None
+
+        if mode == "cancel":
+            tool_name = "cancel_query"
+            emoji = "🔄"
+            label = "Sorgu iptal"
+        else:
+            tool_name = "kill_session"
+            emoji = "💀"
+            label = "Oturum sonlandırma"
+
+        # Onay mekanizması — riskli işlem
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    f"✅ {label} (PID {pid})",
+                    callback_data=f"dbaction:{tool_name}:{pid}:{db_name or ''}",
+                ),
+                InlineKeyboardButton("❌ İptal", callback_data="dbaction_cancel"),
+            ]
+        ])
+
+        await update.message.reply_text(
+            f"{emoji} *{label} — Onay Gerekli*\n\n"
+            f"  PID: `{pid}`\n"
+            f"  İşlem: `{tool_name}`\n\n"
+            f"⚠️ Bu işlem geri alınamaz.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard,
+        )
+
+    async def _cmd_vacuum(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Tablo VACUUM."""
+        if not self._is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Yetkisiz erişim.")
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "❓ *Tablo adı gerekli*\n\n"
+                "Kullanım:\n"
+                "  /vacuum users — VACUUM ANALYZE\n"
+                "  /vacuum public.orders — Schema ile\n"
+                "  /vacuum users full — VACUUM FULL ⚠️\n\n"
+                "⚠️ VACUUM FULL tablo kilitler, dikkatli kullanın.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        table_name = context.args[0]
+        full_mode = len(context.args) > 1 and context.args[1].lower() == "full"
+        db_name = None
+        if len(context.args) > 2:
+            db_name = context.args[2]
+
+        tool_name = "vacuum_full_table" if full_mode else "vacuum_table"
+        label = "VACUUM FULL" if full_mode else "VACUUM ANALYZE"
+
+        await update.message.reply_text(
+            f"🧹 `{label} {table_name}` çalıştırılıyor...",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+        try:
+            from dba_agent.telegram.smart_handler import execute_tool, format_tool_result
+            args = {"table_name": table_name}
+            if db_name:
+                args["db_name"] = db_name
+            if not full_mode:
+                args["analyze"] = True
+
+            result = await execute_tool(tool_name, args)
+            formatted = format_tool_result(tool_name, result)
+            await self.send_message(update.effective_chat.id, formatted)
+        except Exception as e:
+            await update.message.reply_text(f"❌ VACUUM hatası: {str(e)[:300]}")
+
+    async def _cmd_ssh(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """SSH üzerinden sistem bilgisi."""
+        if not self._is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Yetkisiz erişim.")
+            return
+
+        sub_cmd = context.args[0] if context.args else "info"
+        ssh_target = context.args[1] if len(context.args) > 1 else None
+
+        tool_map = {
+            "info": ("get_system_info", {}),
+            "disk": ("check_disk_space", {}),
+            "ps": ("check_process_list", {}),
+            "process": ("check_process_list", {}),
+            "port": ("check_port", {"port": int(context.args[1]) if len(context.args) > 1 else 5432}),
+        }
+
+        if sub_cmd not in tool_map:
+            await update.message.reply_text(
+                "❓ *SSH Alt Komutlar*\n\n"
+                "  /ssh info — Sistem bilgisi\n"
+                "  /ssh disk — Disk durumu\n"
+                "  /ssh ps — Process listesi\n"
+                "  /ssh port 5432 — Port kontrolü\n\n"
+                "Alternatif:\n"
+                "  /service postgresql — Servis durumu\n"
+                "  /run read\\_service\\_logs service\\_name=postgresql",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        tool_name, default_args = tool_map[sub_cmd]
+        if ssh_target and sub_cmd != "port":
+            default_args["ssh_target"] = ssh_target
+
+        await update.message.reply_text(f"🔄 SSH: `{sub_cmd}` çalıştırılıyor...", parse_mode=ParseMode.MARKDOWN)
+
+        try:
+            from dba_agent.telegram.smart_handler import execute_tool, format_tool_result
+            result = await execute_tool(tool_name, default_args)
+            formatted = format_tool_result(tool_name, result)
+            await self.send_message(update.effective_chat.id, formatted)
+        except Exception as e:
+            await update.message.reply_text(f"❌ SSH hatası: {str(e)[:300]}")
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Serbest metin — Akıllı DBA Agent mesaj işleyici."""
@@ -676,6 +892,30 @@ class DBABot:
         elif data.startswith("reject:"):
             from dba_agent.telegram.approval import handle_approval
             await handle_approval(query, data, approved=False)
+
+        elif data.startswith("dbaction:"):
+            # DB action onay — format: dbaction:tool_name:pid:db_name
+            parts = data.split(":")
+            if len(parts) >= 3:
+                tool_name = parts[1]
+                pid = int(parts[2])
+                db_name = parts[3] if len(parts) > 3 and parts[3] else None
+
+                await query.edit_message_text(
+                    f"⏳ `{tool_name}` çalıştırılıyor (PID {pid})...",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+
+                try:
+                    from dba_agent.telegram.smart_handler import execute_tool, format_tool_result
+                    result = await execute_tool(tool_name, {"pid": pid, "db_name": db_name})
+                    formatted = format_tool_result(tool_name, result)
+                    await self.send_message(chat_id, formatted)
+                except Exception as e:
+                    await self.send_message(chat_id, f"❌ Hata: {str(e)[:300]}")
+
+        elif data == "dbaction_cancel":
+            await query.edit_message_text("❌ İşlem iptal edildi.")
 
 
 # ─────────────────────────────────────────────

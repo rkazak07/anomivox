@@ -61,7 +61,7 @@ INTENT_PATTERNS: List[Tuple[str, List[str], Dict[str, Any]]] = [
     
     # ── Tablo istatistikleri ─────────────────
     ("get_table_stats", [
-        r"tablo|table|boyut|size|vacuum|dead.*row|bloat",
+        r"tablo|table|boyut|size|dead.*row|bloat",
         r"satır\s*sayı|row\s*count|kaç\s*satır|tablo.*bilgi",
     ], {"schema": "public"}),
     
@@ -100,6 +100,102 @@ INTENT_PATTERNS: List[Tuple[str, List[str], Dict[str, Any]]] = [
     ("get_active_alerts", [
         r"alert|alarm|uyarı|aktif.*alert|firing",
     ], {}),
+
+    # ═══════════════════════════════════════════
+    # OS Tools (SSH) — Faz 5
+    # ═══════════════════════════════════════════
+
+    # ── Servis Durumu ─────────────────────────
+    ("check_service_status", [
+        r"servis.*durum|service.*status|systemctl|servis.*çalışıyor",
+        r"postgresql.*servis|mysql.*servis|nginx.*servis|servis.*kontrol",
+        r"servis.*durdu|service.*down|servis.*aktif",
+    ], {"service_name": "postgresql"}),
+
+    # ── Servis Logları ────────────────────────
+    ("read_service_logs", [
+        r"servis.*log|service.*log|journalctl|servis.*hata",
+        r"postgresql.*log|mysql.*log|log.*oku|log.*göster",
+    ], {"service_name": "postgresql", "lines": 50}),
+
+    # ── Sistem Bilgisi ────────────────────────
+    ("get_system_info", [
+        r"sistem.*bilgi|system.*info|sunucu.*bilgi|server.*info",
+        r"hostname|kernel|uptime|os.*bilgi|makine",
+    ], {}),
+
+    # ── Disk Alanı (SSH) ─────────────────────
+    ("check_disk_space", [
+        r"disk.*alan|disk.*space|df|doluluk.*ssh|sunucu.*disk",
+    ], {}),
+
+    # ── Process Listesi ──────────────────────
+    ("check_process_list", [
+        r"process|proses|ps\s*aux|çalışan.*program|top\s*process",
+        r"pid.*liste|hangi.*çalışıyor",
+    ], {}),
+
+    # ── OS Log Okuma ─────────────────────────
+    ("read_os_log", [
+        r"os.*log|sistem.*log|var.*log|syslog|dmesg",
+        r"hata.*log|error.*log|log.*dosya",
+    ], {"log_path": "/var/log/syslog", "lines": 50}),
+
+    # ── Port Kontrolü ────────────────────────
+    ("check_port", [
+        r"port.*kontrol|port.*açık|port.*dinle|port.*listen",
+        r"port\s*\d+|hangi.*port",
+    ], {"port": 5432}),
+
+    # ═══════════════════════════════════════════
+    # DB Action Tools — Faz 5
+    # ═══════════════════════════════════════════
+
+    # ── Sorgu İptal ──────────────────────────
+    ("cancel_query", [
+        r"sorgu.*iptal|cancel.*query|sorgu.*durdur|query.*cancel",
+        r"pg_cancel|iptal.*et",
+    ], {}),
+
+    # ── Oturum Öldürme ───────────────────────
+    ("kill_session", [
+        r"oturum.*öldür|kill.*session|session.*kill|bağlantı.*kes",
+        r"terminate|sonlandır|pid.*öldür|kill.*pid",
+    ], {}),
+
+    # ── VACUUM ───────────────────────────────
+    ("vacuum_table", [
+        r"vacuum|vakum|dead.*temizle|dead.*tuple.*temizle",
+        r"tablo.*temizle|temizlik.*yap",
+    ], {}),
+
+    # ── REINDEX ──────────────────────────────
+    ("reindex_table", [
+        r"reindex|index.*yeniden|index.*oluştur|index.*rebuild",
+        r"bozuk.*index|şişmiş.*index|optimize.*table",
+    ], {}),
+
+    # ── ANALYZE ──────────────────────────────
+    ("analyze_table", [
+        r"analyze|analiz.*tablo|istatistik.*güncelle|planner",
+    ], {}),
+
+    # ── Config ───────────────────────────────
+    ("set_db_config", [
+        r"config.*değiştir|parametre.*ayarla|set.*config|alter.*system",
+        r"work_mem|shared_buffer|effective_cache",
+    ], {}),
+
+    # ── Config Reload ────────────────────────
+    ("reload_db_config", [
+        r"config.*reload|reload.*config|pg_reload|yeniden.*yükle.*config",
+    ], {}),
+
+    # ── Uzun Sorguları Toplu Öldürme ─────────
+    ("kill_long_running_queries", [
+        r"uzun.*sorgu.*öldür|kill.*long.*running|hepsini.*öldür",
+        r"toplu.*öldür|tümünü.*sonlandır",
+    ], {"threshold_sec": 300}),
 ]
 
 # SQL sorgusu tespiti
@@ -230,6 +326,25 @@ def format_tool_result(tool_name: str, result: Dict[str, Any]) -> str:
         "get_pg_metrics": _fmt_pg_metrics,
         "get_active_alerts": _fmt_alerts,
         "execute_diagnostic_query": _fmt_query_result,
+        # OS Tools
+        "check_service_status": _fmt_service_status,
+        "read_service_logs": _fmt_service_logs,
+        "get_system_info": _fmt_system_info,
+        "check_disk_space": _fmt_disk_space,
+        "check_process_list": _fmt_process_list,
+        "read_os_log": _fmt_os_log,
+        "restart_service": _fmt_restart_service,
+        "check_port": _fmt_check_port,
+        # DB Action Tools
+        "cancel_query": _fmt_action_result,
+        "kill_session": _fmt_action_result,
+        "vacuum_table": _fmt_vacuum_result,
+        "vacuum_full_table": _fmt_vacuum_result,
+        "reindex_table": _fmt_action_result,
+        "analyze_table": _fmt_action_result,
+        "set_db_config": _fmt_config_result,
+        "reload_db_config": _fmt_action_result,
+        "kill_long_running_queries": _fmt_bulk_kill_result,
     }
     
     formatter = formatters.get(tool_name)
@@ -518,6 +633,273 @@ def _fmt_query_result(data: Dict) -> str:
 
 
 # ─────────────────────────────────────────────
+# OS Tool Formatters
+# ─────────────────────────────────────────────
+
+def _fmt_service_status(data: Dict) -> str:
+    active = data.get("active")
+    emoji = "✅" if active else "❌" if active is False else "❓"
+    return (
+        f"🖥️ *Servis Durumu*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Servis: `{data.get('service', '?')}`\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  {emoji} Durum: {data.get('status', '?')}\n\n"
+        f"```\n{data.get('details', '')[:1500]}\n```"
+    )
+
+
+def _fmt_service_logs(data: Dict) -> str:
+    log_lines = data.get("log_lines", [])
+    err = data.get("error_count", 0)
+    warn = data.get("warning_count", 0)
+    
+    err_emoji = "🔴" if err > 0 else "🟢"
+    warn_emoji = "🟡" if warn > 0 else ""
+    
+    lines = [
+        f"📋 *Servis Logları*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Servis: `{data.get('service', '?')}`\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Periyot: son {data.get('since', '?')}\n"
+        f"  {err_emoji} Hata: {err} | {warn_emoji}Uyarı: {warn}\n"
+        f"  Toplam: {data.get('total_lines', 0)} satır\n"
+    ]
+    
+    if log_lines:
+        # Son 20 satırı göster
+        shown = log_lines[-20:]
+        lines.append(f"\n```")
+        for l in shown:
+            lines.append(l[:120])
+        lines.append("```")
+    
+    return "\n".join(lines)
+
+
+def _fmt_system_info(data: Dict) -> str:
+    mem = data.get("memory", {})
+    disk = data.get("disk", {})
+    load = data.get("load_avg", {})
+    
+    mem_pct = mem.get("usage_pct", 0)
+    mem_emoji = "🔴" if mem_pct > 90 else "🟡" if mem_pct > 70 else "🟢"
+    
+    return (
+        f"🖥️ *Sistem Bilgisi*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  🏷️ Hostname: {data.get('hostname', '?')}\n"
+        f"  🐧 OS: {data.get('os', '?')}\n"
+        f"  🔧 Kernel: {data.get('kernel', '?')[:80]}\n"
+        f"  ⏱️ Uptime: {data.get('uptime', '?')}\n"
+        f"  💻 CPU: {data.get('cpu_count', '?')} çekirdek\n"
+        f"  📊 Load: {load.get('1min', '?')} / {load.get('5min', '?')} / {load.get('15min', '?')}\n\n"
+        f"  {mem_emoji} Bellek: {mem.get('used_mb', '?')}MB / {mem.get('total_mb', '?')}MB ({mem_pct}%)\n"
+        f"  💾 Disk: {disk.get('used', '?')} / {disk.get('size', '?')} ({disk.get('usage_pct', '?')})"
+    )
+
+
+def _fmt_disk_space(data: Dict) -> str:
+    critical = data.get("critical", [])
+    warnings = data.get("warnings", [])
+    
+    lines = [
+        f"💾 *Disk Kullanımı*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+    ]
+    
+    if critical:
+        lines.append(f"  🔴 *KRİTİK:* {', '.join(critical)}")
+    if warnings:
+        lines.append(f"  🟡 *Uyarı:* {', '.join(warnings)}")
+    if not critical and not warnings:
+        lines.append(f"  🟢 Tüm diskler normal")
+    
+    for fs in data.get("filesystems", [])[:10]:
+        pct = fs.get("usage_pct", 0)
+        emoji = "🔴" if pct >= 95 else "🟡" if pct >= 85 else "🟢"
+        lines.append(
+            f"\n  {emoji} `{fs.get('mount', '?')}` — "
+            f"{fs.get('used', '?')}/{fs.get('size', '?')} ({pct}%)"
+        )
+    
+    return "\n".join(lines)
+
+
+def _fmt_process_list(data: Dict) -> str:
+    processes = data.get("processes", [])
+    
+    lines = [
+        f"⚙️ *Process Listesi*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Filtre: {data.get('filter', '?')}\n"
+        f"  Toplam: {data.get('total', 0)}\n"
+    ]
+    
+    for p in processes[:15]:
+        lines.append(
+            f"\n  PID: {p.get('pid', '?')} | CPU: {p.get('cpu_pct', '?')}% | "
+            f"MEM: {p.get('mem_pct', '?')}%\n"
+            f"  User: {p.get('user', '?')} | `{p.get('command', '?')[:80]}`"
+        )
+    
+    return "\n".join(lines)
+
+
+def _fmt_os_log(data: Dict) -> str:
+    log_lines = data.get("log_lines", [])
+    
+    lines = [
+        f"📄 *OS Log*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Dosya: `{data.get('log_path', '?')}`\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Hata: {data.get('error_count', 0)} satır\n"
+    ]
+    
+    if data.get("grep_pattern"):
+        lines.append(f"  Filtre: `{data['grep_pattern']}`")
+    
+    if log_lines:
+        shown = log_lines[-15:]
+        lines.append(f"\n```")
+        for l in shown:
+            lines.append(l[:120])
+        lines.append("```")
+    
+    return "\n".join(lines)
+
+
+def _fmt_restart_service(data: Dict) -> str:
+    restarted = data.get("restarted", False)
+    emoji = "✅" if restarted else "❌"
+    return (
+        f"🔄 *Servis Yeniden Başlatma*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Servis: `{data.get('service', '?')}`\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Önceki: {data.get('pre_status', '?')}\n"
+        f"  Sonraki: {data.get('post_status', '?')}\n"
+        f"  {emoji} {data.get('message', '?')}"
+    )
+
+
+def _fmt_check_port(data: Dict) -> str:
+    listening = data.get("listening", False)
+    emoji = "✅" if listening else "❌"
+    return (
+        f"🔌 *Port Kontrolü*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Port: {data.get('port', '?')}\n"
+        f"  {emoji} {'Dinleniyor' if listening else 'Dinlenmiyor'}\n"
+        f"  `{data.get('details', '')[:300]}`"
+    )
+
+
+# ─────────────────────────────────────────────
+# DB Action Formatters
+# ─────────────────────────────────────────────
+
+def _fmt_action_result(data: Dict) -> str:
+    # Generic action formatter — cancel_query, kill_session, reindex, analyze, reload
+    success_keys = ["cancelled", "killed", "reindexed", "analyzed", "reloaded"]
+    success = any(data.get(k) for k in success_keys) or data.get("success", False)
+    emoji = "✅" if success else "❌"
+    
+    lines = [
+        f"⚡ *DB Aksiyon Sonucu*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  {emoji} {data.get('message', '?')}\n"
+    ]
+    
+    if data.get("pid"):
+        lines.append(f"  PID: {data['pid']}")
+    if data.get("table"):
+        lines.append(f"  Tablo: `{data['table']}`")
+    if data.get("db_type"):
+        lines.append(f"  DB: {data['db_type']}")
+    if data.get("execution_time_ms"):
+        lines.append(f"  Süre: {data['execution_time_ms']:.0f}ms")
+    
+    qi = data.get("query_info", {})
+    if qi:
+        lines.append(f"\n  📋 Bilgi: {qi.get('user', '?')} | {qi.get('state', '?')}")
+        if qi.get("query"):
+            lines.append(f"  `{qi['query'][:150]}`")
+    
+    return "\n".join(lines)
+
+
+def _fmt_vacuum_result(data: Dict) -> str:
+    vacuumed = data.get("vacuumed", False)
+    emoji = "✅" if vacuumed else "❌"
+    full = "FULL " if data.get("full") else ""
+    
+    lines = [
+        f"🧹 *VACUUM {full}Sonucu*\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Tablo: `{data.get('table', '?')}`\n"
+        f"  {emoji} {data.get('message', '?')}\n"
+        f"  Süre: {data.get('execution_time_ms', 0):.0f}ms\n"
+    ]
+    
+    before = data.get("before", {})
+    after = data.get("after", {})
+    
+    if before and after:
+        lines.append(f"\n  📊 *Öncesi → Sonrası:*")
+        lines.append(f"  Dead rows: {before.get('dead_rows', '?')} → {after.get('dead_rows', '?')}")
+        lines.append(
+            f"  Boyut: {before.get('total_size_mb', '?')}MB → {after.get('total_size_mb', '?')}MB"
+        )
+    
+    return "\n".join(lines)
+
+
+def _fmt_config_result(data: Dict) -> str:
+    applied = data.get("applied", False)
+    emoji = "✅" if applied else "❌"
+    return (
+        f"⚙️ *Config Değişikliği*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Parametre: `{data.get('param', '?')}`\n"
+        f"  Eski: {data.get('old_value', '?')}\n"
+        f"  Yeni: {data.get('new_value', '?')}\n"
+        f"  {emoji} {data.get('message', '?')}\n"
+        f"  📌 {data.get('note', '')}"
+    )
+
+
+def _fmt_bulk_kill_result(data: Dict) -> str:
+    count = data.get("killed_count", 0)
+    emoji = "✅" if count > 0 else "ℹ️"
+    
+    lines = [
+        f"💀 *Toplu Sorgu Sonlandırma*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Eşik: {data.get('threshold_sec', '?')}s\n"
+        f"  {emoji} {data.get('message', '?')}\n"
+    ]
+    
+    for k in data.get("killed", [])[:10]:
+        lines.append(
+            f"\n  💀 PID {k.get('pid')} | {k.get('user', '?')} | "
+            f"{k.get('duration_sec', '?')}s\n"
+            f"    `{k.get('query', '')[:100]}`"
+        )
+    
+    failed = data.get("failed_pids", [])
+    if failed:
+        lines.append(f"\n  ❌ Başarısız PID'ler: {failed}")
+    
+    return "\n".join(lines)
+
+
+# ─────────────────────────────────────────────
 # Ana akıllı mesaj işleme fonksiyonu
 # ─────────────────────────────────────────────
 
@@ -617,6 +999,9 @@ def _detect_multi_intent(text: str) -> List[Tuple[str, Dict[str, Any]]]:
         "bağlantı|connection": ("get_active_connections", {}),
         "lock|kilit": ("get_blocked_locks", {}),
         "sorgu|query|slow": ("get_long_running_queries", {"threshold_sec": 1.0}),
+        "servis|service": ("check_service_status", {"service_name": "postgresql"}),
+        "process|proses": ("check_process_list", {}),
+        "system|sistem|sunucu": ("get_system_info", {}),
     }
     
     for patterns, (tool, args) in combined_keywords.items():

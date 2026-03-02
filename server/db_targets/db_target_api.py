@@ -89,6 +89,13 @@ def _safe_target(t: dict) -> dict:
     else:
         safe["ssh_key_content_set"] = False
         safe["ssh_key_content"] = ""
+    # SSH key passphrase gizle
+    if safe.get("ssh_key_passphrase"):
+        safe["ssh_key_passphrase_set"] = True
+        safe["ssh_key_passphrase"] = ""
+    else:
+        safe["ssh_key_passphrase_set"] = False
+        safe["ssh_key_passphrase"] = ""
     return safe
 
 
@@ -208,22 +215,25 @@ def _test_ssh_connection(t: dict) -> dict:
         ssh_key_content = t.get("ssh_key_content", "").strip()
         ssh_key = t.get("ssh_key_path", "").strip()
         ssh_password = t.get("ssh_password", "").strip()
+        ssh_passphrase = t.get("ssh_key_passphrase", "").strip() or None
 
         if ssh_key_content:
             # Inline PEM key
             try:
-                pkey = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key_content))
+                pkey = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key_content), password=ssh_passphrase)
             except paramiko.SSHException:
                 try:
-                    pkey = paramiko.Ed25519Key.from_private_key(io.StringIO(ssh_key_content))
+                    pkey = paramiko.Ed25519Key.from_private_key(io.StringIO(ssh_key_content), password=ssh_passphrase)
                 except paramiko.SSHException:
-                    pkey = paramiko.ECDSAKey.from_private_key(io.StringIO(ssh_key_content))
+                    pkey = paramiko.ECDSAKey.from_private_key(io.StringIO(ssh_key_content), password=ssh_passphrase)
             connect_kwargs["pkey"] = pkey
         elif ssh_key:
             from pathlib import Path
             key_path = Path(ssh_key).expanduser()
             if key_path.exists():
                 connect_kwargs["key_filename"] = str(key_path)
+                if ssh_passphrase:
+                    connect_kwargs["passphrase"] = ssh_passphrase
             else:
                 return {"ok": False, "error": f"SSH key dosyası bulunamadı: {ssh_key}"}
         elif ssh_password:
@@ -296,12 +306,14 @@ async def add_db_target(
             "ssl_key_path": data.get("ssl_key_path", "").strip(),
             # SSH / OS erişimi (opsiyonel)
             "ssh_enabled": bool(data.get("ssh_enabled", False)),
+            "ssh_auth_type": data.get("ssh_auth_type", "key"),  # 'key' veya 'password'
             "ssh_host": data.get("ssh_host", "").strip(),
             "ssh_port": int(data.get("ssh_port", 22)),
             "ssh_user": data.get("ssh_user", "").strip(),
             "ssh_password": data.get("ssh_password", ""),
             "ssh_key_path": data.get("ssh_key_path", "").strip(),
             "ssh_key_content": data.get("ssh_key_content", ""),  # Inline PEM key
+            "ssh_key_passphrase": data.get("ssh_key_passphrase", ""),  # Key passphrase
             "ssh_last_tested": None,
             "ssh_last_status": None,
             # Meta
@@ -365,6 +377,8 @@ async def update_db_target(
         # SSH alanları
         if "ssh_enabled" in data:
             t["ssh_enabled"] = bool(data["ssh_enabled"])
+        if "ssh_auth_type" in data:
+            t["ssh_auth_type"] = data["ssh_auth_type"]
         for ssh_field in ["ssh_host", "ssh_user", "ssh_key_path"]:
             if ssh_field in data:
                 t[ssh_field] = str(data[ssh_field]).strip()
@@ -374,6 +388,8 @@ async def update_db_target(
             t["ssh_password"] = data["ssh_password"]
         if "ssh_key_content" in data:
             t["ssh_key_content"] = data["ssh_key_content"]
+        if "ssh_key_passphrase" in data:
+            t["ssh_key_passphrase"] = data["ssh_key_passphrase"]
 
         # is_primary ise diğerlerini sıfırla
         if t.get("is_primary"):

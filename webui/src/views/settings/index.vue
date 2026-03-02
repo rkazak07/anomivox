@@ -318,498 +318,498 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════ -->
-    <!-- SECTION 3 — Mail (SMTP) Settings (collapsible)           -->
+    <!-- SECTION 3 — Notification Channels (collapsible, tabbed)  -->
     <!-- ══════════════════════════════════════════════════════════ -->
-    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.mail }">
-      <div class="collapse-card-header" @click="toggleSection('mail')">
+    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.notifications }">
+      <div class="collapse-card-header" @click="toggleSection('notifications')">
         <div class="collapse-card-title">
-          <div class="collapse-card-icon mail-icon">
-            <el-icon :size="20"><Message /></el-icon>
+          <div class="collapse-card-icon notification-icon">
+            <span style="font-size: 20px;">🔔</span>
           </div>
           <div>
-            <h3>{{ $t('mailSettings') }}</h3>
-            <span class="collapse-card-subtitle">{{ $t('mailDesc') }}</span>
+            <h3>{{ $t('notificationChannels') }}</h3>
+            <span class="collapse-card-subtitle">{{ $t('notificationChannelsDesc') }}</span>
           </div>
         </div>
         <div class="collapse-card-right">
-          <el-tag :type="mailConfig.password_set ? 'success' : 'info'" size="default" effect="plain" round>
-            <el-icon style="margin-right: 4px;"><CircleCheck v-if="mailConfig.password_set" /><WarningFilled v-else /></el-icon>
-            {{ mailConfig.password_set ? $t('connected') : $t('notConnected') }}
+          <el-tag v-if="mailConfig.password_set" type="success" size="small" effect="plain" round style="margin-right: 4px;">📧</el-tag>
+          <el-tag v-if="telegramConfig.bot_token_set" type="success" size="small" effect="plain" round>✈️</el-tag>
+          <el-tag v-if="!mailConfig.password_set && !telegramConfig.bot_token_set" type="info" size="default" effect="plain" round>
+            {{ $t('notConnected') }}
           </el-tag>
-          <div class="collapse-chevron" :class="{ rotated: sections.mail }">
+          <div class="collapse-chevron" :class="{ rotated: sections.notifications }">
             <el-icon :size="18"><ArrowDown /></el-icon>
           </div>
         </div>
       </div>
       <Transition name="collapse-body">
-        <div v-show="sections.mail" class="collapse-card-body">
-          <el-form label-position="top" class="telegram-form" v-loading="mailLoading">
-            <!-- SMTP Presets -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('smtpServer')">
-                <span>🖥️ {{ $t('smtpPresets') || 'SMTP Server' }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.smtpServer }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
-                </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.smtpServer" class="inner-card-body">
-                  <div class="form-group">
-                    <el-form-item :label="$t('smtpPresets')">
-                      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <el-button size="small" plain @click="applySmtpPreset('gmail')">Gmail</el-button>
-                        <el-button size="small" plain @click="applySmtpPreset('outlook')">Outlook / Office365</el-button>
-                        <el-button size="small" plain @click="applySmtpPreset('yandex')">Yandex</el-button>
-                        <el-button size="small" plain @click="applySmtpPreset('sendgrid')">SendGrid</el-button>
-                      </div>
-                    </el-form-item>
-                  </div>
+        <div v-show="sections.notifications" class="collapse-card-body">
+          <el-tabs v-model="activeNotificationTab" type="border-card" class="notification-tabs">
 
-                  <!-- SMTP Server Settings -->
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="8">
-                        <el-form-item :label="$t('smtpHost')">
-                          <el-input
-                            v-model="mailConfig.smtp_host"
-                            :placeholder="$t('smtpHostPlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('smtpHostHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="4">
-                        <el-form-item :label="$t('smtpPort')">
-                          <el-input-number
-                            v-model="mailConfig.smtp_port"
-                            :min="1"
-                            :max="65535"
-                            style="width: 100%"
-                          />
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="5">
-                        <el-form-item :label="$t('useTls')">
-                          <div class="toggle-item" style="padding: 0;">
-                            <el-switch v-model="mailConfig.use_tls" @change="onTlsChange" />
-                            <div class="toggle-info">
-                              <span class="toggle-hint">{{ $t('useTlsHint') }}</span>
-                            </div>
-                          </div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="5">
-                        <el-form-item :label="$t('useSsl')">
-                          <div class="toggle-item" style="padding: 0;">
-                            <el-switch v-model="mailConfig.use_ssl" @change="onSslChange" />
-                            <div class="toggle-info">
-                              <span class="toggle-hint">{{ $t('useSslHint') }}</span>
-                            </div>
-                          </div>
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-
-                  <!-- Credentials -->
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="12">
-                        <el-form-item :label="$t('smtpUsername')">
-                          <el-input
-                            v-model="mailConfig.username"
-                            :placeholder="$t('smtpUsernamePlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('smtpUsernameHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="12">
-                        <el-form-item :label="$t('smtpPassword')">
-                          <el-input
-                            v-model="mailConfig.password"
-                            type="password"
-                            show-password
-                            :placeholder="$t('smtpPasswordPlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('smtpPasswordHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-
-                  <!-- From / Recipients -->
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="8">
-                        <el-form-item :label="$t('fromName')">
-                          <el-input
-                            v-model="mailConfig.from_name"
-                            :placeholder="$t('fromNamePlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('fromNameHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="8">
-                        <el-form-item :label="$t('fromAddress')">
-                          <el-input
-                            v-model="mailConfig.from_address"
-                            :placeholder="$t('fromAddressPlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('fromAddressHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="8">
-                        <el-form-item :label="$t('mailRecipients')">
-                          <el-input
-                            v-model="mailConfig.recipients"
-                            :placeholder="$t('mailRecipientsPlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('mailRecipientsHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-                </div>
-              </Transition>
-            </div>
-
-            <!-- Notification Toggles -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('mailNotify')">
-                <span>🔔 {{ $t('notifyOnAlert') || 'Bildirimler' }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.mailNotify }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
-                </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.mailNotify" class="inner-card-body">
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="8">
-                        <div class="toggle-item">
-                          <el-switch v-model="mailConfig.notify_on_alert" />
-                          <div class="toggle-info">
-                            <span class="toggle-label">{{ $t('notifyOnAlert') }}</span>
-                            <span class="toggle-hint">{{ $t('notifyOnAlertHint') }}</span>
-                          </div>
-                        </div>
-                      </el-col>
-                      <el-col :span="8">
-                        <div class="toggle-item">
-                          <el-switch v-model="mailConfig.notify_on_diagnosis" />
-                          <div class="toggle-info">
-                            <span class="toggle-label">{{ $t('notifyOnDiagnosis') }}</span>
-                            <span class="toggle-hint">{{ $t('notifyOnDiagnosisHint') }}</span>
-                          </div>
-                        </div>
-                      </el-col>
-                      <el-col :span="8">
-                        <div class="toggle-item">
-                          <el-switch v-model="mailConfig.notify_on_health" />
-                          <div class="toggle-info">
-                            <span class="toggle-label">{{ $t('notifyOnHealth') }}</span>
-                            <span class="toggle-hint">{{ $t('notifyOnHealthHint') }}</span>
-                          </div>
-                        </div>
-                      </el-col>
-                    </el-row>
-                  </div>
-
-                  <!-- Thresholds -->
-                  <el-divider />
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="12">
-                        <el-form-item :label="$t('healthCheckInterval')">
-                          <el-input-number
-                            v-model="mailConfig.health_check_interval"
-                            :min="30"
-                            :max="3600"
-                            :step="30"
-                            style="width: 100%"
-                          />
-                          <div class="form-hint">{{ $t('healthCheckIntervalHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="12">
-                        <el-form-item :label="$t('slowQueryThreshold')">
-                          <el-input-number
-                            v-model="mailConfig.slow_query_threshold"
-                            :min="0.5"
-                            :max="60"
-                            :step="0.5"
-                            :precision="1"
-                            style="width: 100%"
-                          />
-                          <div class="form-hint">{{ $t('slowQueryThresholdHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-                </div>
-              </Transition>
-            </div>
-
-            <!-- Setup Guide -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('mailGuide')">
-                <span>📖 {{ $t('mailSetupGuide') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.mailGuide }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
-                </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.mailGuide" class="inner-card-body">
-                  <div class="guide-steps">
-                    <p>{{ $t('mailStep1') }}</p>
-                    <p>{{ $t('mailStep2') }}</p>
-                    <p>{{ $t('mailStep3') }}</p>
-                    <p>{{ $t('mailStep4') }}</p>
-                    <p>{{ $t('mailStep5') }}</p>
-                  </div>
-                </div>
-              </Transition>
-            </div>
-
-            <!-- Action buttons -->
-            <div class="telegram-actions">
-              <el-button
-                type="default"
-                :loading="testingMail"
-                @click="onTestMail"
-                :disabled="!mailConfig.smtp_host || !mailConfig.username"
-              >
-                <el-icon style="margin-right: 6px;"><Connection /></el-icon>
-                {{ $t('testConnection') }}
-              </el-button>
-              <el-button type="primary" :loading="savingMail" @click="onSaveMail">
-                <el-icon style="margin-right: 6px;"><Check /></el-icon>
-                {{ $t('save') }}
-              </el-button>
-            </div>
-          </el-form>
-        </div>
-      </Transition>
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════════ -->
-    <!-- SECTION 4 — Telegram Notifications (collapsible)         -->
-    <!-- ══════════════════════════════════════════════════════════ -->
-    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.telegram }">
-      <div class="collapse-card-header" @click="toggleSection('telegram')">
-        <div class="collapse-card-title">
-          <div class="collapse-card-icon telegram-icon">
-            <span style="font-size: 20px;">✈️</span>
-          </div>
-          <div>
-            <h3>{{ $t('telegramAlertSettings') }}</h3>
-            <span class="collapse-card-subtitle">{{ $t('telegramAlertDesc') }}</span>
-          </div>
-        </div>
-        <div class="collapse-card-right">
-          <el-tag :type="telegramConfig.bot_token_set ? 'success' : 'info'" size="default" effect="plain" round>
-            <el-icon style="margin-right: 4px;"><CircleCheck v-if="telegramConfig.bot_token_set" /><WarningFilled v-else /></el-icon>
-            {{ telegramConfig.bot_token_set ? $t('telegramBotConnected') : $t('telegramBotNotConnected') }}
-          </el-tag>
-          <div class="collapse-chevron" :class="{ rotated: sections.telegram }">
-            <el-icon :size="18"><ArrowDown /></el-icon>
-          </div>
-        </div>
-      </div>
-      <Transition name="collapse-body">
-        <div v-show="sections.telegram" class="collapse-card-body">
-          <el-form label-position="top" class="telegram-form" v-loading="telegramLoading">
-
-            <!-- ═══ Bot Settings ═══ -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('telegramBot')">
-                <span>🤖 {{ $t('telegramBotToken') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramBot }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
-                </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.telegramBot" class="inner-card-body">
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="16">
-                        <el-form-item :label="$t('telegramBotToken')">
-                          <el-input
-                            v-model="telegramConfig.bot_token"
-                            :placeholder="$t('telegramBotTokenPlaceholder')"
-                            clearable
-                            type="password"
-                            show-password
-                          />
-                          <div class="form-hint">
-                            {{ $t('telegramBotTokenHint') }}
-                            <span v-if="telegramConfig.bot_token_set" class="token-status token-set"> — {{ $t('tokenSetLeaveBlank') }}</span>
-                          </div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="8">
-                        <el-form-item label="Status">
-                          <div v-if="telegramConfig.bot_username" style="display:flex; align-items:center; gap:8px; padding-top: 4px;">
-                            <el-tag type="success" effect="plain" round>
-                              <span>@{{ telegramConfig.bot_username }}</span>
-                            </el-tag>
-                          </div>
-                          <div v-else style="padding-top: 8px; color: var(--el-text-color-placeholder); font-size: 13px;">
-                            {{ $t('telegramBotNotConnected') }}
-                          </div>
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="8">
-                        <el-form-item :label="$t('telegramAdminChatId')">
-                          <el-input
-                            v-model="telegramConfig.admin_chat_id"
-                            :placeholder="$t('telegramAdminChatIdPlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('telegramAdminChatIdHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="8">
-                        <el-form-item :label="$t('telegramExtraChatIds')">
-                          <el-input
-                            v-model="telegramConfig.extra_chat_ids"
-                            :placeholder="$t('telegramExtraChatIdsPlaceholder')"
-                            clearable
-                          />
-                          <div class="form-hint">{{ $t('telegramExtraChatIdsHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="8" style="display: flex; align-items: flex-end; padding-bottom: 18px;">
-                        <el-button
-                          type="default"
-                          :loading="findingChatId"
-                          @click="onFindChatId"
-                          :disabled="!telegramConfig.bot_token_set && !telegramConfig.bot_token"
-                        >
-                          <el-icon style="margin-right: 6px;"><Search /></el-icon>
-                          {{ $t('telegramFindChatId') }}
-                        </el-button>
-                      </el-col>
-                    </el-row>
-                  </div>
-
-                  <!-- Chat ID Sonuçları -->
-                  <div v-if="foundChats.length > 0" style="margin-bottom: 16px;">
-                    <div class="form-group-title">{{ $t('telegramFoundChats') }}</div>
-                    <div v-for="chat in foundChats" :key="chat.chat_id" style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
-                      <el-tag type="info" size="small">{{ chat.type }}</el-tag>
-                      <code style="font-size: 13px; font-weight: 600;">{{ chat.chat_id }}</code>
-                      <span style="font-size: 13px; color: var(--el-text-color-secondary);">
-                        {{ chat.first_name || chat.title || chat.username || '' }}
-                      </span>
-                      <el-button size="small" type="primary" link @click="telegramConfig.admin_chat_id = String(chat.chat_id)">
-                        {{ $t('use') }}
-                      </el-button>
+            <!-- ════════════════════════════════════════════════ -->
+            <!-- TAB: Email (SMTP)                               -->
+            <!-- ════════════════════════════════════════════════ -->
+            <el-tab-pane :label="$t('notificationTabEmail')" name="email">
+              <template #label>
+                <span class="tab-label-custom">
+                  <span>📧</span>
+                  <span>{{ $t('notificationTabEmail') }}</span>
+                  <el-tag v-if="mailConfig.password_set" type="success" size="small" effect="plain" round style="margin-left: 6px;">{{ $t('connected') }}</el-tag>
+                </span>
+              </template>
+              <el-form label-position="top" class="telegram-form" v-loading="mailLoading">
+                <!-- SMTP Presets -->
+                <div class="inner-card">
+                  <div class="inner-card-header" @click="toggleInner('smtpServer')">
+                    <span>🖥️ {{ $t('smtpPresets') || 'SMTP Server' }}</span>
+                    <div class="collapse-chevron small" :class="{ rotated: innerSections.smtpServer }">
+                      <el-icon :size="14"><ArrowDown /></el-icon>
                     </div>
                   </div>
-                </div>
-              </Transition>
-            </div>
+                  <Transition name="collapse-body">
+                    <div v-show="innerSections.smtpServer" class="inner-card-body">
+                      <div class="form-group">
+                        <el-form-item :label="$t('smtpPresets')">
+                          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <el-button size="small" plain @click="applySmtpPreset('gmail')">Gmail</el-button>
+                            <el-button size="small" plain @click="applySmtpPreset('outlook')">Outlook / Office365</el-button>
+                            <el-button size="small" plain @click="applySmtpPreset('yandex')">Yandex</el-button>
+                            <el-button size="small" plain @click="applySmtpPreset('sendgrid')">SendGrid</el-button>
+                          </div>
+                        </el-form-item>
+                      </div>
 
-            <!-- ═══ Notification Toggles ═══ -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('telegramNotify')">
-                <span>🔔 {{ $t('telegramEnabled') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramNotify }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
+                      <!-- SMTP Server Settings -->
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="8">
+                            <el-form-item :label="$t('smtpHost')">
+                              <el-input
+                                v-model="mailConfig.smtp_host"
+                                :placeholder="$t('smtpHostPlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('smtpHostHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="4">
+                            <el-form-item :label="$t('smtpPort')">
+                              <el-input-number
+                                v-model="mailConfig.smtp_port"
+                                :min="1"
+                                :max="65535"
+                                style="width: 100%"
+                              />
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="5">
+                            <el-form-item :label="$t('useTls')">
+                              <div class="toggle-item" style="padding: 0;">
+                                <el-switch v-model="mailConfig.use_tls" @change="onTlsChange" />
+                                <div class="toggle-info">
+                                  <span class="toggle-hint">{{ $t('useTlsHint') }}</span>
+                                </div>
+                              </div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="5">
+                            <el-form-item :label="$t('useSsl')">
+                              <div class="toggle-item" style="padding: 0;">
+                                <el-switch v-model="mailConfig.use_ssl" @change="onSslChange" />
+                                <div class="toggle-info">
+                                  <span class="toggle-hint">{{ $t('useSslHint') }}</span>
+                                </div>
+                              </div>
+                            </el-form-item>
+                          </el-col>
+                        </el-row>
+                      </div>
+
+                      <!-- Credentials -->
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="12">
+                            <el-form-item :label="$t('smtpUsername')">
+                              <el-input
+                                v-model="mailConfig.username"
+                                :placeholder="$t('smtpUsernamePlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('smtpUsernameHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="12">
+                            <el-form-item :label="$t('smtpPassword')">
+                              <el-input
+                                v-model="mailConfig.password"
+                                type="password"
+                                show-password
+                                :placeholder="$t('smtpPasswordPlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('smtpPasswordHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                        </el-row>
+                      </div>
+
+                      <!-- From / Recipients -->
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="8">
+                            <el-form-item :label="$t('fromName')">
+                              <el-input
+                                v-model="mailConfig.from_name"
+                                :placeholder="$t('fromNamePlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('fromNameHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="8">
+                            <el-form-item :label="$t('fromAddress')">
+                              <el-input
+                                v-model="mailConfig.from_address"
+                                :placeholder="$t('fromAddressPlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('fromAddressHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="8">
+                            <el-form-item :label="$t('mailRecipients')">
+                              <el-input
+                                v-model="mailConfig.recipients"
+                                :placeholder="$t('mailRecipientsPlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('mailRecipientsHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                        </el-row>
+                      </div>
+                    </div>
+                  </Transition>
                 </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.telegramNotify" class="inner-card-body">
-                  <div class="form-group">
-                    <el-row :gutter="20">
-                      <el-col :span="8">
-                        <div class="toggle-item">
-                          <el-switch v-model="telegramConfig.notify_on_alert" />
-                          <div class="toggle-info">
-                            <span class="toggle-label">{{ $t('telegramNotifyAlert') }}</span>
-                            <span class="toggle-hint">{{ $t('telegramNotifyAlertHint') }}</span>
-                          </div>
-                        </div>
-                      </el-col>
-                      <el-col :span="8">
-                        <div class="toggle-item">
-                          <el-switch v-model="telegramConfig.notify_on_resolved" />
-                          <div class="toggle-info">
-                            <span class="toggle-label">{{ $t('telegramNotifyResolved') }}</span>
-                            <span class="toggle-hint">{{ $t('telegramNotifyResolvedHint') }}</span>
-                          </div>
-                        </div>
-                      </el-col>
-                      <el-col :span="8">
-                        <div class="toggle-item">
-                          <el-switch v-model="telegramConfig.notify_on_diagnosis" />
-                          <div class="toggle-info">
-                            <span class="toggle-label">{{ $t('telegramNotifyDiagnosis') }}</span>
-                            <span class="toggle-hint">{{ $t('telegramNotifyDiagnosisHint') }}</span>
-                          </div>
-                        </div>
-                      </el-col>
-                    </el-row>
+
+                <!-- Notification Toggles -->
+                <div class="inner-card">
+                  <div class="inner-card-header" @click="toggleInner('mailNotify')">
+                    <span>🔔 {{ $t('notifyOnAlert') }}</span>
+                    <div class="collapse-chevron small" :class="{ rotated: innerSections.mailNotify }">
+                      <el-icon :size="14"><ArrowDown /></el-icon>
+                    </div>
                   </div>
-                </div>
-              </Transition>
-            </div>
+                  <Transition name="collapse-body">
+                    <div v-show="innerSections.mailNotify" class="inner-card-body">
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="8">
+                            <div class="toggle-item">
+                              <el-switch v-model="mailConfig.notify_on_alert" />
+                              <div class="toggle-info">
+                                <span class="toggle-label">{{ $t('notifyOnAlert') }}</span>
+                                <span class="toggle-hint">{{ $t('notifyOnAlertHint') }}</span>
+                              </div>
+                            </div>
+                          </el-col>
+                          <el-col :span="8">
+                            <div class="toggle-item">
+                              <el-switch v-model="mailConfig.notify_on_diagnosis" />
+                              <div class="toggle-info">
+                                <span class="toggle-label">{{ $t('notifyOnDiagnosis') }}</span>
+                                <span class="toggle-hint">{{ $t('notifyOnDiagnosisHint') }}</span>
+                              </div>
+                            </div>
+                          </el-col>
+                          <el-col :span="8">
+                            <div class="toggle-item">
+                              <el-switch v-model="mailConfig.notify_on_health" />
+                              <div class="toggle-info">
+                                <span class="toggle-label">{{ $t('notifyOnHealth') }}</span>
+                                <span class="toggle-hint">{{ $t('notifyOnHealthHint') }}</span>
+                              </div>
+                            </div>
+                          </el-col>
+                        </el-row>
+                      </div>
 
-            <!-- ═══ Setup Guide ═══ -->
-            <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('telegramGuide')">
-                <span>📖 {{ $t('telegramSetupGuide') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramGuide }">
-                  <el-icon :size="14"><ArrowDown /></el-icon>
+                      <!-- Thresholds -->
+                      <el-divider />
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="12">
+                            <el-form-item :label="$t('healthCheckInterval')">
+                              <el-input-number
+                                v-model="mailConfig.health_check_interval"
+                                :min="30"
+                                :max="3600"
+                                :step="30"
+                                style="width: 100%"
+                              />
+                              <div class="form-hint">{{ $t('healthCheckIntervalHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="12">
+                            <el-form-item :label="$t('slowQueryThreshold')">
+                              <el-input-number
+                                v-model="mailConfig.slow_query_threshold"
+                                :min="0.5"
+                                :max="60"
+                                :step="0.5"
+                                :precision="1"
+                                style="width: 100%"
+                              />
+                              <div class="form-hint">{{ $t('slowQueryThresholdHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                        </el-row>
+                      </div>
+                    </div>
+                  </Transition>
                 </div>
-              </div>
-              <Transition name="collapse-body">
-                <div v-show="innerSections.telegramGuide" class="inner-card-body">
-                  <div class="guide-steps">
-                    <p>{{ $t('telegramStep1') }}</p>
-                    <p>{{ $t('telegramStep2') }}</p>
-                    <p>{{ $t('telegramStep3') }}</p>
-                    <p>{{ $t('telegramStep4') }}</p>
-                    <p>{{ $t('telegramStep5') }}</p>
+
+                <!-- Setup Guide -->
+                <div class="inner-card">
+                  <div class="inner-card-header" @click="toggleInner('mailGuide')">
+                    <span>📖 {{ $t('mailSetupGuide') }}</span>
+                    <div class="collapse-chevron small" :class="{ rotated: innerSections.mailGuide }">
+                      <el-icon :size="14"><ArrowDown /></el-icon>
+                    </div>
                   </div>
+                  <Transition name="collapse-body">
+                    <div v-show="innerSections.mailGuide" class="inner-card-body">
+                      <div class="guide-steps">
+                        <p>{{ $t('mailStep1') }}</p>
+                        <p>{{ $t('mailStep2') }}</p>
+                        <p>{{ $t('mailStep3') }}</p>
+                        <p>{{ $t('mailStep4') }}</p>
+                        <p>{{ $t('mailStep5') }}</p>
+                      </div>
+                    </div>
+                  </Transition>
                 </div>
-              </Transition>
-            </div>
 
-            <!-- Action buttons -->
-            <div class="telegram-actions">
-              <el-button
-                type="default"
-                :loading="testingTelegram"
-                @click="onTestTelegram"
-                :disabled="!telegramConfig.bot_token_set && !telegramConfig.bot_token"
-              >
-                <el-icon style="margin-right: 6px;"><Connection /></el-icon>
-                {{ $t('telegramTestSend') }}
-              </el-button>
-              <el-button type="primary" :loading="savingTelegram" @click="onSaveTelegram">
-                <el-icon style="margin-right: 6px;"><Check /></el-icon>
-                {{ $t('save') }}
-              </el-button>
-            </div>
-          </el-form>
+                <!-- Action buttons -->
+                <div class="telegram-actions">
+                  <el-button
+                    type="default"
+                    :loading="testingMail"
+                    @click="onTestMail"
+                    :disabled="!mailConfig.smtp_host || !mailConfig.username"
+                  >
+                    <el-icon style="margin-right: 6px;"><Connection /></el-icon>
+                    {{ $t('testConnection') }}
+                  </el-button>
+                  <el-button type="primary" :loading="savingMail" @click="onSaveMail">
+                    <el-icon style="margin-right: 6px;"><Check /></el-icon>
+                    {{ $t('save') }}
+                  </el-button>
+                </div>
+              </el-form>
+            </el-tab-pane>
+
+            <!-- ════════════════════════════════════════════════ -->
+            <!-- TAB: Telegram                                   -->
+            <!-- ════════════════════════════════════════════════ -->
+            <el-tab-pane :label="$t('notificationTabTelegram')" name="telegram">
+              <template #label>
+                <span class="tab-label-custom">
+                  <span>✈️</span>
+                  <span>{{ $t('notificationTabTelegram') }}</span>
+                  <el-tag v-if="telegramConfig.bot_token_set" type="success" size="small" effect="plain" round style="margin-left: 6px;">{{ $t('telegramBotConnected') }}</el-tag>
+                </span>
+              </template>
+              <el-form label-position="top" class="telegram-form" v-loading="telegramLoading">
+
+                <!-- ═══ Bot Settings ═══ -->
+                <div class="inner-card">
+                  <div class="inner-card-header" @click="toggleInner('telegramBot')">
+                    <span>🤖 {{ $t('telegramBotToken') }}</span>
+                    <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramBot }">
+                      <el-icon :size="14"><ArrowDown /></el-icon>
+                    </div>
+                  </div>
+                  <Transition name="collapse-body">
+                    <div v-show="innerSections.telegramBot" class="inner-card-body">
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="16">
+                            <el-form-item :label="$t('telegramBotToken')">
+                              <el-input
+                                v-model="telegramConfig.bot_token"
+                                :placeholder="$t('telegramBotTokenPlaceholder')"
+                                clearable
+                                type="password"
+                                show-password
+                              />
+                              <div class="form-hint">
+                                {{ $t('telegramBotTokenHint') }}
+                                <span v-if="telegramConfig.bot_token_set" class="token-status token-set"> — {{ $t('tokenSetLeaveBlank') }}</span>
+                              </div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="8">
+                            <el-form-item label="Status">
+                              <div v-if="telegramConfig.bot_username" style="display:flex; align-items:center; gap:8px; padding-top: 4px;">
+                                <el-tag type="success" effect="plain" round>
+                                  <span>@{{ telegramConfig.bot_username }}</span>
+                                </el-tag>
+                              </div>
+                              <div v-else style="padding-top: 8px; color: var(--el-text-color-placeholder); font-size: 13px;">
+                                {{ $t('telegramBotNotConnected') }}
+                              </div>
+                            </el-form-item>
+                          </el-col>
+                        </el-row>
+                      </div>
+
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="8">
+                            <el-form-item :label="$t('telegramAdminChatId')">
+                              <el-input
+                                v-model="telegramConfig.admin_chat_id"
+                                :placeholder="$t('telegramAdminChatIdPlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('telegramAdminChatIdHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="8">
+                            <el-form-item :label="$t('telegramExtraChatIds')">
+                              <el-input
+                                v-model="telegramConfig.extra_chat_ids"
+                                :placeholder="$t('telegramExtraChatIdsPlaceholder')"
+                                clearable
+                              />
+                              <div class="form-hint">{{ $t('telegramExtraChatIdsHint') }}</div>
+                            </el-form-item>
+                          </el-col>
+                          <el-col :span="8" style="display: flex; align-items: flex-end; padding-bottom: 18px;">
+                            <el-button
+                              type="default"
+                              :loading="findingChatId"
+                              @click="onFindChatId"
+                              :disabled="!telegramConfig.bot_token_set && !telegramConfig.bot_token"
+                            >
+                              <el-icon style="margin-right: 6px;"><Search /></el-icon>
+                              {{ $t('telegramFindChatId') }}
+                            </el-button>
+                          </el-col>
+                        </el-row>
+                      </div>
+
+                      <!-- Chat ID Sonuçları -->
+                      <div v-if="foundChats.length > 0" style="margin-bottom: 16px;">
+                        <div class="form-group-title">{{ $t('telegramFoundChats') }}</div>
+                        <div v-for="chat in foundChats" :key="chat.chat_id" style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
+                          <el-tag type="info" size="small">{{ chat.type }}</el-tag>
+                          <code style="font-size: 13px; font-weight: 600;">{{ chat.chat_id }}</code>
+                          <span style="font-size: 13px; color: var(--el-text-color-secondary);">
+                            {{ chat.first_name || chat.title || chat.username || '' }}
+                          </span>
+                          <el-button size="small" type="primary" link @click="telegramConfig.admin_chat_id = String(chat.chat_id)">
+                            {{ $t('use') }}
+                          </el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+
+                <!-- ═══ Notification Toggles ═══ -->
+                <div class="inner-card">
+                  <div class="inner-card-header" @click="toggleInner('telegramNotify')">
+                    <span>🔔 {{ $t('telegramEnabled') }}</span>
+                    <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramNotify }">
+                      <el-icon :size="14"><ArrowDown /></el-icon>
+                    </div>
+                  </div>
+                  <Transition name="collapse-body">
+                    <div v-show="innerSections.telegramNotify" class="inner-card-body">
+                      <div class="form-group">
+                        <el-row :gutter="20">
+                          <el-col :span="8">
+                            <div class="toggle-item">
+                              <el-switch v-model="telegramConfig.notify_on_alert" />
+                              <div class="toggle-info">
+                                <span class="toggle-label">{{ $t('telegramNotifyAlert') }}</span>
+                                <span class="toggle-hint">{{ $t('telegramNotifyAlertHint') }}</span>
+                              </div>
+                            </div>
+                          </el-col>
+                          <el-col :span="8">
+                            <div class="toggle-item">
+                              <el-switch v-model="telegramConfig.notify_on_resolved" />
+                              <div class="toggle-info">
+                                <span class="toggle-label">{{ $t('telegramNotifyResolved') }}</span>
+                                <span class="toggle-hint">{{ $t('telegramNotifyResolvedHint') }}</span>
+                              </div>
+                            </div>
+                          </el-col>
+                          <el-col :span="8">
+                            <div class="toggle-item">
+                              <el-switch v-model="telegramConfig.notify_on_diagnosis" />
+                              <div class="toggle-info">
+                                <span class="toggle-label">{{ $t('telegramNotifyDiagnosis') }}</span>
+                                <span class="toggle-hint">{{ $t('telegramNotifyDiagnosisHint') }}</span>
+                              </div>
+                            </div>
+                          </el-col>
+                        </el-row>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+
+                <!-- ═══ Setup Guide ═══ -->
+                <div class="inner-card">
+                  <div class="inner-card-header" @click="toggleInner('telegramGuide')">
+                    <span>📖 {{ $t('telegramSetupGuide') }}</span>
+                    <div class="collapse-chevron small" :class="{ rotated: innerSections.telegramGuide }">
+                      <el-icon :size="14"><ArrowDown /></el-icon>
+                    </div>
+                  </div>
+                  <Transition name="collapse-body">
+                    <div v-show="innerSections.telegramGuide" class="inner-card-body">
+                      <div class="guide-steps">
+                        <p>{{ $t('telegramStep1') }}</p>
+                        <p>{{ $t('telegramStep2') }}</p>
+                        <p>{{ $t('telegramStep3') }}</p>
+                        <p>{{ $t('telegramStep4') }}</p>
+                        <p>{{ $t('telegramStep5') }}</p>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="telegram-actions">
+                  <el-button
+                    type="default"
+                    :loading="testingTelegram"
+                    @click="onTestTelegram"
+                    :disabled="!telegramConfig.bot_token_set && !telegramConfig.bot_token"
+                  >
+                    <el-icon style="margin-right: 6px;"><Connection /></el-icon>
+                    {{ $t('telegramTestSend') }}
+                  </el-button>
+                  <el-button type="primary" :loading="savingTelegram" @click="onSaveTelegram">
+                    <el-icon style="margin-right: 6px;"><Check /></el-icon>
+                    {{ $t('save') }}
+                  </el-button>
+                </div>
+              </el-form>
+            </el-tab-pane>
+
+          </el-tabs>
         </div>
       </Transition>
     </div>
 
     <!-- ══════════════════════════════════════════════════════════ -->
-    <!-- SECTION 5 — DB Connection Management (collapsible)       -->
+    <!-- SECTION 4 — DB Connection Management (collapsible)       -->
     <!-- ══════════════════════════════════════════════════════════ -->
     <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.dbTargets }">
       <div class="collapse-card-header" @click="toggleSection('dbTargets')">
@@ -1047,37 +1047,63 @@
                         <el-input-number v-model="newDbTarget.ssh_port" :min="1" :max="65535" :disabled="!newDbTarget.ssh_enabled" style="width: 100%" controls-position="right" />
                       </el-form-item>
                     </el-col>
-                    <el-col :span="4">
+                    <el-col :span="5">
                       <el-form-item :label="$t('sshUser')">
                         <el-input v-model="newDbTarget.ssh_user" :placeholder="$t('sshUserPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
                       </el-form-item>
                     </el-col>
-                    <el-col :span="4">
-                      <el-form-item :label="$t('sshPassword')">
-                        <el-input v-model="newDbTarget.ssh_password" type="password" show-password placeholder="••••" :disabled="!newDbTarget.ssh_enabled" clearable />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="5">
-                      <el-form-item :label="$t('sshKeyPath')">
-                        <el-input v-model="newDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-                  <el-row :gutter="16" v-if="newDbTarget.ssh_enabled">
-                    <el-col :span="24">
-                      <el-form-item :label="$t('sshKeyContent')">
-                        <el-input
-                          v-model="newDbTarget.ssh_key_content"
-                          type="textarea"
-                          :rows="4"
-                          :placeholder="$t('sshKeyContentPlaceholder')"
-                          :disabled="!newDbTarget.ssh_enabled"
-                          style="font-family: monospace; font-size: 12px;"
-                        />
-                        <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('sshAuthMethod')">
+                        <el-radio-group v-model="newDbTarget.ssh_auth_type" :disabled="!newDbTarget.ssh_enabled">
+                          <el-radio-button label="key">🔑 {{ $t('sshAuthKey') }}</el-radio-button>
+                          <el-radio-button label="password">🔒 {{ $t('sshAuthPassword') }}</el-radio-button>
+                        </el-radio-group>
                       </el-form-item>
                     </el-col>
                   </el-row>
+
+                  <!-- SSH Key Auth -->
+                  <div v-if="newDbTarget.ssh_enabled && newDbTarget.ssh_auth_type === 'key'">
+                    <el-row :gutter="16">
+                      <el-col :span="12">
+                        <el-form-item :label="$t('sshKeyPath')">
+                          <el-input v-model="newDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" clearable />
+                          <div class="form-hint">{{ $t('sshKeyPathHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="12">
+                        <el-form-item :label="$t('sshKeyPassphrase')">
+                          <el-input v-model="newDbTarget.ssh_key_passphrase" type="password" show-password :placeholder="$t('sshKeyPassphrasePlaceholder')" clearable />
+                          <div class="form-hint">{{ $t('sshKeyPassphraseHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                    <el-row :gutter="16">
+                      <el-col :span="24">
+                        <el-form-item :label="$t('sshKeyContent')">
+                          <el-input
+                            v-model="newDbTarget.ssh_key_content"
+                            type="textarea"
+                            :rows="4"
+                            :placeholder="$t('sshKeyContentPlaceholder')"
+                            style="font-family: monospace; font-size: 12px;"
+                          />
+                          <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                  </div>
+
+                  <!-- SSH Password Auth -->
+                  <div v-if="newDbTarget.ssh_enabled && newDbTarget.ssh_auth_type === 'password'">
+                    <el-row :gutter="16">
+                      <el-col :span="12">
+                        <el-form-item :label="$t('sshPassword')">
+                          <el-input v-model="newDbTarget.ssh_password" type="password" show-password placeholder="••••" clearable />
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                  </div>
 
                   <!-- Ekle Butonu -->
                   <el-row :gutter="16" style="margin-top: 8px;">
@@ -1086,7 +1112,6 @@
                         type="primary"
                         :loading="addingDbTarget"
                         @click="onAddDbTarget"
-                        :disabled="!newDbTarget.name || !newDbTarget.host || !newDbTarget.user || !newDbTarget.dbname"
                       >
                         <el-icon style="margin-right: 6px;"><Plus /></el-icon>
                         {{ $t('dbTargetAdd') }}
@@ -1242,7 +1267,7 @@
               <el-switch v-model="editDbTarget.ssh_enabled" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item :label="$t('sshHost')">
               <el-input v-model="editDbTarget.ssh_host" :placeholder="$t('sshHostPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
             </el-form-item>
@@ -1252,39 +1277,63 @@
               <el-input-number v-model="editDbTarget.ssh_port" :min="1" :max="65535" :disabled="!editDbTarget.ssh_enabled" style="width: 100%" controls-position="right" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item :label="$t('sshUser')">
               <el-input v-model="editDbTarget.ssh_user" :placeholder="$t('sshUserPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="16" v-if="editDbTarget.ssh_enabled">
-          <el-col :span="8">
-            <el-form-item :label="$t('sshPassword')">
-              <el-input v-model="editDbTarget.ssh_password" type="password" show-password :placeholder="$t('editPasswordPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
-            </el-form-item>
-          </el-col>
-          <el-col :span="16">
-            <el-form-item :label="$t('sshKeyPath')">
-              <el-input v-model="editDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" :disabled="!editDbTarget.ssh_enabled" clearable />
+          <el-col :span="4">
+            <el-form-item :label="$t('sshAuthMethod')">
+              <el-radio-group v-model="editDbTarget.ssh_auth_type" :disabled="!editDbTarget.ssh_enabled" size="small">
+                <el-radio-button label="key">🔑 {{ $t('sshAuthKey') }}</el-radio-button>
+                <el-radio-button label="password">🔒 {{ $t('sshAuthPassword') }}</el-radio-button>
+              </el-radio-group>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="16" v-if="editDbTarget.ssh_enabled">
-          <el-col :span="24">
-            <el-form-item :label="$t('sshKeyContent')">
-              <el-input
-                v-model="editDbTarget.ssh_key_content"
-                type="textarea"
-                :rows="4"
-                :placeholder="$t('sshKeyContentPlaceholder')"
-                :disabled="!editDbTarget.ssh_enabled"
-                style="font-family: monospace; font-size: 12px;"
-              />
-              <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
-            </el-form-item>
-          </el-col>
-        </el-row>
+
+        <!-- SSH Key Auth -->
+        <div v-if="editDbTarget.ssh_enabled && editDbTarget.ssh_auth_type === 'key'">
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item :label="$t('sshKeyPath')">
+                <el-input v-model="editDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" clearable />
+                <div class="form-hint">{{ $t('sshKeyPathHint') }}</div>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item :label="$t('sshKeyPassphrase')">
+                <el-input v-model="editDbTarget.ssh_key_passphrase" type="password" show-password :placeholder="$t('sshKeyPassphrasePlaceholder')" clearable />
+                <div class="form-hint">{{ $t('sshKeyPassphraseHint') }}</div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="24">
+              <el-form-item :label="$t('sshKeyContent')">
+                <el-input
+                  v-model="editDbTarget.ssh_key_content"
+                  type="textarea"
+                  :rows="4"
+                  :placeholder="$t('sshKeyContentPlaceholder')"
+                  style="font-family: monospace; font-size: 12px;"
+                />
+                <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- SSH Password Auth -->
+        <div v-if="editDbTarget.ssh_enabled && editDbTarget.ssh_auth_type === 'password'">
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item :label="$t('sshPassword')">
+                <el-input v-model="editDbTarget.ssh_password" type="password" show-password :placeholder="$t('editPasswordPlaceholder')" clearable />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="showEditDbDialog = false">{{ $t('cancel') }}</el-button>
@@ -1347,8 +1396,7 @@ const isAdmin = computed(() => basicStore.roles.includes('admin'))
 const sections = reactive({
   users: true,
   litellm: true,
-  mail: false,
-  telegram: false,
+  notifications: false,
   dbTargets: false,
 })
 const innerSections = reactive({
@@ -1366,6 +1414,7 @@ const innerSections = reactive({
 })
 const toggleSection = (key) => { sections[key] = !sections[key] }
 const toggleInner = (key) => { innerSections[key] = !innerSections[key] }
+const activeNotificationTab = ref('email')
 
 const loading = ref(false)
 const users = ref([])
@@ -1817,6 +1866,7 @@ const newDbTarget = reactive({
   ssl_ca_path: '',
   ssl_cert_path: '',
   ssl_key_path: '',
+  ssh_auth_type: 'key',
   ssh_enabled: false,
   ssh_host: '',
   ssh_port: 22,
@@ -1824,6 +1874,7 @@ const newDbTarget = reactive({
   ssh_password: '',
   ssh_key_path: '',
   ssh_key_content: '',
+  ssh_key_passphrase: '',
 })
 
 // Edit dialog state
@@ -1844,6 +1895,7 @@ const editDbTarget = reactive({
   ssl_ca_path: '',
   ssl_cert_path: '',
   ssl_key_path: '',
+  ssh_auth_type: 'key',
   ssh_enabled: false,
   ssh_host: '',
   ssh_port: 22,
@@ -1851,6 +1903,7 @@ const editDbTarget = reactive({
   ssh_password: '',
   ssh_key_path: '',
   ssh_key_content: '',
+  ssh_key_passphrase: '',
 })
 
 const fetchDbTargets = async () => {
@@ -1868,6 +1921,16 @@ const fetchDbTargets = async () => {
 }
 
 const onAddDbTarget = async () => {
+  // Zorunlu alan kontrolü
+  const missing = []
+  if (!newDbTarget.name?.trim()) missing.push('Name')
+  if (!newDbTarget.host?.trim()) missing.push('Host')
+  if (!newDbTarget.user?.trim()) missing.push('User')
+  if (!newDbTarget.dbname?.trim()) missing.push('Database')
+  if (missing.length) {
+    ElMessage.warning(`Lütfen zorunlu alanları doldurun: ${missing.join(', ')}`)
+    return
+  }
   addingDbTarget.value = true
   try {
     const res = await addDbTargetReq({
@@ -1885,12 +1948,14 @@ const onAddDbTarget = async () => {
       ssl_cert_path: newDbTarget.ssl_cert_path,
       ssl_key_path: newDbTarget.ssl_key_path,
       ssh_enabled: newDbTarget.ssh_enabled,
+      ssh_auth_type: newDbTarget.ssh_auth_type,
       ssh_host: newDbTarget.ssh_host,
       ssh_port: newDbTarget.ssh_port,
       ssh_user: newDbTarget.ssh_user,
-      ssh_password: newDbTarget.ssh_password,
-      ssh_key_path: newDbTarget.ssh_key_path,
-      ssh_key_content: newDbTarget.ssh_key_content,
+      ssh_password: newDbTarget.ssh_auth_type === 'password' ? newDbTarget.ssh_password : '',
+      ssh_key_path: newDbTarget.ssh_auth_type === 'key' ? newDbTarget.ssh_key_path : '',
+      ssh_key_content: newDbTarget.ssh_auth_type === 'key' ? newDbTarget.ssh_key_content : '',
+      ssh_key_passphrase: newDbTarget.ssh_auth_type === 'key' ? newDbTarget.ssh_key_passphrase : '',
     })
     if (res.code === 200) {
       ElMessage.success(res.msg)
@@ -1907,12 +1972,14 @@ const onAddDbTarget = async () => {
       newDbTarget.ssl_cert_path = ''
       newDbTarget.ssl_key_path = ''
       newDbTarget.ssh_enabled = false
+      newDbTarget.ssh_auth_type = 'key'
       newDbTarget.ssh_host = ''
       newDbTarget.ssh_port = 22
       newDbTarget.ssh_user = ''
       newDbTarget.ssh_password = ''
       newDbTarget.ssh_key_path = ''
       newDbTarget.ssh_key_content = ''
+      newDbTarget.ssh_key_passphrase = ''
       fetchDbTargets()
     } else {
       ElMessage.error(res.msg || 'Error')
@@ -2019,12 +2086,14 @@ const onEditDbTarget = (row) => {
   editDbTarget.ssl_cert_path = row.ssl_cert_path || ''
   editDbTarget.ssl_key_path = row.ssl_key_path || ''
   editDbTarget.ssh_enabled = row.ssh_enabled || false
+  editDbTarget.ssh_auth_type = row.ssh_auth_type || (row.ssh_key_path || row.ssh_key_content ? 'key' : 'password')
   editDbTarget.ssh_host = row.ssh_host || ''
   editDbTarget.ssh_port = row.ssh_port || 22
   editDbTarget.ssh_user = row.ssh_user || ''
   editDbTarget.ssh_password = ''
   editDbTarget.ssh_key_path = row.ssh_key_path || ''
   editDbTarget.ssh_key_content = ''
+  editDbTarget.ssh_key_passphrase = ''
   showEditDbDialog.value = true
 }
 
@@ -2046,6 +2115,7 @@ const onSaveEditDbTarget = async () => {
       ssl_cert_path: editDbTarget.ssl_cert_path,
       ssl_key_path: editDbTarget.ssl_key_path,
       ssh_enabled: editDbTarget.ssh_enabled,
+      ssh_auth_type: editDbTarget.ssh_auth_type,
       ssh_host: editDbTarget.ssh_host,
       ssh_port: editDbTarget.ssh_port,
       ssh_user: editDbTarget.ssh_user,
@@ -2055,6 +2125,7 @@ const onSaveEditDbTarget = async () => {
     if (editDbTarget.password) payload.password = editDbTarget.password
     if (editDbTarget.ssh_password) payload.ssh_password = editDbTarget.ssh_password
     if (editDbTarget.ssh_key_content) payload.ssh_key_content = editDbTarget.ssh_key_content
+    if (editDbTarget.ssh_key_passphrase) payload.ssh_key_passphrase = editDbTarget.ssh_key_passphrase
 
     const res = await updateDbTargetReq(payload)
     if (res.code === 200) {
@@ -2293,6 +2364,11 @@ const onSubmitPassword = () => {
     color: #2563eb;
   }
 
+  &.notification-icon {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #d97706;
+  }
+
   &.db-icon {
     background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
     color: #059669;
@@ -2460,6 +2536,42 @@ const onSubmitPassword = () => {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--el-border-color-lighter);
+}
+
+/* ══════════════════════════════════════════════════════════ */
+/*  Notification Tabs                                        */
+/* ══════════════════════════════════════════════════════════ */
+.notification-tabs {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+
+  :deep(.el-tabs__header) {
+    background: var(--el-fill-color-extra-light);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    border: 1px solid var(--el-border-color-extra-light);
+  }
+
+  :deep(.el-tabs__content) {
+    padding: 0;
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: 13px;
+    height: 40px;
+    line-height: 40px;
+  }
+
+  :deep(.el-tabs__item.is-active) {
+    font-weight: 600;
+  }
+}
+
+.tab-label-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ══════════════════════════════════════════════════════════ */

@@ -34,5 +34,33 @@
     "created_at": "2026-03-02 18:36:10",
     "last_tested": "2026-03-02 18:36:12",
     "last_status": "ok"
+  },
+  {
+    "id": "898de1c6",
+    "name": "mysql",
+    "db_type": "mysql",
+    "host": "192.168.1.202",
+    "port": 3306,
+    "user": "remoteuser",
+    "password": "YeniSifre123*",
+    "dbname": "mysql",
+    "is_primary": false,
+    "ssl_enabled": false,
+    "ssl_mode": "require",
+    "ssl_ca_path": "",
+    "ssl_cert_path": "",
+    "ssl_key_path": "",
+    "ssh_enabled": true,
+    "ssh_host": "192.168.1.202",
+    "ssh_port": 22,
+    "ssh_user": "anomivox-llm",
+    "ssh_password": "1q2w3e",
+    "ssh_key_path": "",
+    "ssh_key_content": "",
+    "ssh_last_tested": "2026-03-02 19:53:02",
+    "ssh_last_status": "ok",
+    "created_at": "2026-03-02 19:52:53",
+    "last_tested": null,
+    "last_status": null
   }
 ]

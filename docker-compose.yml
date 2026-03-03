@@ -22,7 +22,7 @@ services:
       HF_HUB_OFFLINE: "0"
       TRANSFORMERS_OFFLINE: "0"
       # LiteLLM Proxy bağlantısı (model yönetim UI için)
-      LITELLM_BASE_URL: http://litellm-proxy:4000
+      LITELLM_BASE_URL: http://ai-agent-gateway:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
       # DBA Agent bağlantısı
       DBA_AGENT_URL: http://dba-agent:8100

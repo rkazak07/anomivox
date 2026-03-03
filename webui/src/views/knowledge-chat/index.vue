@@ -8,7 +8,7 @@
             class="llm-select"
             placeholder="Select"
             size="default"
-            style="width: 120px"
+            style="width: 200px"
         >
           <template #empty>
             <div class="el-select__empty">{{ $t('noData') }}</div>
@@ -29,7 +29,7 @@
             class="llm-select"
             placeholder="Select"
             size="default"
-            style="width: 120px"
+            style="width: 200px"
         >
           <template #empty>
             <div class="el-select__empty">{{ $t('noData') }}</div>

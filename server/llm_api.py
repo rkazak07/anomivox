@@ -3,9 +3,35 @@ from configs import logger, log_verbose, LLM_MODELS, HTTPX_DEFAULT_TIMEOUT
 from server.utils import (BaseResponse, fschat_controller_address, list_config_llm_models,
                           get_httpx_client, get_model_worker_config)
 from typing import List
+import os, httpx
+
 
 def llm_model() -> BaseResponse:
-    return BaseResponse(data=LLM_MODELS)
+    """Return configured LLM_MODELS + AI-Gateway (LiteLLM) models (prefixed with 'litellm/')."""
+    models = list(LLM_MODELS)
+
+    # ── Fetch LiteLLM proxy runtime models ─────────────────
+    litellm_base = os.environ.get("LITELLM_BASE_URL", "http://ai-agent-gateway:4000")
+    litellm_key = os.environ.get("LITELLM_MASTER_KEY",
+                                 os.environ.get("LITELLM_API_KEY", "sk-anomivox-local"))
+    try:
+        with httpx.Client(timeout=5) as client:
+            resp = client.get(
+                f"{litellm_base}/v1/models",
+                headers={"Authorization": f"Bearer {litellm_key}"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                for m in data.get("data", []):
+                    model_id = m.get("id", "")
+                    if model_id:
+                        prefixed = f"ai-gw-agent/{model_id}"
+                        if prefixed not in models:
+                            models.append(prefixed)
+    except Exception as e:
+        logger.debug(f"LiteLLM model list fetch skipped: {e}")
+
+    return BaseResponse(data=models)
 def list_running_models(
     controller_address: str = Body(None, description="FastChat controller server address", examples=[fschat_controller_address()]),
     placeholder: str = Body(None, description="This parameter is unused, placeholder only"),

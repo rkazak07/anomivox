@@ -42,6 +42,27 @@ def get_ChatOpenAI(
         verbose: bool = True,
         **kwargs: Any,
 ) -> ChatOpenAI:
+    # ── LiteLLM / AI Gateway models ──────────────────────
+    # model_name like "ai-gw-agent/llama3.1:8b" → route through LiteLLM proxy
+    if model_name.startswith("ai-gw-agent/"):
+        actual_model = model_name[len("ai-gw-agent/"):]  # strip prefix
+        litellm_base = os.environ.get("LITELLM_BASE_URL", "http://ai-agent-gateway:4000")
+        litellm_key = os.environ.get("LITELLM_MASTER_KEY",
+                                     os.environ.get("LITELLM_API_KEY", "sk-anomivox-local"))
+        model = ChatOpenAI(
+            streaming=streaming,
+            verbose=verbose,
+            callbacks=callbacks,
+            openai_api_key=litellm_key,
+            openai_api_base=f"{litellm_base}/v1",
+            model_name=actual_model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs
+        )
+        return model
+
+    # ── Classic config-based models (groq-api, openai-api, …) ──
     config = get_model_worker_config(model_name)
     if config.get("online_api") and config.get("model_name"):
         model_name = config.get("model_name")

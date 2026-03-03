@@ -109,7 +109,7 @@ export const knowledgeChatReq = (query, ignoreCache, answerCache, knowledgeBaseN
   return fetchData('chat/knowledge_base_chat', {
     query, ignore_cache: ignoreCache, answer_cache: answerCache, knowledge_base_name: knowledgeBaseName,
     model_name: modelName, history, prompt_name: getPromptName(),
-    temperature: 0.7, max_tokens: 0, top_k: 3, score_threshold: 0.5, history_len: historyLen, stream: true
+    temperature: 0.7, max_tokens: 0, top_k: 3, score_threshold: 2.0, history_len: historyLen, stream: true
   })
 }
 
@@ -134,6 +134,60 @@ export const knowledgeUploadDocsReq = (knowledgeBaseName, files, chunkSize = 250
 }
 
 // ── Conversation (Sohbet) API ─────────────────────────────
+
+// ── KB General Settings API ───────────────────────────────
+
+export const getKbSettingsReq = () => {
+  return axiosReq({
+    url: 'knowledge_base/settings/config',
+    method: 'get',
+    reqLoading: false
+  })
+}
+
+export const saveKbSettingsReq = (config) => {
+  return axiosReq({
+    url: 'knowledge_base/settings/config',
+    data: config,
+    method: 'post'
+  })
+}
+
+// ── KB Auto-Ingest API ────────────────────────────────────
+
+export const getAutoIngestConfigReq = () => {
+  return axiosReq({
+    url: 'knowledge_base/auto_ingest/config',
+    method: 'get',
+    reqLoading: false
+  })
+}
+
+export const saveAutoIngestConfigReq = (config) => {
+  return axiosReq({
+    url: 'knowledge_base/auto_ingest/config',
+    data: config,
+    method: 'post'
+  })
+}
+
+export const manualIngestReq = (filePath) => {
+  return axiosReq({
+    url: 'knowledge_base/auto_ingest/manual',
+    data: { file_path: filePath },
+    method: 'post'
+  })
+}
+
+export const getAutoIngestStatsReq = () => {
+  return axiosReq({
+    url: 'knowledge_base/auto_ingest/stats',
+    method: 'get',
+    reqLoading: false
+  })
+}
+
+// ── Conversation (Sohbet) API (continued) ─────────────────
 
 export const createConversationReq = (name = 'Yeni Sohbet', chatType = 'llm_chat') => {
   return axiosReq({ url: 'chat/conversations', data: { name, chat_type: chatType }, method: 'post' })

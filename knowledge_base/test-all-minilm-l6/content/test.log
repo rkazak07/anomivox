@@ -1,0 +1,18 @@
+2026-03-03 14:30:01.123 UTC [101] LOG:  database system was shut down at 2026-03-03 14:25:00 UTC
+2026-03-03 14:30:01.456 UTC [101] LOG:  database system is ready to accept connections
+2026-03-03 14:30:05.789 UTC [105] LOG:  connection received: host=192.168.1.10 port=5432 user=postgres
+2026-03-03 14:30:05.790 UTC [105] LOG:  connection authorized: user=postgres database=postgres
+2026-03-03 14:30:10.234 UTC [106] ERROR:  relation "users" does not exist at character 15
+2026-03-03 14:30:10.234 UTC [106] STATEMENT:  SELECT * FROM users;
+2026-03-03 14:30:12.567 UTC [107] WARNING:  there is already a transaction in progress
+2026-03-03 14:30:15.890 UTC [108] ERROR:  division by zero
+2026-03-03 14:30:15.890 UTC [108] STATEMENT:  SELECT 10 / 0;
+2026-03-03 14:30:18.123 UTC [109] LOG:  checkpoint starting: time
+2026-03-03 14:30:20.456 UTC [109] LOG:  checkpoint complete: wrote 8 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; sync=fsync
+2026-03-03 14:30:25.789 UTC [110] ERROR:  syntax error at or near "SELEC"
+2026-03-03 14:30:25.789 UTC [110] STATEMENT:  SELEC * FROM orders;
+2026-03-03 14:30:30.012 UTC [111] LOG:  connection received: host=192.168.1.11 port=5432 user=test_user
+2026-03-03 14:30:30.013 UTC [111] FATAL:  password authentication failed for user "test_user"
+2026-03-03 14:30:35.345 UTC [112] LOG:  disconnection: session time: 0:00:05.123 user=postgres database=postgres host=192.168.1.10 port=5432
+2026-03-03 14:30:40.678 UTC [113] ERROR:  permission denied for relation secret_data
+2026-03-03 14:30:40.678 UTC [113] STATEMENT:  SELECT * FROM secret_data;

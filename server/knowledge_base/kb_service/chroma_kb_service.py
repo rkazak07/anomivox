@@ -1,4 +1,4 @@
-from configs import SCORE_THRESHOLD, kbs_config, VS_TYPE_PROMPT_TOTAL_BYTE_SIZE
+from configs import SCORE_THRESHOLD, kbs_config, VS_TYPE_PROMPT_TOTAL_BYTE_SIZE, logger
 from server.knowledge_base.kb_service.base import KBService, SupportedVSType, EmbeddingsFunAdapter, \
     score_threshold_process
 from server.knowledge_base.utils import KnowledgeFile, get_kb_path, get_vs_path
@@ -23,7 +23,6 @@ class ChromaKBService(KBService):
         return get_kb_path(self.kb_name)
 
     def save_vector_store(self):
-        print("==============save_vector_store=================")
         pass
 
     def get_doc_by_ids(self, ids: List[str]) -> List[Document]:
@@ -44,7 +43,7 @@ class ChromaKBService(KBService):
         pass
 
     def do_drop_kb(self):
-        print("==============do_drop_kb=================")
+        logger.info("Dropping ChromaDB knowledge base: %s", self.kb_name)
         pass
 
     def do_search(self,
@@ -72,7 +71,7 @@ class ChromaKBService(KBService):
 
             if byte_count >= VS_TYPE_PROMPT_TOTAL_BYTE_SIZE:
                 break
-        print(f"ChromaDB found {len(info_docs)} results")
+        logger.debug("ChromaDB found %d results for query: %s", len(info_docs), query[:100])
         result_file = open("chromadb_search_results.txt", "w", encoding="utf-8")
         result_file.write(f"query:{query}")
         result_file.write(f"ChromaDB found {len(info_docs)} results:\n")
@@ -82,23 +81,18 @@ class ChromaKBService(KBService):
             result_file.write("*" * 20)
             result_file.write("\n")
             result_file.flush()
-            # print(doc.page_content + "\n")
-            # print("*" * 20)
-            # print("\n")
         result_file.close()
         return info_docs
     def do_add_doc(self,
                    docs: List[Document],
                    **kwargs,
                    ) -> List[Dict]:
-        print(f"server.knowledge_base.kb_service.chroma_kb_service.do_add_doc input docs length: {len(docs)}")
-        print("*" * 100)
+        logger.debug("do_add_doc input docs length: %d", len(docs))
         texts = [doc.page_content for doc in docs]
         metadatas = [doc.metadata for doc in docs]
         ids = self.chroma.add_texts(texts, metadatas)
         doc_infos = [{"id": id, "metadata": metadata} for id, metadata in zip(ids, metadatas)]
-        print("Data written successfully.")
-        print("*"*100)
+        logger.debug("ChromaDB data written successfully, %d docs added", len(doc_infos))
         return doc_infos
 
     def do_delete_doc(self,
@@ -109,7 +103,7 @@ class ChromaKBService(KBService):
             self.chroma.delete(ids)
 
     def do_clear_vs(self):
-        print("==============do_clear_vs=================")
+        logger.info("Clearing ChromaDB vector store: %s", self.kb_name)
         pass
 
 
@@ -118,7 +112,5 @@ if __name__ == '__main__':
     # chromaService.add_doc(KnowledgeFile("C:\\Users\\hd\\Desktop\\Data-Chat\\README.md", "test"))
     # chromaService.delete_doc(KnowledgeFile("C:\\Users\\hd\\Desktop\\Data-Chat\\README.md", "test"), False)
     # ids = chromaService.chroma.get(where={"source": "C:\\Users\\hd\\Desktop\\Data-Chat\\README.md"}).get('ids')
-    # print(ids)
     docs = chromaService.do_search(query="Which departments manage donated funds at Tsinghua University", top_k=3, score_threshold=1)
-    print(docs)
 

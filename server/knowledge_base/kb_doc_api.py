@@ -26,8 +26,8 @@ def api_search_docs(
         knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
         top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Number of matching vectors"),
         score_threshold: float = Body(SCORE_THRESHOLD,
-                                      description="Match threshold, 0-1. Lower SCORE means higher relevance. 1 means no filter, 0.5 is recommended",
-                                      ge=0, le=1),
+                                      description="Match threshold. Lower SCORE means higher relevance. Use higher values to include more results.",
+                                      ge=0, le=4),
 ) -> List[DocumentWithScore]:
     data = search_docs(query, knowledge_base_name, top_k, score_threshold)
     return BaseResponse(code=200, msg="Success", data=data)
@@ -37,25 +37,9 @@ def search_docs(
         knowledge_base_name: str = Body(..., description="Knowledge base name", examples=["samples"]),
         top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Number of matching vectors"),
         score_threshold: float = Body(SCORE_THRESHOLD,
-                                      description="Match threshold, 0-1. Lower SCORE means higher relevance. 1 means no filter, 0.5 is recommended",
-                                      ge=0, le=1),
+                                      description="Match threshold. Lower SCORE means higher relevance. Use higher values to include more results.",
+                                      ge=0, le=4),
 ) -> List[DocumentWithScore]:
-    # kb = KBServiceFactory.get_service_by_name(knowledge_base_name)
-    # if kb is None:
-    #     return []
-    #
-    # docs = kb.search_docs(query, top_k, score_threshold)
-    #
-    # # remove elements with the same content in docs
-    # no_replicate_docs = []
-    # for i, doc in enumerate(docs):
-    #     if i == 0 or ('content' not in doc[0].metadata) or (
-    #             doc[0].metadata['content'] != docs[i - 1][0].metadata['content']):
-    #         no_replicate_docs.append(doc)
-    #
-    # data = [DocumentWithScore(page_content=x[0].page_content, metadata=x[0].dict()['metadata'], score=x[1]) for x in
-    #         docs]
-
     data = []
     for vs_type in DEFAULT_VS_TYPES:
         kb = KBServiceFactory.get_service(knowledge_base_name, vs_type)
@@ -64,28 +48,28 @@ def search_docs(
         docs = kb.search_docs(query, top_k * 2, score_threshold)
 
         no_replicate_docs = []
-        # import pdb; pdb.set_trace()
         for i, doc in enumerate(docs):
             if 'cause_name' in doc[0].metadata:
                 not_exist = True
                 for compare_doc in no_replicate_docs:
-                    if doc[0].metadata['cause_name'] == compare_doc[0].metadata['cause_name']:
+                    if 'cause_name' in compare_doc[0].metadata and doc[0].metadata['cause_name'] == compare_doc[0].metadata['cause_name']:
                         not_exist = False
                         break
                 
                 if not_exist == True:
                     no_replicate_docs.append(doc)
+            else:
+                # Documents without cause_name (e.g. uploaded files) are always included
+                no_replicate_docs.append(doc)
 
         if len(no_replicate_docs) > top_k:
             no_replicate_docs = no_replicate_docs[:top_k]
 
         data.extend([DocumentWithScore(page_content=x[0].page_content, metadata=x[0].dict()['metadata'], score=x[1]) for x in no_replicate_docs])
 
-        print(f"Number of documents used from knowledge base: {len(no_replicate_docs)}")
-        # print no_replicate_docs separated by \n
+        logger.debug("Number of documents used from knowledge base: %d", len(no_replicate_docs))
         for doc in no_replicate_docs:
-            print(doc[0].metadata)
-        print('*' * 100)
+            logger.debug("Doc metadata: %s", doc[0].metadata)
     
     return data
 
@@ -167,26 +151,6 @@ def _save_files_in_thread(files: List[UploadFile],
         yield result
 
 
-#                 knowledge_base_name: str = Form(..., description="Knowledge base name", examples=["samples"]),
-#     '''
-#     '''
-#     def generate(files, knowledge_base_name, override):
-#         for result in _save_files_in_thread(files, knowledge_base_name=knowledge_base_name, override=override):
-#             yield json.dumps(result, ensure_ascii=False)
-
-#     return StreamingResponse(generate(files, knowledge_base_name=knowledge_base_name, override=override), media_type="text/event-stream")
-
-
-#                 knowledge_base_name: str = Form(..., description="Knowledge base name", examples=["samples"]),
-#     def save_files(files, knowledge_base_name, override):
-#         for result in _save_files_in_thread(files, knowledge_base_name=knowledge_base_name, override=override):
-#             yield json.dumps(result, ensure_ascii=False)
-
-#     def files_to_docs(files):
-#         for result in files2docs_in_thread(files):
-#             yield json.dumps(result, ensure_ascii=False)
-
-
 def upload_docs(
         files: List[UploadFile] = File(..., description="Upload files, multiple files supported"),
         knowledge_base_name: str = Form(..., description="Knowledge base name", examples=["samples"]),
@@ -257,13 +221,33 @@ def delete_docs(
             continue
 
         for file_name in file_names:
-            if not kb.exist_doc(file_name):
-                failed_files[file_name] = f"File not found: {file_name}"
+            try:
+                if not kb.exist_doc(file_name):
+                    failed_files[file_name] = f"File not found: {file_name}"
+                    continue
+            except ValueError:
+                # Unsupported file format – still try to remove from DB/VS
+                pass
 
             try:
                 kb_file = KnowledgeFile(filename=file_name,
                                         knowledge_base_name=knowledge_base_name)
                 kb.delete_doc(kb_file, delete_content, not_refresh_vs_cache=True)
+            except ValueError:
+                # File format not supported by KnowledgeFile – fall back to
+                # deleting just the DB record and the physical file.
+                try:
+                    from server.db.repository.knowledge_file_repository import delete_files_from_db
+                    delete_files_from_db([file_name], knowledge_base_name)
+                    if delete_content:
+                        filepath = get_file_path(knowledge_base_name, file_name)
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                    logger.info("Deleted unsupported-format file from DB: %s", file_name)
+                except Exception as inner_e:
+                    msg = f"Failed to delete unsupported file {file_name}: {inner_e}"
+                    logger.error(msg)
+                    failed_files[file_name] = msg
             except Exception as e:
                 msg = f"Failed to delete file {file_name}, error: {e}"
                 logger.error(f'{e.__class__.__name__}: {msg}',

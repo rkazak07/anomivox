@@ -51,6 +51,10 @@ ONLINE_LLM_MODEL = {
 MODEL_PATH = {
     "embed_model": {
         "all-MiniLM-L6-v2": "sentence-transformers/all-MiniLM-L6-v2",
+        "all-MiniLM-L12-v2": "sentence-transformers/all-MiniLM-L12-v2",
+        "all-mpnet-base-v2": "sentence-transformers/all-mpnet-base-v2",
+        "paraphrase-multilingual-MiniLM-L12-v2": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        "paraphrase-multilingual-mpnet-base-v2": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
     },
 
     "llm_model": {},

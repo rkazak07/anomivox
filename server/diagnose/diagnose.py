@@ -9,11 +9,10 @@ from configs import (
     DIAGNOSE_RUN_LOG_PATH,
     DIAGNOSE_RUN_PID_PATH,
     DIAGNOSE_USER_FEEDBACK_PATH,
-    DIAGNOSE_RUN_DATA_PATH)
+    DIAGNOSE_RUN_DATA_PATH,
+    logger)
 import threading
 from server.utils import BaseResponse, save_file
-
-current_task = {"thread": None, "output": "", "process": None}
 
 THREADNAME = "run_diagnose"
 
@@ -50,6 +49,18 @@ def run_diagnose_script(file_path: str, config_file_path: str = "config.yaml"):
         with open(DIAGNOSE_RUN_PID_PATH, "w") as pid_file:
             pid_file.write(str(process.pid))
         process.wait(3600)
+
+    # Auto-ingest diagnosis result into Knowledge Base
+    try:
+        from server.knowledge_base.kb_auto_ingest import ingest_from_file
+        if os.path.exists(DIAGNOSE_RUN_DATA_PATH):
+            result = ingest_from_file(DIAGNOSE_RUN_DATA_PATH)
+            if result.get("success"):
+                logger.info("[KB Auto-Ingest] %s", result['message'])
+            else:
+                logger.debug("[KB Auto-Ingest] Skipped: %s", result['message'])
+    except Exception as e:
+        logger.warning("[KB Auto-Ingest] Error: %s", e)
 
 
 def save_diagnose_file(file: UploadFile = File(..., description="Upload file")):

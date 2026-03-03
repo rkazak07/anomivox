@@ -24,7 +24,7 @@ from server.db.repository.knowledge_file_repository import (
 )
 
 from configs import (kbs_config, VECTOR_SEARCH_TOP_K, SCORE_THRESHOLD,
-                     EMBEDDING_MODEL, KB_INFO, DEFAULT_VS_TYPES)
+                     EMBEDDING_MODEL, KB_INFO, DEFAULT_VS_TYPES, logger)
 from server.knowledge_base.utils import (
     get_kb_path, get_doc_path, KnowledgeFile,
     list_kbs_from_folder, list_files_from_folder,
@@ -86,7 +86,7 @@ class KBService(ABC):
         if not os.path.exists(self.doc_path):
             os.makedirs(self.doc_path)
         self.do_create_kb()
-        print("========Knowledge base ingestion======="f"KnowledgeBase {self.kb_name} created")
+        logger.info("KnowledgeBase '%s' created", self.kb_name)
         status = add_kb_to_db(
             self.kb_name,
             self.kb_info,
@@ -141,8 +141,8 @@ class KBService(ABC):
                         rel_path.as_posix().strip("/"))
 
                 except Exception as e:
-                    print(
-                        f"cannot convert absolute path ({source}) to relative path. error is : {e}")
+                    logger.warning(
+                        "cannot convert absolute path (%s) to relative path: %s", source, e)
             self.delete_doc(kb_file)
             doc_infos = self.do_add_doc(docs, **kwargs)
             status = add_file_to_db(kb_file,

@@ -1,0 +1,13 @@
+{
+  "enabled": false,
+  "target_kb_name": "dba_diagnosis_history",
+  "embed_model": "m3e-base",
+  "auto_create_kb": true,
+  "include_metrics": true,
+  "include_root_cause": true,
+  "include_solution": true,
+  "min_severity": "1",
+  "chunk_size": 500,
+  "chunk_overlap": 50,
+  "max_history_docs": 1000
+}

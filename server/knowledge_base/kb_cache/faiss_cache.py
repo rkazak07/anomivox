@@ -38,10 +38,14 @@ class ThreadSafeFaiss(ThreadSafeObject):
 class _FaissPool(CachePool):
     def new_vector_store(
         self,
-        embed_model: str = EMBEDDING_MODEL,
-        embed_device: str = embedding_device(),
+        embed_model: str = None,
+        embed_device: str = None,
     ) -> FAISS:
         # create an empty vector store
+        if embed_model is None:
+            embed_model = _current_embedding_model()
+        if embed_device is None:
+            embed_device = embedding_device()
         embeddings = EmbeddingsFunAdapter(embed_model)
         doc = Document(page_content="init", metadata={})
         vector_store = FAISS.from_documents([doc], embeddings, normalize_L2=True)
@@ -65,10 +69,14 @@ class KBFaissPool(_FaissPool):
             kb_name: str,
             vector_name: str = None,
             create: bool = True,
-            embed_model: str = EMBEDDING_MODEL,
-            embed_device: str = embedding_device(),
+            embed_model: str = None,
+            embed_device: str = None,
     ) -> ThreadSafeFaiss:
         self.atomic.acquire()
+        if embed_model is None:
+            embed_model = _current_embedding_model()
+        if embed_device is None:
+            embed_device = embedding_device()
         vector_name = vector_name or embed_model
         cache = self.get((kb_name, vector_name))
         if cache is None:
@@ -101,10 +109,14 @@ class MemoFaissPool(_FaissPool):
     def load_vector_store(
         self,
         kb_name: str,
-        embed_model: str = EMBEDDING_MODEL,
-        embed_device: str = embedding_device(),
+        embed_model: str = None,
+        embed_device: str = None,
     ) -> ThreadSafeFaiss:
         self.atomic.acquire()
+        if embed_model is None:
+            embed_model = _current_embedding_model()
+        if embed_device is None:
+            embed_device = embedding_device()
         cache = self.get(kb_name)
         if cache is None:
             item = ThreadSafeFaiss(kb_name, pool=self)

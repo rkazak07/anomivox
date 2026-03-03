@@ -72,8 +72,7 @@ class ESKBService(KBService):
                     embedding=self.embeddings_model,
                 )
         except ConnectionError:
-            print("### Failed to connect to Elasticsearch!")
-            logger.error("### Failed to connect to Elasticsearch!")
+            logger.error("Failed to connect to Elasticsearch!")
         except Exception as e:
             logger.error(f"Error occurred: {e}")
 
@@ -122,16 +121,12 @@ class ESKBService(KBService):
                     vector_query_field="dense_vector",
                     verify_certs=False)
         except ConnectionError as ce:
-            print(ce)
-            print("Failed to connect to Elasticsearch!")
-            logger.error("Failed to connect to Elasticsearch!")
+            logger.error("Failed to connect to Elasticsearch: %s", ce)
         except Exception as e:
             logger.error(f"Error occurred: {e}")
-            print(e)
 
     def do_search(self, query: str, top_k: int, score_threshold: float):
-        print(
-            f"server.knowledge_base.kb_service.es_kb_service.do_search input query: {query}")
+        logger.debug("ES do_search input query: %s", query[:100])
         query_list = jieba.analyse.textrank(query, topK=20, withWeight=False)
         if len(query_list) == 0:
             query_list = [query]
@@ -168,7 +163,7 @@ class ESKBService(KBService):
 
             if byte_count >= VS_TYPE_PROMPT_TOTAL_BYTE_SIZE:
                 break
-        print(f"ES found {len(info_docs)} results:")
+        logger.debug("ES found %d results for query", len(info_docs))
         result_file = open("es_search_results.txt", "w", encoding="utf-8")
         result_file.write(f"query:{query}")
         result_file.write(f"ES found {len(info_docs)} results:\n")
@@ -178,9 +173,6 @@ class ESKBService(KBService):
             result_file.write("*" * 20)
             result_file.write("\n")
             result_file.flush()
-            print(doc.page_content + "\n")
-            print("*" * 20)
-            print("\n")
         result_file.close()
         return info_docs
 
@@ -214,12 +206,9 @@ class ESKBService(KBService):
             logger.error(f"Error occurred: {e}")
             return None
     def do_add_doc(self, docs: List[Document], **kwargs):
-        print(
-            f"server.knowledge_base.kb_service.es_kb_service.do_add_doc input docs length: {len(docs)}")
-        print("*" * 100)
+        logger.debug("ES do_add_doc input docs length: %d", len(docs))
         self._load_es(docs=docs, embed_model=self.embeddings_model)
-        print("Data written successfully.")
-        print("*" * 100)
+        logger.debug("ES data written successfully.")
 
         if self.es_client_python.indices.exists(index=self.index_name):
             file_path = docs[0].metadata.get("source")

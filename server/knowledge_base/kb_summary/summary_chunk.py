@@ -123,8 +123,8 @@ class SummaryAdapter:
         """
         summary_combine, summary_intermediate_steps = self.chain.combine_docs(docs=docs,
                                                                               task_briefing=file_description)
-        print(summary_combine)
-        print(summary_intermediate_steps)
+        logger.debug("Summary combine result: %s", summary_combine)
+        logger.debug("Summary intermediate steps: %s", summary_intermediate_steps)
 
         # if len(summary_combine) == 0:
         #     result_docs = [
@@ -212,4 +212,4 @@ if __name__ == '__main__':
     text = separator.join(merge_docs)
     text = text.strip()
 
-    print(text)
+    logger.debug("Merged summary text: %s", text[:200] if len(text) > 200 else text)

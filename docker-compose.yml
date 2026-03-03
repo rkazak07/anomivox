@@ -19,8 +19,8 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      HF_HUB_OFFLINE: "1"
-      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_OFFLINE: "0"
+      TRANSFORMERS_OFFLINE: "0"
       # LiteLLM Proxy bağlantısı (model yönetim UI için)
       LITELLM_BASE_URL: http://litellm-proxy:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
@@ -197,13 +197,13 @@ services:
     restart: unless-stopped
 
   # ─────────────────────────────────────────────
-  # LiteLLM Proxy — Model Routing & Fallback
+  # AI Agent Gateway — Model Routing & Fallback
   # ─────────────────────────────────────────────
   # LLM çağrılarını Ollama'ya yönlendirir.
   # Retry, fallback, timeout, cache yönetimi sağlar.
   # ─────────────────────────────────────────────
 
-  litellm-proxy:
+  ai-agent-gateway:
     image: ghcr.io/berriai/litellm:main-latest
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
@@ -236,9 +236,9 @@ services:
       dockerfile: Dockerfile.dba-agent
     environment:
       # ── Inference ──
-      LITELLM_BASE_URL: http://litellm-proxy:4000
+      LITELLM_BASE_URL: http://ai-agent-gateway:4000
       LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
-      OLLAMA_BASE_URL: http://192.168.1.202:11434
+      OLLAMA_BASE_URL: http://localhost:11434
       DBA_REASONING_MODEL: ollama/llama3.1:8b
       DBA_SQL_MODEL: ollama/sqlcoder:latest
       DBA_TRIAGE_MODEL: ollama/llama3.2:1b
@@ -280,7 +280,7 @@ services:
     depends_on:
       postgres_db:
         condition: service_healthy
-      litellm-proxy:
+      ai-agent-gateway:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

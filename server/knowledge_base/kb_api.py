@@ -1,4 +1,3 @@
-import pdb
 import urllib
 from server.utils import BaseResponse, ListResponse
 from server.knowledge_base.utils import validate_kb_name
@@ -24,7 +23,7 @@ def create_kb(
         info: str = Body(default=""),
         embed_model: str = Body(EMBEDDING_MODEL),
         ) -> BaseResponse:
-    print("====DEFAULT_VS_TYPES===", DEFAULT_VS_TYPES)
+    logger.debug("DEFAULT_VS_TYPES: %s", DEFAULT_VS_TYPES)
     # Create selected knowledge base
     if not validate_kb_name(knowledge_base_name):
         return BaseResponse(code=403, msg="Don't attack me")

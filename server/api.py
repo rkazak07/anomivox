@@ -43,6 +43,9 @@ def create_app(run_mode: str = None):
     # Initialize default admin user
     from server.db.repository.user_repository import init_admin_user
     init_admin_user()
+    # Apply any saved KB settings overrides from JSON
+    from configs.kb_settings_config import load_kb_settings_on_startup
+    load_kb_settings_on_startup()
 
     app = FastAPI(
         title="Datachat API Server",
@@ -94,6 +97,8 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
              )(chat_feedback)
 
     mount_knowledge_routes(app)
+    mount_kb_auto_ingest_routes(app)
+    mount_kb_settings_routes(app)
     mount_filename_summary_routes(app)
     mount_alert_routes(app)
     mount_diagnose_routes(app)
@@ -305,6 +310,46 @@ def mount_alert_routes(app: FastAPI):
              tags=["Alert"],
              response_model=BaseResponse,
              summary="Get anomaly diagnosis model list")(diagnose_llm_model_list)
+
+
+def mount_kb_auto_ingest_routes(app: FastAPI):
+    from server.knowledge_base.kb_auto_ingest_api import (
+        api_get_auto_ingest_config,
+        api_save_auto_ingest_config,
+        api_manual_ingest,
+        api_ingest_stats,
+    )
+    app.get("/knowledge_base/auto_ingest/config",
+            tags=["Knowledge Base Auto-Ingest"],
+            response_model=BaseResponse,
+            summary="Get auto-ingest configuration")(api_get_auto_ingest_config)
+    app.post("/knowledge_base/auto_ingest/config",
+             tags=["Knowledge Base Auto-Ingest"],
+             response_model=BaseResponse,
+             summary="Save auto-ingest configuration")(api_save_auto_ingest_config)
+    app.post("/knowledge_base/auto_ingest/manual",
+             tags=["Knowledge Base Auto-Ingest"],
+             response_model=BaseResponse,
+             summary="Manually ingest a diagnosis file into KB")(api_manual_ingest)
+    app.get("/knowledge_base/auto_ingest/stats",
+            tags=["Knowledge Base Auto-Ingest"],
+            response_model=BaseResponse,
+            summary="Get auto-ingest statistics")(api_ingest_stats)
+
+
+def mount_kb_settings_routes(app: FastAPI):
+    from server.knowledge_base.kb_settings_api import (
+        api_get_kb_settings,
+        api_save_kb_settings,
+    )
+    app.get("/knowledge_base/settings/config",
+            tags=["Knowledge Base Settings"],
+            response_model=BaseResponse,
+            summary="Get KB general settings")(api_get_kb_settings)
+    app.post("/knowledge_base/settings/config",
+             tags=["Knowledge Base Settings"],
+             response_model=BaseResponse,
+             summary="Save KB general settings")(api_save_kb_settings)
 
 
 def mount_knowledge_routes(app: FastAPI):

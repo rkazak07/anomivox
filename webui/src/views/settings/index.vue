@@ -119,6 +119,9 @@
             <el-icon style="margin-right: 4px;"><CircleCheck v-if="dbaAgentOnline" /><WarningFilled v-else /></el-icon>
             {{ dbaAgentOnline ? 'DBA Agent ✓' : 'DBA Agent ✗' }}
           </el-tag>
+          <el-tag v-if="dbTargets.length > 0" type="success" size="default" effect="plain" round style="margin-left: 4px;">
+            🗄️ {{ dbTargets.length }} DB
+          </el-tag>
           <div class="collapse-chevron" :class="{ rotated: sections.litellm }">
             <el-icon :size="18"><ArrowDown /></el-icon>
           </div>
@@ -280,6 +283,297 @@
               </Transition>
             </div>
 
+            <!-- ═══ DB Connections (moved from separate section) ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('dbTargetList')">
+                <span>🗄️ {{ $t('dbTargetSettings') }}
+                  <el-tag :type="dbTargets.length > 0 ? 'success' : 'info'" size="small" effect="plain" round style="margin-left: 8px;">
+                    {{ dbTargets.length }} {{ $t('dbTargetCount') }}
+                  </el-tag>
+                </span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.dbTargetList }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.dbTargetList" class="inner-card-body" v-loading="dbTargetsLoading">
+
+                  <el-table :data="dbTargets" stripe size="small" style="margin-bottom: 16px;" :empty-text="$t('dbTargetNoTargets')">
+                    <el-table-column :label="$t('dbTargetPrimary')" width="70" align="center">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.is_primary" type="warning" size="small" effect="dark" round>★</el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="name" :label="$t('name')" min-width="120" />
+                    <el-table-column prop="db_type" :label="$t('dbTargetType')" width="110">
+                      <template #default="{ row }">
+                        <el-tag :type="row.db_type === 'postgresql' ? 'primary' : 'success'" size="small" effect="plain">
+                          {{ row.db_type === 'postgresql' ? '🐘 PostgreSQL' : '🐬 MySQL' }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('dbTargetHost')" min-width="200">
+                      <template #default="{ row }">
+                        <code style="font-size: 12px;">{{ row.host }}:{{ row.port }}/{{ row.dbname }}</code>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="user" :label="$t('username')" width="100" />
+                    <el-table-column :label="'SSL'" width="70" align="center">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.ssl_enabled" type="success" size="small" effect="plain">🔒</el-tag>
+                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="'SSH'" width="70" align="center">
+                      <template #default="{ row }">
+                        <template v-if="row.ssh_enabled">
+                          <el-tag v-if="row.ssh_last_status === 'ok'" type="success" size="small" effect="plain">🖥 ✓</el-tag>
+                          <el-tag v-else-if="row.ssh_last_status === 'error'" type="danger" size="small" effect="plain">🖥 ✗</el-tag>
+                          <el-tag v-else type="info" size="small" effect="plain">🖥</el-tag>
+                        </template>
+                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('status')" width="90" align="center">
+                      <template #default="{ row }">
+                        <el-tag v-if="row.last_status === 'ok'" type="success" size="small" effect="plain">✓</el-tag>
+                        <el-tag v-else-if="row.last_status === 'error'" type="danger" size="small" effect="plain">✗</el-tag>
+                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('actions')" width="320" align="center">
+                      <template #default="{ row }">
+                        <el-button size="small" type="primary" link :loading="testingDbTarget === row.id" @click="onTestDbTarget(row.id)">
+                          {{ $t('testConnection') }}
+                        </el-button>
+                        <el-button v-if="row.ssh_enabled" size="small" type="info" link :loading="testingSshTarget === row.id" @click="onTestSshTarget(row.id)">
+                          SSH Test
+                        </el-button>
+                        <el-button size="small" type="default" link @click="onEditDbTarget(row)">
+                          {{ $t('edit') }}
+                        </el-button>
+                        <el-button v-if="!row.is_primary" size="small" type="warning" link @click="onSetPrimaryDb(row.id)">
+                          {{ $t('dbTargetSetPrimary') }}
+                        </el-button>
+                        <el-button size="small" type="danger" link @click="onDeleteDbTarget(row)">
+                          {{ $t('delete') }}
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+
+                  <!-- Test Sonucu -->
+                  <div v-if="dbTestResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 500; margin-bottom: 6px;">🧪 {{ $t('dbTargetTestResult') }}:</div>
+                    <div style="font-size: 13px; color: var(--el-text-color-secondary);">
+                      <strong>Version:</strong> {{ dbTestResult.version }}<br>
+                      <strong>Database:</strong> {{ dbTestResult.database }}<br>
+                      <strong>User:</strong> {{ dbTestResult.user }}
+                      <template v-if="dbTestResult.size"><br><strong>Size:</strong> {{ dbTestResult.size }}</template>
+                    </div>
+                  </div>
+
+                  <!-- SSH Test Sonucu -->
+                  <div v-if="sshTestResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 500; margin-bottom: 6px;">🖥️ {{ $t('sshTestResult') }}:</div>
+                    <pre style="font-size: 12px; color: var(--el-text-color-secondary); white-space: pre-wrap; margin: 0;">{{ sshTestResult.output || sshTestResult.error_output || '' }}</pre>
+                  </div>
+
+                  <!-- Yeni DB Bağlantısı Ekleme Formu -->
+                  <el-divider content-position="left">
+                    <span style="font-size: 13px;">➕ {{ $t('dbTargetAdd') }}</span>
+                  </el-divider>
+
+                  <el-row :gutter="16">
+                    <el-col :span="5">
+                      <el-form-item :label="$t('name')">
+                        <el-input v-model="newDbTarget.name" :placeholder="$t('dbTargetNamePlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('dbTargetType')">
+                        <el-select v-model="newDbTarget.db_type" style="width: 100%">
+                          <el-option label="🐘 PostgreSQL" value="postgresql" />
+                          <el-option label="🐬 MySQL" value="mysql" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('dbTargetHost')">
+                        <el-input v-model="newDbTarget.host" :placeholder="$t('dbTargetHostPlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="3">
+                      <el-form-item :label="$t('smtpPort')">
+                        <el-input-number v-model="newDbTarget.port" :min="1" :max="65535" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('username')">
+                        <el-input v-model="newDbTarget.user" :placeholder="$t('dbTargetUserPlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="3">
+                      <el-form-item :label="$t('password')">
+                        <el-input v-model="newDbTarget.password" type="password" show-password placeholder="••••" clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="16">
+                    <el-col :span="6">
+                      <el-form-item :label="$t('dbTargetDbName')">
+                        <el-input v-model="newDbTarget.dbname" :placeholder="$t('dbTargetDbNamePlaceholder')" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('dbTargetPrimary')">
+                        <div class="toggle-item" style="padding: 0;">
+                          <el-switch v-model="newDbTarget.is_primary" />
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- SSL Bağlantı (Opsiyonel) -->
+                  <el-divider content-position="left">
+                    <span style="font-size: 13px;">🔒 {{ $t('sslSection') }}</span>
+                  </el-divider>
+
+                  <el-row :gutter="16">
+                    <el-col :span="3">
+                      <el-form-item :label="$t('sslEnabled')">
+                        <div class="toggle-item" style="padding: 0;">
+                          <el-switch v-model="newDbTarget.ssl_enabled" />
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('sslMode')">
+                        <el-select v-model="newDbTarget.ssl_mode" :disabled="!newDbTarget.ssl_enabled" style="width: 100%">
+                          <el-option label="require" value="require" />
+                          <el-option label="verify-ca" value="verify-ca" />
+                          <el-option label="verify-full" value="verify-full" />
+                          <el-option label="prefer" value="prefer" />
+                          <el-option label="disable" value="disable" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('sslCaPath')">
+                        <el-input v-model="newDbTarget.ssl_ca_path" :placeholder="$t('sslCaPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sslCertPath')">
+                        <el-input v-model="newDbTarget.ssl_cert_path" :placeholder="$t('sslCertPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sslKeyPath')">
+                        <el-input v-model="newDbTarget.ssl_key_path" :placeholder="$t('sslKeyPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- SSH / OS Erişimi (Opsiyonel) -->
+                  <el-divider content-position="left">
+                    <span style="font-size: 13px;">🖥️ {{ $t('sshAccessOptional') }}</span>
+                  </el-divider>
+                  <div class="form-hint" style="margin-bottom: 12px;">{{ $t('sshAccessHint') }}</div>
+
+                  <el-row :gutter="16">
+                    <el-col :span="3">
+                      <el-form-item :label="$t('sshEnabled')">
+                        <div class="toggle-item" style="padding: 0;">
+                          <el-switch v-model="newDbTarget.ssh_enabled" />
+                        </div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sshHost')">
+                        <el-input v-model="newDbTarget.ssh_host" :placeholder="$t('sshHostPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="3">
+                      <el-form-item :label="$t('sshPort')">
+                        <el-input-number v-model="newDbTarget.ssh_port" :min="1" :max="65535" :disabled="!newDbTarget.ssh_enabled" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('sshUser')">
+                        <el-input v-model="newDbTarget.ssh_user" :placeholder="$t('sshUserPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('sshAuthMethod')">
+                        <el-radio-group v-model="newDbTarget.ssh_auth_type" :disabled="!newDbTarget.ssh_enabled">
+                          <el-radio-button label="key">🔑 {{ $t('sshAuthKey') }}</el-radio-button>
+                          <el-radio-button label="password">🔒 {{ $t('sshAuthPassword') }}</el-radio-button>
+                        </el-radio-group>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- SSH Key Auth -->
+                  <div v-if="newDbTarget.ssh_enabled && newDbTarget.ssh_auth_type === 'key'">
+                    <el-row :gutter="16">
+                      <el-col :span="12">
+                        <el-form-item :label="$t('sshKeyPath')">
+                          <el-input v-model="newDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" clearable />
+                          <div class="form-hint">{{ $t('sshKeyPathHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="12">
+                        <el-form-item :label="$t('sshKeyPassphrase')">
+                          <el-input v-model="newDbTarget.ssh_key_passphrase" type="password" show-password :placeholder="$t('sshKeyPassphrasePlaceholder')" clearable />
+                          <div class="form-hint">{{ $t('sshKeyPassphraseHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                    <el-row :gutter="16">
+                      <el-col :span="24">
+                        <el-form-item :label="$t('sshKeyContent')">
+                          <el-input
+                            v-model="newDbTarget.ssh_key_content"
+                            type="textarea"
+                            :rows="4"
+                            :placeholder="$t('sshKeyContentPlaceholder')"
+                            style="font-family: monospace; font-size: 12px;"
+                          />
+                          <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                  </div>
+
+                  <!-- SSH Password Auth -->
+                  <div v-if="newDbTarget.ssh_enabled && newDbTarget.ssh_auth_type === 'password'">
+                    <el-row :gutter="16">
+                      <el-col :span="12">
+                        <el-form-item :label="$t('sshPassword')">
+                          <el-input v-model="newDbTarget.ssh_password" type="password" show-password placeholder="••••" clearable />
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                  </div>
+
+                  <!-- Ekle Butonu -->
+                  <el-row :gutter="16" style="margin-top: 8px;">
+                    <el-col :span="24" style="display: flex; justify-content: flex-end;">
+                      <el-button
+                        type="primary"
+                        :loading="addingDbTarget"
+                        @click="onAddDbTarget"
+                      >
+                        <el-icon style="margin-right: 6px;"><Plus /></el-icon>
+                        {{ $t('dbTargetAdd') }}
+                      </el-button>
+                    </el-col>
+                  </el-row>
+                </div>
+              </Transition>
+            </div>
+
             <!-- ═══ Setup Guide ═══ -->
             <div class="inner-card">
               <div class="inner-card-header" @click="toggleInner('litellmGuide')">
@@ -306,6 +600,10 @@
               <el-button type="default" :loading="refreshingLitellm" @click="onRefreshLitellm">
                 <el-icon style="margin-right: 6px;"><Refresh /></el-icon>
                 {{ $t('litellmRefresh') }}
+              </el-button>
+              <el-button type="default" :loading="refreshingDbTargets" @click="onRefreshDbTargets" style="margin-left: 8px;">
+                <el-icon style="margin-right: 6px;"><Refresh /></el-icon>
+                {{ $t('dbTargetRefresh') }}
               </el-button>
               <el-button type="primary" :loading="savingLitellm" @click="onSaveLitellmSettings">
                 <el-icon style="margin-right: 6px;"><Check /></el-icon>
@@ -809,335 +1107,325 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════ -->
-    <!-- SECTION 4 — DB Connection Management (collapsible)       -->
+    <!-- SECTION 4 — Knowledge Base Settings (combined)           -->
     <!-- ══════════════════════════════════════════════════════════ -->
-    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.dbTargets }">
-      <div class="collapse-card-header" @click="toggleSection('dbTargets')">
+    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.knowledgeBase }">
+      <div class="collapse-card-header" @click="toggleSection('knowledgeBase')">
         <div class="collapse-card-title">
-          <div class="collapse-card-icon db-icon">
-            <el-icon :size="20"><Coin /></el-icon>
+          <div class="collapse-card-icon kb-icon">
+            <span style="font-size: 20px;">📚</span>
           </div>
           <div>
-            <h3>{{ $t('dbTargetSettings') }}</h3>
-            <span class="collapse-card-subtitle">{{ $t('dbTargetDesc') }}</span>
+            <h3>{{ $t('kbCombinedTitle') }}</h3>
+            <span class="collapse-card-subtitle">{{ $t('kbCombinedDesc') }}</span>
           </div>
         </div>
         <div class="collapse-card-right">
-          <el-tag :type="dbTargets.length > 0 ? 'success' : 'info'" size="default" effect="plain" round>
-            {{ dbTargets.length }} {{ $t('dbTargetCount') }}
+          <el-tag type="primary" size="small" effect="plain" round style="margin-left: 4px;">
+            {{ kbSettingsConfig.default_vs_type }}
           </el-tag>
-          <div class="collapse-chevron" :class="{ rotated: sections.dbTargets }">
+          <el-tag :type="autoIngestConfig.enabled ? 'success' : 'info'" size="small" effect="plain" round style="margin-left: 4px;">
+            Auto-Ingest {{ autoIngestConfig.enabled ? 'ON' : 'OFF' }}
+          </el-tag>
+          <div class="collapse-chevron" :class="{ rotated: sections.knowledgeBase }">
             <el-icon :size="18"><ArrowDown /></el-icon>
           </div>
         </div>
       </div>
       <Transition name="collapse-body">
-        <div v-show="sections.dbTargets" class="collapse-card-body">
-          <el-form label-position="top" class="telegram-form" v-loading="dbTargetsLoading">
+        <div v-show="sections.knowledgeBase" class="collapse-card-body">
+          <el-form label-position="top" class="telegram-form" v-loading="kbSettingsLoading || autoIngestLoading">
 
-            <!-- ═══ DB Target Listesi ═══ -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- KB GENERAL SETTINGS                                -->
+            <!-- ═══════════════════════════════════════════════════ -->
+
+            <!-- ═══ Document Processing ═══ -->
             <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('dbTargetList')">
-                <span>🗄️ {{ $t('dbTargetList') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.dbTargetList }">
+              <div class="inner-card-header" @click="toggleInner('kbSettingsDocProcessing')">
+                <span>📄 {{ $t('kbSettingsDocProcessing') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.kbSettingsDocProcessing }">
                   <el-icon :size="14"><ArrowDown /></el-icon>
                 </div>
               </div>
               <Transition name="collapse-body">
-                <div v-show="innerSections.dbTargetList" class="inner-card-body">
-
-                  <el-table :data="dbTargets" stripe size="small" style="margin-bottom: 16px;" :empty-text="$t('dbTargetNoTargets')">
-                    <el-table-column :label="$t('dbTargetPrimary')" width="70" align="center">
-                      <template #default="{ row }">
-                        <el-tag v-if="row.is_primary" type="warning" size="small" effect="dark" round>★</el-tag>
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="name" :label="$t('name')" min-width="120" />
-                    <el-table-column prop="db_type" :label="$t('dbTargetType')" width="110">
-                      <template #default="{ row }">
-                        <el-tag :type="row.db_type === 'postgresql' ? 'primary' : 'success'" size="small" effect="plain">
-                          {{ row.db_type === 'postgresql' ? '🐘 PostgreSQL' : '🐬 MySQL' }}
-                        </el-tag>
-                      </template>
-                    </el-table-column>
-                    <el-table-column :label="$t('dbTargetHost')" min-width="200">
-                      <template #default="{ row }">
-                        <code style="font-size: 12px;">{{ row.host }}:{{ row.port }}/{{ row.dbname }}</code>
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="user" :label="$t('username')" width="100" />
-                    <el-table-column :label="'SSL'" width="70" align="center">
-                      <template #default="{ row }">
-                        <el-tag v-if="row.ssl_enabled" type="success" size="small" effect="plain">🔒</el-tag>
-                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column :label="'SSH'" width="70" align="center">
-                      <template #default="{ row }">
-                        <template v-if="row.ssh_enabled">
-                          <el-tag v-if="row.ssh_last_status === 'ok'" type="success" size="small" effect="plain">🖥 ✓</el-tag>
-                          <el-tag v-else-if="row.ssh_last_status === 'error'" type="danger" size="small" effect="plain">🖥 ✗</el-tag>
-                          <el-tag v-else type="info" size="small" effect="plain">🖥</el-tag>
-                        </template>
-                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column :label="$t('status')" width="90" align="center">
-                      <template #default="{ row }">
-                        <el-tag v-if="row.last_status === 'ok'" type="success" size="small" effect="plain">✓</el-tag>
-                        <el-tag v-else-if="row.last_status === 'error'" type="danger" size="small" effect="plain">✗</el-tag>
-                        <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
-                      </template>
-                    </el-table-column>
-                    <el-table-column :label="$t('actions')" width="320" align="center">
-                      <template #default="{ row }">
-                        <el-button size="small" type="primary" link :loading="testingDbTarget === row.id" @click="onTestDbTarget(row.id)">
-                          {{ $t('testConnection') }}
-                        </el-button>
-                        <el-button v-if="row.ssh_enabled" size="small" type="info" link :loading="testingSshTarget === row.id" @click="onTestSshTarget(row.id)">
-                          SSH Test
-                        </el-button>
-                        <el-button size="small" type="default" link @click="onEditDbTarget(row)">
-                          {{ $t('edit') }}
-                        </el-button>
-                        <el-button v-if="!row.is_primary" size="small" type="warning" link @click="onSetPrimaryDb(row.id)">
-                          {{ $t('dbTargetSetPrimary') }}
-                        </el-button>
-                        <el-button size="small" type="danger" link @click="onDeleteDbTarget(row)">
-                          {{ $t('delete') }}
-                        </el-button>
-                      </template>
-                    </el-table-column>
-                  </el-table>
-
-                  <!-- Test Sonucu -->
-                  <div v-if="dbTestResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-                    <div style="font-weight: 500; margin-bottom: 6px;">🧪 {{ $t('dbTargetTestResult') }}:</div>
-                    <div style="font-size: 13px; color: var(--el-text-color-secondary);">
-                      <strong>Version:</strong> {{ dbTestResult.version }}<br>
-                      <strong>Database:</strong> {{ dbTestResult.database }}<br>
-                      <strong>User:</strong> {{ dbTestResult.user }}
-                      <template v-if="dbTestResult.size"><br><strong>Size:</strong> {{ dbTestResult.size }}</template>
-                    </div>
-                  </div>
-
-                  <!-- SSH Test Sonucu -->
-                  <div v-if="sshTestResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-                    <div style="font-weight: 500; margin-bottom: 6px;">🖥️ {{ $t('sshTestResult') }}:</div>
-                    <pre style="font-size: 12px; color: var(--el-text-color-secondary); white-space: pre-wrap; margin: 0;">{{ sshTestResult.output || sshTestResult.error_output || '' }}</pre>
-                  </div>
-
-                  <!-- Yeni DB Bağlantısı Ekleme Formu -->
-                  <el-divider content-position="left">
-                    <span style="font-size: 13px;">➕ {{ $t('dbTargetAdd') }}</span>
-                  </el-divider>
-
-                  <el-row :gutter="16">
-                    <el-col :span="5">
-                      <el-form-item :label="$t('name')">
-                        <el-input v-model="newDbTarget.name" :placeholder="$t('dbTargetNamePlaceholder')" clearable />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="4">
-                      <el-form-item :label="$t('dbTargetType')">
-                        <el-select v-model="newDbTarget.db_type" style="width: 100%">
-                          <el-option label="🐘 PostgreSQL" value="postgresql" />
-                          <el-option label="🐬 MySQL" value="mysql" />
-                        </el-select>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="5">
-                      <el-form-item :label="$t('dbTargetHost')">
-                        <el-input v-model="newDbTarget.host" :placeholder="$t('dbTargetHostPlaceholder')" clearable />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="3">
-                      <el-form-item :label="$t('smtpPort')">
-                        <el-input-number v-model="newDbTarget.port" :min="1" :max="65535" style="width: 100%" controls-position="right" />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="4">
-                      <el-form-item :label="$t('username')">
-                        <el-input v-model="newDbTarget.user" :placeholder="$t('dbTargetUserPlaceholder')" clearable />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="3">
-                      <el-form-item :label="$t('password')">
-                        <el-input v-model="newDbTarget.password" type="password" show-password placeholder="••••" clearable />
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-                  <el-row :gutter="16">
+                <div v-show="innerSections.kbSettingsDocProcessing" class="inner-card-body">
+                  <el-row :gutter="20">
                     <el-col :span="6">
-                      <el-form-item :label="$t('dbTargetDbName')">
-                        <el-input v-model="newDbTarget.dbname" :placeholder="$t('dbTargetDbNamePlaceholder')" clearable />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="4">
-                      <el-form-item :label="$t('dbTargetPrimary')">
-                        <div class="toggle-item" style="padding: 0;">
-                          <el-switch v-model="newDbTarget.is_primary" />
-                        </div>
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-
-                  <!-- SSL Bağlantı (Opsiyonel) -->
-                  <el-divider content-position="left">
-                    <span style="font-size: 13px;">🔒 {{ $t('sslSection') }}</span>
-                  </el-divider>
-
-                  <el-row :gutter="16">
-                    <el-col :span="3">
-                      <el-form-item :label="$t('sslEnabled')">
-                        <div class="toggle-item" style="padding: 0;">
-                          <el-switch v-model="newDbTarget.ssl_enabled" />
-                        </div>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="4">
-                      <el-form-item :label="$t('sslMode')">
-                        <el-select v-model="newDbTarget.ssl_mode" :disabled="!newDbTarget.ssl_enabled" style="width: 100%">
-                          <el-option label="require" value="require" />
-                          <el-option label="verify-ca" value="verify-ca" />
-                          <el-option label="verify-full" value="verify-full" />
-                          <el-option label="prefer" value="prefer" />
-                          <el-option label="disable" value="disable" />
-                        </el-select>
+                      <el-form-item :label="$t('kbSettingsChunkSize')">
+                        <el-input-number v-model="kbSettingsConfig.chunk_size" :min="100" :max="8000" :step="100" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbSettingsChunkSizeHint') }}</div>
                       </el-form-item>
                     </el-col>
                     <el-col :span="6">
-                      <el-form-item :label="$t('sslCaPath')">
-                        <el-input v-model="newDbTarget.ssl_ca_path" :placeholder="$t('sslCaPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                      <el-form-item :label="$t('kbSettingsOverlapSize')">
+                        <el-input-number v-model="kbSettingsConfig.overlap_size" :min="0" :max="1000" :step="10" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbSettingsOverlapSizeHint') }}</div>
                       </el-form-item>
                     </el-col>
-                    <el-col :span="5">
-                      <el-form-item :label="$t('sslCertPath')">
-                        <el-input v-model="newDbTarget.ssl_cert_path" :placeholder="$t('sslCertPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
+                    <el-col :span="6">
+                      <el-form-item :label="$t('kbSettingsTextSplitter')">
+                        <el-select v-model="kbSettingsConfig.text_splitter_name" style="width: 100%">
+                          <el-option label="RecursiveCharacterTextSplitter" value="RecursiveCharacterTextSplitter" />
+                          <el-option label="SpacyTextSplitter" value="SpacyTextSplitter" />
+                          <el-option label="MarkdownHeaderTextSplitter" value="MarkdownHeaderTextSplitter" />
+                        </el-select>
+                        <div class="form-hint">{{ $t('kbSettingsTextSplitterHint') }}</div>
                       </el-form-item>
                     </el-col>
-                    <el-col :span="5">
-                      <el-form-item :label="$t('sslKeyPath')">
-                        <el-input v-model="newDbTarget.ssl_key_path" :placeholder="$t('sslKeyPathPlaceholder')" :disabled="!newDbTarget.ssl_enabled" clearable />
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-
-                  <!-- SSH / OS Erişimi (Opsiyonel) -->
-                  <el-divider content-position="left">
-                    <span style="font-size: 13px;">🖥️ {{ $t('sshAccessOptional') }}</span>
-                  </el-divider>
-                  <div class="form-hint" style="margin-bottom: 12px;">{{ $t('sshAccessHint') }}</div>
-
-                  <el-row :gutter="16">
-                    <el-col :span="3">
-                      <el-form-item :label="$t('sshEnabled')">
-                        <div class="toggle-item" style="padding: 0;">
-                          <el-switch v-model="newDbTarget.ssh_enabled" />
+                    <el-col :span="6">
+                      <div class="toggle-item" style="margin-top: 4px;">
+                        <el-switch v-model="kbSettingsConfig.zh_title_enhance" />
+                        <div class="toggle-info">
+                          <span class="toggle-label">{{ $t('kbSettingsZhTitleEnhance') }}</span>
+                          <span class="toggle-hint">{{ $t('kbSettingsZhTitleEnhanceHint') }}</span>
                         </div>
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="5">
-                      <el-form-item :label="$t('sshHost')">
-                        <el-input v-model="newDbTarget.ssh_host" :placeholder="$t('sshHostPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="3">
-                      <el-form-item :label="$t('sshPort')">
-                        <el-input-number v-model="newDbTarget.ssh_port" :min="1" :max="65535" :disabled="!newDbTarget.ssh_enabled" style="width: 100%" controls-position="right" />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="5">
-                      <el-form-item :label="$t('sshUser')">
-                        <el-input v-model="newDbTarget.ssh_user" :placeholder="$t('sshUserPlaceholder')" :disabled="!newDbTarget.ssh_enabled" clearable />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="8">
-                      <el-form-item :label="$t('sshAuthMethod')">
-                        <el-radio-group v-model="newDbTarget.ssh_auth_type" :disabled="!newDbTarget.ssh_enabled">
-                          <el-radio-button label="key">🔑 {{ $t('sshAuthKey') }}</el-radio-button>
-                          <el-radio-button label="password">🔒 {{ $t('sshAuthPassword') }}</el-radio-button>
-                        </el-radio-group>
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-
-                  <!-- SSH Key Auth -->
-                  <div v-if="newDbTarget.ssh_enabled && newDbTarget.ssh_auth_type === 'key'">
-                    <el-row :gutter="16">
-                      <el-col :span="12">
-                        <el-form-item :label="$t('sshKeyPath')">
-                          <el-input v-model="newDbTarget.ssh_key_path" :placeholder="$t('sshKeyPathPlaceholder')" clearable />
-                          <div class="form-hint">{{ $t('sshKeyPathHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="12">
-                        <el-form-item :label="$t('sshKeyPassphrase')">
-                          <el-input v-model="newDbTarget.ssh_key_passphrase" type="password" show-password :placeholder="$t('sshKeyPassphrasePlaceholder')" clearable />
-                          <div class="form-hint">{{ $t('sshKeyPassphraseHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                    <el-row :gutter="16">
-                      <el-col :span="24">
-                        <el-form-item :label="$t('sshKeyContent')">
-                          <el-input
-                            v-model="newDbTarget.ssh_key_content"
-                            type="textarea"
-                            :rows="4"
-                            :placeholder="$t('sshKeyContentPlaceholder')"
-                            style="font-family: monospace; font-size: 12px;"
-                          />
-                          <div class="form-hint" style="margin-top: 4px;">{{ $t('sshKeyContentHint') }}</div>
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-
-                  <!-- SSH Password Auth -->
-                  <div v-if="newDbTarget.ssh_enabled && newDbTarget.ssh_auth_type === 'password'">
-                    <el-row :gutter="16">
-                      <el-col :span="12">
-                        <el-form-item :label="$t('sshPassword')">
-                          <el-input v-model="newDbTarget.ssh_password" type="password" show-password placeholder="••••" clearable />
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-
-                  <!-- Ekle Butonu -->
-                  <el-row :gutter="16" style="margin-top: 8px;">
-                    <el-col :span="24" style="display: flex; justify-content: flex-end;">
-                      <el-button
-                        type="primary"
-                        :loading="addingDbTarget"
-                        @click="onAddDbTarget"
-                      >
-                        <el-icon style="margin-right: 6px;"><Plus /></el-icon>
-                        {{ $t('dbTargetAdd') }}
-                      </el-button>
+                      </div>
                     </el-col>
                   </el-row>
                 </div>
               </Transition>
             </div>
 
-            <!-- ═══ Setup Guide ═══ -->
+            <!-- ═══ Search Parameters ═══ -->
             <div class="inner-card">
-              <div class="inner-card-header" @click="toggleInner('dbTargetGuide')">
-                <span>📖 {{ $t('dbTargetSetupGuide') }}</span>
-                <div class="collapse-chevron small" :class="{ rotated: innerSections.dbTargetGuide }">
+              <div class="inner-card-header" @click="toggleInner('kbSettingsSearchParams')">
+                <span>🔍 {{ $t('kbSettingsSearchParams') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.kbSettingsSearchParams }">
                   <el-icon :size="14"><ArrowDown /></el-icon>
                 </div>
               </div>
               <Transition name="collapse-body">
-                <div v-show="innerSections.dbTargetGuide" class="inner-card-body">
+                <div v-show="innerSections.kbSettingsSearchParams" class="inner-card-body">
+                  <el-row :gutter="20">
+                    <el-col :span="8">
+                      <el-form-item :label="$t('kbSettingsTopK')">
+                        <el-input-number v-model="kbSettingsConfig.vector_search_top_k" :min="1" :max="20" :step="1" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbSettingsTopKHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('kbSettingsScoreThreshold')">
+                        <el-input-number v-model="kbSettingsConfig.score_threshold" :min="0" :max="4" :step="0.1" :precision="2" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbSettingsScoreThresholdHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('kbSettingsVsType')">
+                        <el-select v-model="kbSettingsConfig.default_vs_type" style="width: 100%">
+                          <el-option label="🟢 ChromaDB" value="chromadb" />
+                          <el-option label="🔵 Elasticsearch" value="es" />
+                        </el-select>
+                        <div class="form-hint">{{ $t('kbSettingsVsTypeHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!-- KB AUTO-INGEST                                     -->
+            <!-- ═══════════════════════════════════════════════════ -->
+
+            <!-- ═══ Auto-Ingest General ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('kbAutoIngestSettings')">
+                <span>🔄 {{ $t('kbAutoIngestSettings') }}
+                  <el-tag :type="autoIngestConfig.enabled ? 'success' : 'info'" size="small" effect="plain" round style="margin-left: 8px;">
+                    {{ autoIngestConfig.enabled ? 'ON' : 'OFF' }}
+                  </el-tag>
+                </span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.kbAutoIngestSettings }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.kbAutoIngestSettings" class="inner-card-body">
+                  <div class="form-group">
+                    <el-row :gutter="20">
+                      <el-col :span="6">
+                        <div class="toggle-item">
+                          <el-switch v-model="autoIngestConfig.enabled" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('kbAutoIngestEnabled') }}</span>
+                            <span class="toggle-hint">{{ $t('kbAutoIngestEnabledHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                      <el-col :span="6">
+                        <el-form-item :label="$t('kbAutoIngestTargetKb')">
+                          <el-input v-model="autoIngestConfig.target_kb_name" :placeholder="$t('kbAutoIngestTargetKbPlaceholder')" clearable />
+                          <div class="form-hint">{{ $t('kbAutoIngestTargetKbHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="6">
+                        <el-form-item :label="$t('kbAutoIngestEmbedModel')">
+                          <el-input v-model="autoIngestConfig.embed_model" :placeholder="$t('kbAutoIngestEmbedModelPlaceholder')" clearable />
+                          <div class="form-hint">{{ $t('kbAutoIngestEmbedModelHint') }}</div>
+                        </el-form-item>
+                      </el-col>
+                      <el-col :span="6">
+                        <div class="toggle-item">
+                          <el-switch v-model="autoIngestConfig.auto_create_kb" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('kbAutoIngestAutoCreate') }}</span>
+                            <span class="toggle-hint">{{ $t('kbAutoIngestAutoCreateHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                    </el-row>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Content Options ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('kbAutoIngestContent')">
+                <span>📝 {{ $t('kbAutoIngestContentOptions') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.kbAutoIngestContent }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.kbAutoIngestContent" class="inner-card-body">
+                  <div class="form-group">
+                    <el-row :gutter="20">
+                      <el-col :span="8">
+                        <div class="toggle-item">
+                          <el-switch v-model="autoIngestConfig.include_metrics" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('kbAutoIngestIncludeMetrics') }}</span>
+                            <span class="toggle-hint">{{ $t('kbAutoIngestIncludeMetricsHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                      <el-col :span="8">
+                        <div class="toggle-item">
+                          <el-switch v-model="autoIngestConfig.include_root_cause" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('kbAutoIngestIncludeRootCause') }}</span>
+                            <span class="toggle-hint">{{ $t('kbAutoIngestIncludeRootCauseHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                      <el-col :span="8">
+                        <div class="toggle-item">
+                          <el-switch v-model="autoIngestConfig.include_solution" />
+                          <div class="toggle-info">
+                            <span class="toggle-label">{{ $t('kbAutoIngestIncludeSolution') }}</span>
+                            <span class="toggle-hint">{{ $t('kbAutoIngestIncludeSolutionHint') }}</span>
+                          </div>
+                        </div>
+                      </el-col>
+                    </el-row>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Advanced Settings ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('kbAutoIngestAdvanced')">
+                <span>🔧 {{ $t('kbAutoIngestAdvanced') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.kbAutoIngestAdvanced }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.kbAutoIngestAdvanced" class="inner-card-body">
+                  <el-row :gutter="20">
+                    <el-col :span="6">
+                      <el-form-item :label="$t('kbAutoIngestMinSeverity')">
+                        <el-input-number v-model="autoIngestConfig.min_severity" :min="1" :max="5" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbAutoIngestMinSeverityHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('kbAutoIngestChunkSize')">
+                        <el-input-number v-model="autoIngestConfig.chunk_size" :min="100" :max="4000" :step="100" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbAutoIngestChunkSizeHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('kbAutoIngestChunkOverlap')">
+                        <el-input-number v-model="autoIngestConfig.chunk_overlap" :min="0" :max="500" :step="10" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbAutoIngestChunkOverlapHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('kbAutoIngestMaxDocs')">
+                        <el-input-number v-model="autoIngestConfig.max_history_docs" :min="0" :max="100000" :step="100" style="width: 100%" controls-position="right" />
+                        <div class="form-hint">{{ $t('kbAutoIngestMaxDocsHint') }}</div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Statistics ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('kbAutoIngestStats')">
+                <span>📊 {{ $t('kbAutoIngestStats') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.kbAutoIngestStats }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.kbAutoIngestStats" class="inner-card-body">
+                  <el-row :gutter="20" style="margin-bottom: 16px;">
+                    <el-col :span="8">
+                      <div style="font-size: 13px; color: var(--el-text-color-secondary);">
+                        <strong>{{ $t('kbAutoIngestStatsKbExists') }}:</strong>
+                        <el-tag :type="autoIngestStats.kb_exists ? 'success' : 'info'" size="small" effect="plain" style="margin-left: 6px;">
+                          {{ autoIngestStats.kb_exists ? $t('kbAutoIngestStatsKbExistsYes') : $t('kbAutoIngestStatsKbExistsNo') }}
+                        </el-tag>
+                      </div>
+                    </el-col>
+                    <el-col :span="8">
+                      <div style="font-size: 13px; color: var(--el-text-color-secondary);">
+                        <strong>{{ $t('kbAutoIngestStatsDocCount') }}:</strong>
+                        <span style="margin-left: 6px; font-weight: 600; color: var(--el-text-color-primary);">{{ autoIngestStats.doc_count ?? '—' }}</span>
+                      </div>
+                    </el-col>
+                    <el-col :span="8" style="display: flex; align-items: center;">
+                      <el-button size="small" type="default" @click="onRefreshAutoIngestStats">
+                        <el-icon style="margin-right: 4px;"><Refresh /></el-icon>
+                        {{ $t('litellmRefresh') }}
+                      </el-button>
+                    </el-col>
+                  </el-row>
+                  <el-divider />
+                  <div style="margin-bottom: 8px;">
+                    <span style="font-size: 13px; font-weight: 500; color: var(--el-text-color-primary);">{{ $t('kbAutoIngestManualIngest') }}</span>
+                    <div class="form-hint">{{ $t('kbAutoIngestManualIngestHint') }}</div>
+                  </div>
+                  <el-button type="primary" size="small" :loading="manualIngesting" @click="onManualIngest">
+                    <el-icon style="margin-right: 4px;"><Upload /></el-icon>
+                    {{ $t('kbAutoIngestManualIngest') }}
+                  </el-button>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Setup Guide ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('kbSettingsGuide')">
+                <span>📖 {{ $t('kbSettingsGuide') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.kbSettingsGuide }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.kbSettingsGuide" class="inner-card-body">
                   <div class="guide-steps">
-                    <p>{{ $t('dbTargetStep1') }}</p>
-                    <p>{{ $t('dbTargetStep2') }}</p>
-                    <p>{{ $t('dbTargetStep3') }}</p>
-                    <p>{{ $t('dbTargetStep4') }}</p>
-                    <p>{{ $t('dbTargetStep5') }}</p>
+                    <p>{{ $t('kbSettingsStep1') }}</p>
+                    <p>{{ $t('kbSettingsStep2') }}</p>
+                    <p>{{ $t('kbSettingsStep3') }}</p>
+                    <p>{{ $t('kbSettingsStep4') }}</p>
+                    <p>{{ $t('kbSettingsStep5') }}</p>
                   </div>
                 </div>
               </Transition>
@@ -1145,9 +1433,9 @@
 
             <!-- Action buttons -->
             <div class="telegram-actions">
-              <el-button type="default" :loading="refreshingDbTargets" @click="onRefreshDbTargets">
-                <el-icon style="margin-right: 6px;"><Refresh /></el-icon>
-                {{ $t('litellmRefresh') }}
+              <el-button type="primary" :loading="savingKbSettings" @click="onSaveAllKbSettings">
+                <el-icon style="margin-right: 6px;"><Check /></el-icon>
+                {{ $t('save') }}
               </el-button>
             </div>
           </el-form>
@@ -1156,7 +1444,7 @@
     </div>
 
     <!-- Non-admin users see info message -->
-    <div v-else class="collapse-card">
+    <div v-if="!isAdmin" class="collapse-card">
       <el-result icon="info" :title="$t('noPermission')" :sub-title="$t('noPermissionDesc')">
         <template #icon>
           <el-icon size="64" color="var(--el-color-info)"><Lock /></el-icon>
@@ -1386,6 +1674,7 @@ import { litellmHealthReq, litellmModelsReq, litellmAddModelReq, litellmRemoveMo
 import { getMailConfigReq, saveMailConfigReq, testMailReq } from '@/api/mail'
 import { getTelegramAlertConfigReq, saveTelegramAlertConfigReq, testTelegramAlertReq, telegramGetChatIdReq } from '@/api/telegram'
 import { listDbTargetsReq, addDbTargetReq, updateDbTargetReq, deleteDbTargetReq, testDbTargetReq, testSshTargetReq, setPrimaryDbTargetReq } from '@/api/dbTargets'
+import { getAutoIngestConfigReq, saveAutoIngestConfigReq, manualIngestReq, getAutoIngestStatsReq, getKbSettingsReq, saveKbSettingsReq } from '@/api/knowledge'
 import { useI18n } from 'vue-i18n'
 
 const { t: $t } = useI18n()
@@ -1397,7 +1686,7 @@ const sections = reactive({
   users: true,
   litellm: true,
   notifications: false,
-  dbTargets: false,
+  knowledgeBase: false,
 })
 const innerSections = reactive({
   models: true,
@@ -1411,6 +1700,15 @@ const innerSections = reactive({
   telegramGuide: false,
   dbTargetList: true,
   dbTargetGuide: false,
+  kbAutoIngestSettings: true,
+  kbAutoIngestContent: false,
+  kbAutoIngestAdvanced: false,
+  kbAutoIngestStats: false,
+  kbAutoIngestGuide: false,
+  kbSettingsEmbedding: true,
+  kbSettingsDocProcessing: true,
+  kbSettingsSearchParams: false,
+  kbSettingsGuide: false,
 })
 const toggleSection = (key) => { sections[key] = !sections[key] }
 const toggleInner = (key) => { innerSections[key] = !innerSections[key] }
@@ -1440,6 +1738,9 @@ onMounted(() => {
     fetchMailConfig()
     fetchTelegramConfig()
     fetchDbTargets()
+    fetchAutoIngestConfig()
+    fetchAutoIngestStats()
+    fetchKbSettings()
   }
 })
 
@@ -2142,6 +2443,222 @@ const onSaveEditDbTarget = async () => {
   }
 }
 
+// ========== KB Auto-Ingest ==========
+const autoIngestLoading = ref(false)
+const savingAutoIngest = ref(false)
+const manualIngesting = ref(false)
+const autoIngestConfig = reactive({
+  enabled: false,
+  target_kb_name: 'dba_diagnosis_history',
+  embed_model: 'm3e-base',
+  auto_create_kb: true,
+  include_metrics: true,
+  include_root_cause: true,
+  include_solution: true,
+  min_severity: 1,
+  chunk_size: 500,
+  chunk_overlap: 50,
+  max_history_docs: 1000,
+})
+const autoIngestStats = reactive({
+  kb_exists: false,
+  doc_count: 0,
+})
+
+const fetchAutoIngestConfig = async () => {
+  autoIngestLoading.value = true
+  try {
+    const res = await getAutoIngestConfigReq()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      autoIngestConfig.enabled = d.enabled ?? false
+      autoIngestConfig.target_kb_name = d.target_kb_name || 'dba_diagnosis_history'
+      autoIngestConfig.embed_model = d.embed_model || 'm3e-base'
+      autoIngestConfig.auto_create_kb = d.auto_create_kb ?? true
+      autoIngestConfig.include_metrics = d.include_metrics ?? true
+      autoIngestConfig.include_root_cause = d.include_root_cause ?? true
+      autoIngestConfig.include_solution = d.include_solution ?? true
+      autoIngestConfig.min_severity = d.min_severity ?? 1
+      autoIngestConfig.chunk_size = d.chunk_size ?? 500
+      autoIngestConfig.chunk_overlap = d.chunk_overlap ?? 50
+      autoIngestConfig.max_history_docs = d.max_history_docs ?? 1000
+    }
+  } catch (e) {
+    console.error('Failed to load Auto-Ingest config:', e)
+  } finally {
+    autoIngestLoading.value = false
+  }
+}
+
+const onSaveAutoIngest = async () => {
+  savingAutoIngest.value = true
+  try {
+    const res = await saveAutoIngestConfigReq({
+      enabled: autoIngestConfig.enabled,
+      target_kb_name: autoIngestConfig.target_kb_name,
+      embed_model: autoIngestConfig.embed_model,
+      auto_create_kb: autoIngestConfig.auto_create_kb,
+      include_metrics: autoIngestConfig.include_metrics,
+      include_root_cause: autoIngestConfig.include_root_cause,
+      include_solution: autoIngestConfig.include_solution,
+      min_severity: autoIngestConfig.min_severity,
+      chunk_size: autoIngestConfig.chunk_size,
+      chunk_overlap: autoIngestConfig.chunk_overlap,
+      max_history_docs: autoIngestConfig.max_history_docs,
+    })
+    if (res.code === 200) {
+      ElMessage.success($t('saveSuccess'))
+    } else {
+      ElMessage.error(res.msg || 'Error')
+    }
+  } catch (e) {
+    ElMessage.error(e?.msg || 'Error')
+  } finally {
+    savingAutoIngest.value = false
+  }
+}
+
+const fetchAutoIngestStats = async () => {
+  try {
+    const res = await getAutoIngestStatsReq()
+    if (res.code === 200 && res.data) {
+      autoIngestStats.kb_exists = res.data.kb_exists ?? false
+      autoIngestStats.doc_count = res.data.doc_count ?? 0
+    }
+  } catch (e) {
+    console.error('Failed to load Auto-Ingest stats:', e)
+  }
+}
+
+const onRefreshAutoIngestStats = async () => {
+  await fetchAutoIngestStats()
+  ElMessage.success($t('litellmRefreshed'))
+}
+
+const onManualIngest = async () => {
+  manualIngesting.value = true
+  try {
+    const res = await manualIngestReq('diagnose_run_data.jsonl')
+    if (res.code === 200) {
+      ElMessage.success($t('kbAutoIngestManualIngestSuccess'))
+      fetchAutoIngestStats()
+    } else {
+      ElMessage.error($t('kbAutoIngestManualIngestFail') + ': ' + (res.msg || ''))
+    }
+  } catch (e) {
+    ElMessage.error($t('kbAutoIngestManualIngestFail'))
+  } finally {
+    manualIngesting.value = false
+  }
+}
+
+// ========== KB General Settings ==========
+const kbSettingsLoading = ref(false)
+const savingKbSettings = ref(false)
+const kbSettingsConfig = reactive({
+  chunk_size: 500,
+  overlap_size: 50,
+  vector_search_top_k: 3,
+  score_threshold: 2.0,
+  text_splitter_name: 'RecursiveCharacterTextSplitter',
+  default_vs_type: 'chromadb',
+  zh_title_enhance: false,
+  embedding_model: 'all-MiniLM-L6-v2',
+  default_knowledge_base: 'samples',
+  vs_type_prompt_total_byte_size: 3000,
+})
+
+const fetchKbSettings = async () => {
+  kbSettingsLoading.value = true
+  try {
+    const res = await getKbSettingsReq()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      kbSettingsConfig.chunk_size = d.chunk_size ?? 500
+      kbSettingsConfig.overlap_size = d.overlap_size ?? 50
+      kbSettingsConfig.vector_search_top_k = d.vector_search_top_k ?? 3
+      kbSettingsConfig.score_threshold = d.score_threshold ?? 2.0
+      kbSettingsConfig.text_splitter_name = d.text_splitter_name || 'RecursiveCharacterTextSplitter'
+      kbSettingsConfig.default_vs_type = d.default_vs_type || 'chromadb'
+      kbSettingsConfig.zh_title_enhance = d.zh_title_enhance ?? false
+      kbSettingsConfig.embedding_model = d.embedding_model || 'all-MiniLM-L6-v2'
+      kbSettingsConfig.default_knowledge_base = d.default_knowledge_base || 'samples'
+      kbSettingsConfig.vs_type_prompt_total_byte_size = d.vs_type_prompt_total_byte_size ?? 3000
+    }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    kbSettingsLoading.value = false
+  }
+}
+
+const onSaveKbSettings = async () => {
+  savingKbSettings.value = true
+  try {
+    const res = await saveKbSettingsReq({
+      chunk_size: kbSettingsConfig.chunk_size,
+      overlap_size: kbSettingsConfig.overlap_size,
+      vector_search_top_k: kbSettingsConfig.vector_search_top_k,
+      score_threshold: kbSettingsConfig.score_threshold,
+      text_splitter_name: kbSettingsConfig.text_splitter_name,
+      default_vs_type: kbSettingsConfig.default_vs_type,
+      zh_title_enhance: kbSettingsConfig.zh_title_enhance,
+      embedding_model: kbSettingsConfig.embedding_model,
+      default_knowledge_base: kbSettingsConfig.default_knowledge_base,
+      vs_type_prompt_total_byte_size: kbSettingsConfig.vs_type_prompt_total_byte_size,
+    })
+    if (res.code === 200) {
+      ElMessage.success($t('kbSettingsSaveSuccess'))
+    } else {
+      ElMessage.error(res.msg || 'Save failed')
+    }
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('Save failed')
+  } finally {
+    savingKbSettings.value = false
+  }
+}
+
+const onSaveAllKbSettings = async () => {
+  savingKbSettings.value = true
+  try {
+    await Promise.all([
+      saveKbSettingsReq({
+        chunk_size: kbSettingsConfig.chunk_size,
+        overlap_size: kbSettingsConfig.overlap_size,
+        vector_search_top_k: kbSettingsConfig.vector_search_top_k,
+        score_threshold: kbSettingsConfig.score_threshold,
+        text_splitter_name: kbSettingsConfig.text_splitter_name,
+        default_vs_type: kbSettingsConfig.default_vs_type,
+        zh_title_enhance: kbSettingsConfig.zh_title_enhance,
+        embedding_model: kbSettingsConfig.embedding_model,
+        default_knowledge_base: kbSettingsConfig.default_knowledge_base,
+        vs_type_prompt_total_byte_size: kbSettingsConfig.vs_type_prompt_total_byte_size,
+      }),
+      saveAutoIngestConfigReq({
+        enabled: autoIngestConfig.enabled,
+        target_kb_name: autoIngestConfig.target_kb_name,
+        embed_model: autoIngestConfig.embed_model,
+        auto_create_kb: autoIngestConfig.auto_create_kb,
+        include_metrics: autoIngestConfig.include_metrics,
+        include_root_cause: autoIngestConfig.include_root_cause,
+        include_solution: autoIngestConfig.include_solution,
+        min_severity: autoIngestConfig.min_severity,
+        chunk_size: autoIngestConfig.chunk_size,
+        chunk_overlap: autoIngestConfig.chunk_overlap,
+        max_history_docs: autoIngestConfig.max_history_docs,
+      }),
+    ])
+    ElMessage.success($t('saveSuccess'))
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('Save failed')
+  } finally {
+    savingKbSettings.value = false
+  }
+}
+
 // Create user
 const showCreateDialog = ref(false)
 const createLoading = ref(false)
@@ -2372,6 +2889,16 @@ const onSubmitPassword = () => {
   &.db-icon {
     background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
     color: #059669;
+  }
+
+  &.kb-icon {
+    background: linear-gradient(135deg, #ede9fe 0%, #c4b5fd 100%);
+    color: #7c3aed;
+  }
+
+  &.kbs-icon {
+    background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
+    color: #2563eb;
   }
 }
 

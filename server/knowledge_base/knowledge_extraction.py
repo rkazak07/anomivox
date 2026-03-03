@@ -16,7 +16,7 @@ def run_knowledge_extraction_script(file_path: str) -> Iterator[str]:
             if process.poll() is not None and output == '':
                 break
             if output:
-                print('Diagnosis output:', output.strip())
+                logger.debug('Diagnosis output: %s', output.strip())
                 current_task["output"] += f"{output.strip()}\n"
     except Exception as e:
         error_message = f"Error executing task: {e}"

@@ -51,7 +51,6 @@ def import_from_db(
     Currently only supports sqlite
     """
     import sqlite3 as sql
-    from pprint import pprint
 
     models = list(Base.registry.mappers)
 
@@ -64,18 +63,18 @@ def import_from_db(
             table = model.local_table.fullname
             if table not in tables:
                 continue
-            print(f"processing table: {table}")
+            logger.info("processing table: %s", table)
             with session_scope() as session:
                 for row in cur.execute(f"select * from {table}").fetchall():
                     data = {k: row[k] for k in row.keys() if k in model.columns}
                     if "create_time" in data:
                         data["create_time"] = parse(data["create_time"])
-                    pprint(data)
+                    logger.debug("importing row: %s", data)
                     session.add(model.class_(**data))
         con.close()
         return True
     except Exception as e:
-        print(f"Cannot read backup database: {sqlite_path}. Error: {e}")
+        logger.error("Cannot read backup database: %s. Error: %s", sqlite_path, e)
         return False
 
 
@@ -116,12 +115,12 @@ def folder2db(
                                                     zh_title_enhance=zh_title_enhance):
             if success:
                 _, filename, docs = result
-                print(f"Adding {kb_name}/{filename} to vector store, containing {len(docs)} documents")
+                logger.info("Adding %s/%s to vector store, containing %d documents", kb_name, filename, len(docs))
                 kb_file = KnowledgeFile(filename=filename, knowledge_base_name=kb_name)
                 kb_file.splited_docs = docs
                 kb.add_doc(kb_file=kb_file, not_refresh_vs_cache=True)
             else:
-                print(result)
+                logger.error("Failed to add document: %s", result)
 
     kb_names = kb_names or list_kbs_from_folder()
 
@@ -153,7 +152,7 @@ def folder2db(
                 kb.save_vector_store()
 
             else:
-                print(f"unspported migrate mode: {mode}")
+                logger.warning("unsupported migrate mode: %s", mode)
 
 
 def prune_db_docs(kb_names: List[str]):
@@ -170,7 +169,7 @@ def prune_db_docs(kb_names: List[str]):
             kb_files = file_to_kbfile(kb_name, files)
             for kb_file in kb_files:
                 kb.delete_doc(kb_file, not_refresh_vs_cache=True)
-                print(f"success to delete docs for file: {kb_name}/{kb_file.filename}")
+                logger.info("success to delete docs for file: %s/%s", kb_name, kb_file.filename)
             kb.save_vector_store()
 
 
@@ -187,4 +186,4 @@ def prune_folder_files(kb_names: List[str]):
             files = list(set(files_in_folder) - set(files_in_db))
             for file in files:
                 os.remove(get_file_path(kb_name, file))
-                print(f"success to delete file: {kb_name}/{file}")
+                logger.info("success to delete file: %s/%s", kb_name, file)

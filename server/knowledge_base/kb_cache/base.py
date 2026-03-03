@@ -1,12 +1,18 @@
 from langchain.embeddings.base import Embeddings
 from langchain.vectorstores.faiss import FAISS
 import threading
-from configs import (EMBEDDING_MODEL, CHUNK_SIZE,
-                    logger, log_verbose)
+import configs as _configs_mod
+import configs.model_config as _model_config_mod
+from configs import (CHUNK_SIZE, logger, log_verbose)
 from server.utils import embedding_device, get_model_path, list_online_embed_models
 from contextlib import contextmanager
 from collections import OrderedDict
 from typing import List, Any, Union, Tuple
+
+
+def _current_embedding_model() -> str:
+    """Always return the *live* EMBEDDING_MODEL value (hot-reloadable)."""
+    return getattr(_model_config_mod, "EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
 
 class ThreadSafeObject:
@@ -101,11 +107,16 @@ class CachePool:
     def load_kb_embeddings(
         self,
         kb_name: str,
-        embed_device: str = embedding_device(),
-        default_embed_model: str = EMBEDDING_MODEL,
+        embed_device: str = None,
+        default_embed_model: str = None,
     ) -> Embeddings:
         from server.db.repository.knowledge_base_repository import get_kb_detail
         from server.knowledge_base.kb_service.base import EmbeddingsFunAdapter
+
+        if embed_device is None:
+            embed_device = embedding_device()
+        if default_embed_model is None:
+            default_embed_model = _current_embedding_model()
 
         kb_detail = get_kb_detail(kb_name)
         embed_model = kb_detail.get("embed_model", default_embed_model)
@@ -119,8 +130,8 @@ class CachePool:
 class EmbeddingsPool(CachePool):
     def load_embeddings(self, model: str = None, device: str = None) -> Embeddings:
         self.atomic.acquire()
-        model = model or EMBEDDING_MODEL
-        device = embedding_device()
+        model = model or _current_embedding_model()
+        device = device or embedding_device()
         key = (model, device)
         if not self.get(key):
             item = ThreadSafeObject(key, pool=self)

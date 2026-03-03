@@ -321,6 +321,12 @@ def get_model_path(model_name: str, type: str = None) -> Optional[str]:
                 return str(path)
         return path_str  # THUDM/chatglm06b
 
+    # Fallback: if the model name isn't registered in MODEL_PATH, assume it is
+    # a sentence-transformers model that HuggingFace Hub can download.
+    if "/" not in model_name:
+        return f"sentence-transformers/{model_name}"
+    return model_name
+
 
 
 def get_model_worker_config(model_name: str = None) -> dict:

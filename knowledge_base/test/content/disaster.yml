@@ -1,0 +1,16 @@
+---
+- name: "Site Playbook for All Servers"
+  hosts: vault_dr
+  become: yes
+  pre_tasks:
+    - name: "Include DR overrides"
+      include_vars:
+        file: "{{ playbook_dir }}/group_vars/all-dr.yml"
+  roles:
+    - common
+    - firewall
+    - chrony
+    - vault
+    - keepalived
+    - auditlog
+    - disaster

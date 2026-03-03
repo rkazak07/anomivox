@@ -35,20 +35,32 @@ PROMPT_TEMPLATES = {
     "knowledge_base_chat": {
         # --- English ---
         "default":
-            '<known-information>{{ context }}</known-information>\n'
-            '<question>{{ question }}</question>\n',
+            'Use the following context from the knowledge base to answer the question. '
+            'If the answer is found in the context, provide a detailed response based on it. '
+            'If the context does not contain relevant information, clearly state that.\n\n'
+            '<context>{{ context }}</context>\n\n'
+            'Question: {{ question }}\n'
+            'Answer:',
 
         "text":
-            '<known-information>{{ context }}</known-information>\n'
-            '<question>{{ question }}</question>\n',
+            'Use the following context from the knowledge base to answer the question. '
+            'If the answer is found in the context, provide a detailed response based on it. '
+            'If the context does not contain relevant information, clearly state that.\n\n'
+            '<context>{{ context }}</context>\n\n'
+            'Question: {{ question }}\n'
+            'Answer:',
 
         "empty":
             '{{ question }}\n\n',
 
         # --- Turkish ---
         "tr":
-            '<bilinen-bilgi>{{ context }}</bilinen-bilgi>\n'
-            '<soru>{{ question }}</soru>\n',
+            'Aşağıdaki bilgi tabanı bağlamını kullanarak soruyu cevapla. '
+            'Cevap bağlamda bulunuyorsa, bağlama dayalı ayrıntılı bir yanıt ver. '
+            'Bağlamda ilgili bilgi yoksa bunu açıkça belirt.\n\n'
+            '<bağlam>{{ context }}</bağlam>\n\n'
+            'Soru: {{ question }}\n'
+            'Cevap:',
 
         "empty_tr":
             '{{ question }}\n\n',

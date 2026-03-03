@@ -27,9 +27,9 @@ async def knowledge_base_chat(query: str = Body(..., description="User input", e
                               top_k: int = Body(VECTOR_SEARCH_TOP_K, description="Number of matching vectors"),
                               score_threshold: float = Body(
                                   SCORE_THRESHOLD,
-                                  description="Knowledge base match threshold (0-1). Lower SCORE = higher relevance. 1 means no filtering, 0.5 recommended",
+                                  description="Knowledge base match threshold. Lower SCORE = higher relevance. Use higher values to include more results.",
                                   ge=0,
-                                  le=2
+                                  le=4
 ),
     history: List[History] = Body(
                                   [],

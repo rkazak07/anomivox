@@ -254,7 +254,7 @@ def make_text_splitter(
                         chunk_overlap=chunk_overlap
                     )
     except Exception as e:
-        print(e)
+        logger.error("Failed to load text splitter: %s", e)
         text_splitter_module = importlib.import_module('langchain.text_splitter')
         TextSplitter = getattr(text_splitter_module, "RecursiveCharacterTextSplitter")
         text_splitter = TextSplitter(chunk_size=chunk_size, chunk_overlap=50)
@@ -336,7 +336,7 @@ class KnowledgeFile:
         if not docs:
             return []
 
-        print(f"Document split example: {docs[0]}")
+        logger.debug("Document split example: %s", docs[0])
         if zh_title_enhance:
             docs = func_zh_title_enhance(docs)
         self.splited_docs = docs
@@ -425,4 +425,3 @@ if __name__ == "__main__":
         knowledge_base_name="samples")
     # kb_file.text_splitter_name = "RecursiveCharacterTextSplitter"
     docs = kb_file.file2docs()
-    # pprint(docs[-1])

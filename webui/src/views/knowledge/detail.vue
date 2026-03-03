@@ -177,7 +177,6 @@ const editForm = reactive({
 watch(
     () => activeIndex.value,
     (newValue, oldValue) => {
-      console.log('activeIndex', newValue, oldValue)
       if (newValue === 'setting') {
         getKnowledgeBaseDetail()
       }
@@ -288,7 +287,6 @@ const onUploadDocsClick = () => {
 }
 
 const uploadFile = (files) => {
-  console.log(files)
   knowledgeUploadDocsReq(route.query.kb_name, files.file).then(() => {
     ElMessage({
       type: 'success',
@@ -305,7 +303,6 @@ const onMenuClick = (index) => {
 }
 
 const onHandleFileReviewClick = (file) => {
-  console.log('file:', file)
   fileSplitContents.value = []
   reviewDrawerTitle.value = file.file_name
   reviewDrawer.value = true
@@ -314,7 +311,6 @@ const onHandleFileReviewClick = (file) => {
 }
 
 const onHandleFileDeleteClick = (file) => {
-  console.log('file:', file)
   ElMessageBox.confirm(
       'Will permanently delete the file. Continue?',
       'Warning',

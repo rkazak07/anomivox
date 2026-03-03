@@ -14,6 +14,12 @@
               </el-icon>
               <span>Dataset</span>
             </div>
+            <div :class="`rowSC menu-item ${activeIndex === 'chat' ? ' active' : ''}`" @click="onMenuClick('chat')">
+              <el-icon>
+                <ChatDotRound/>
+              </el-icon>
+              <span>{{ $t('kbChat') }}</span>
+            </div>
             <div :class="`rowSC menu-item ${activeIndex === 'search' ? ' active' : ''}`" @click="onMenuClick('search')">
               <el-icon>
                 <Search/>

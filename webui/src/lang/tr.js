@@ -52,6 +52,8 @@ export default {
   createSuccessfully: 'Başarıyla Oluşturuldu',
   knowledgeBase: 'Bilgi Tabanı:',
   useCache: 'Önbellek Kullan:',
+  clearChat: 'Sohbeti Temizle',
+  chatCleared: 'Sohbet geçmişi temizlendi',
   pleaseInputSomething: 'Lütfen bir şeyler yazın',
   pleaseCreateAndSelectKnowledgeBase: 'Lütfen önce bir bilgi tabanı oluşturun ve seçin',
   uploadSuccessful: 'Yükleme başarılı. Tanı başlatılıyor!',

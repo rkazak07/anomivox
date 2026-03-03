@@ -235,14 +235,37 @@ def delete_docs(
                 kb.delete_doc(kb_file, delete_content, not_refresh_vs_cache=True)
             except ValueError:
                 # File format not supported by KnowledgeFile – fall back to
-                # deleting just the DB record and the physical file.
+                # deleting just the DB records and the physical file directly.
                 try:
-                    from server.db.repository.knowledge_file_repository import delete_files_from_db
-                    delete_files_from_db([file_name], knowledge_base_name)
+                    from server.db.repository.knowledge_file_repository import (
+                        delete_docs_from_db,
+                    )
+                    from server.db.models.knowledge_file_model import KnowledgeFileModel
+                    from server.db.models.knowledge_base_model import KnowledgeBaseModel
+                    from server.db.session import session_scope
+
+                    # 1) Delete FileDocModel rows via existing helper
+                    delete_docs_from_db(kb_name=knowledge_base_name, file_name=file_name)
+
+                    # 2) Delete KnowledgeFileModel row & decrement file_count
+                    with session_scope() as session:
+                        existing = session.query(KnowledgeFileModel).filter_by(
+                            file_name=file_name, kb_name=knowledge_base_name
+                        ).first()
+                        if existing:
+                            session.delete(existing)
+                            kb = session.query(KnowledgeBaseModel).filter_by(
+                                kb_name=knowledge_base_name
+                            ).first()
+                            if kb:
+                                kb.file_count = max((kb.file_count or 1) - 1, 0)
+
+                    # 3) Optionally remove the physical file
                     if delete_content:
                         filepath = get_file_path(knowledge_base_name, file_name)
                         if os.path.exists(filepath):
                             os.remove(filepath)
+
                     logger.info("Deleted unsupported-format file from DB: %s", file_name)
                 except Exception as inner_e:
                     msg = f"Failed to delete unsupported file {file_name}: {inner_e}"

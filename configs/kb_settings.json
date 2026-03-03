@@ -6,7 +6,7 @@
   "text_splitter_name": "RecursiveCharacterTextSplitter",
   "default_vs_type": "chromadb",
   "zh_title_enhance": false,
-  "embedding_model": "all-MiniLM-L6-v2",
+  "embedding_model": "text-embedding-ada-002",
   "default_knowledge_base": "samples",
   "vs_type_prompt_total_byte_size": 3000
 }

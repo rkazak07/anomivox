@@ -52,6 +52,8 @@ export default {
   createSuccessfully: 'Create Successfully',
   knowledgeBase: 'Knowledge Base:',
   useCache: 'Use Cache:',
+  clearChat: 'Clear Chat',
+  chatCleared: 'Chat history cleared',
   pleaseInputSomething: 'Please input something',
   pleaseCreateAndSelectKnowledgeBase: 'Please create and select a knowledge base first',
   uploadSuccessful: 'Upload successful. Start diagnosis!',

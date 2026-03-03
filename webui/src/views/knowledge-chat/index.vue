@@ -52,6 +52,12 @@
         <span>{{ $t('useCache') }}</span>
         <el-switch v-model="userCache" size="default"/>
       </div>
+
+      <div class="header-item" style="margin-left: auto;">
+        <el-button type="danger" plain size="small" @click="clearChatHistory">
+          🗑️ {{ $t('clearChat') }}
+        </el-button>
+      </div>
     </div>
 
     <div ref="messagesScrollDiv" class="messages-container">
@@ -87,8 +93,11 @@ interface KnowledgeMessage {
   cacheData: object[]
 }
 
-const KNOWLEDGE_CHAT_HISTORY_KEY = 'anomivox-knowledge-chat-history'
+const KNOWLEDGE_CHAT_HISTORY_PREFIX = 'anomivox-kb-chat-'
 const KNOWLEDGE_CHAT_USR_CACHE_KEY = 'anomivox-knowledge-chat-use-cache'
+
+/** Return a per-KB localStorage key for chat history */
+const chatHistoryKey = () => `${KNOWLEDGE_CHAT_HISTORY_PREFIX}${knowledgeBase.value}`
 
 const router = useRouter()
 const { t } = useI18n()
@@ -121,11 +130,20 @@ watch(userCache, (newValue) => {
   localStorage.setItem(KNOWLEDGE_CHAT_USR_CACHE_KEY, String(newValue));
 });
 
+// When the selected KB changes, load its own chat history
+watch(knowledgeBase, (newKb, oldKb) => {
+  if (newKb) {
+    messageList.value = getLocalHistoryMessages()
+  } else {
+    messageList.value = []
+  }
+})
+
 onMounted(() => {
   nextTick(() => {
     getLlmModelListModels()
     getKnowledgeList()
-    messageList.value = getLocalHistoryMessages()
+    // messageList will be loaded by the knowledgeBase watcher after getKnowledgeList sets it
   })
 });
 
@@ -203,7 +221,15 @@ const getHistoryMessages = () => {
 }
 
 const saveHistoryMessagesToLocal = () => {
-  localStorage.setItem(KNOWLEDGE_CHAT_HISTORY_KEY, JSON.stringify(messageList.value))
+  if (!knowledgeBase.value) return
+  localStorage.setItem(chatHistoryKey(), JSON.stringify(messageList.value))
+}
+
+const clearChatHistory = () => {
+  if (!knowledgeBase.value) return
+  messageList.value = []
+  localStorage.removeItem(chatHistoryKey())
+  ElMessage.success(t('chatCleared'))
 }
 
 const ignoreMessageCache = (message: KnowledgeMessage) => {
@@ -215,7 +241,8 @@ const ignoreMessageCache = (message: KnowledgeMessage) => {
 }
 
 const getLocalHistoryMessages = () => {
-  const historyMessages = JSON.parse(localStorage.getItem(KNOWLEDGE_CHAT_HISTORY_KEY) || '[]')
+  if (!knowledgeBase.value) return []
+  const historyMessages = JSON.parse(localStorage.getItem(chatHistoryKey()) || '[]')
   return historyMessages.map((item: KnowledgeMessage) => {
     return {
       role: item.role,

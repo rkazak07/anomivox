@@ -10,10 +10,11 @@ import requests
 from configs import DIAGNOSTIC_RESULTS_PATH
 from prometheus_service_docker.yaml_utils import read_prometheus_metrics_yaml
 
+# Prometheus bağlantı — env var'lardan oku, Docker servis isimleri varsayılan
 PROMETHEUS_CONFIG = {
-    "api_url": "http://8.131.129.55:9090/",
-    "postgresql_exporter_instance": "112.27.58.65:9187",
-    "node_exporter_instance": "171.27.58.65:9100"
+    "api_url": os.environ.get("PROMETHEUS_URL", "http://prometheus:9090") + "/",
+    "postgresql_exporter_instance": os.environ.get("PG_EXPORTER_INSTANCE", "pg_exporter:9630"),
+    "node_exporter_instance": os.environ.get("NODE_EXPORTER_INSTANCE", "node_exporter:9100"),
 }
 
 prometheus_metrics = read_prometheus_metrics_yaml(

@@ -1,6 +1,7 @@
+import os
 import requests
 
-prometheus_api_url = "http://localhost:9090/api/v1/query"
+prometheus_api_url = os.environ.get("PROMETHEUS_URL", "http://prometheus:9090") + "/api/v1/query"
 
 cpu_query = '100 - (avg by (instance) (irate(node_cpu_seconds_total{instance="node_exporter:9100",mode="idle"}[5m])) * 100)'
 

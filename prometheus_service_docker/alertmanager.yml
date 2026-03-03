@@ -7,7 +7,7 @@ route:
 receivers:
   - name: 'anomivox'
     webhook_configs:
-      - url: 'http://python_app:8023/alert'
+      - url: 'http://notify-worker:8023/alert'
 inhibit_rules:
   - source_match:
       severity: 'critical'

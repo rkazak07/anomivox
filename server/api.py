@@ -106,6 +106,7 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     mount_telegram_alert_routes(app)
     mount_litellm_routes(app)
     mount_db_target_routes(app)
+    mount_dashboard_routes(app)
 
     from server.utils import all_embed_models
 
@@ -291,6 +292,24 @@ def mount_diagnose_routes(app: FastAPI):
              tags=["Diagnose"],
              response_model=BaseResponse,
              summary="Kullanıcı geri bildirimi ekle")(diagnose_user_feedback)
+
+
+def mount_dashboard_routes(app: FastAPI):
+    from server.dashboard.dashboard_api import (
+        dashboard_health, dashboard_diagnosis_summary, dashboard_pipeline_status
+    )
+    app.get("/dashboard/health",
+            tags=["Dashboard"],
+            response_model=BaseResponse,
+            summary="Servis sağlık durumu")(dashboard_health)
+    app.post("/dashboard/diagnosis_summary",
+             tags=["Dashboard"],
+             response_model=BaseResponse,
+             summary="Teşhis istatistikleri özeti")(dashboard_diagnosis_summary)
+    app.get("/dashboard/pipeline_status",
+            tags=["Dashboard"],
+            response_model=BaseResponse,
+            summary="Pipeline zincir durumu")(dashboard_pipeline_status)
 
 
 def mount_alert_routes(app: FastAPI):

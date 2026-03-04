@@ -20,7 +20,19 @@ export const constantRoutes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/chat',
+    redirect: '/dashboard',
+    children: [
+      {
+        path: 'dashboard',
+        name: 'Dashboard',
+        component: () => import('@/views/dashboard/index.vue'),
+        meta: { title: 'Dashboard', elSvgIcon: 'Monitor', affix: true }
+      }
+    ]
+  },
+  {
+    path: '/chat',
+    component: Layout,
     children: [
       {
         path: 'chat',

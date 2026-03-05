@@ -77,7 +77,7 @@
       <!-- Teleport: dialog body'e render edilir, sidebar layout'u etkilemez -->
       <Teleport to="body">
         <el-dialog v-model="showPwdDialog" :title="$t('changeMyPassword')" width="420px" :close-on-click-modal="false" @close="resetPwdForm">
-          <el-form ref="refPwdForm" :model="pwdForm" :rules="pwdRules" label-width="140px">
+          <el-form ref="refPwdForm" :model="pwdForm" :rules="pwdRules" label-position="top">
             <el-form-item :label="$t('currentPassword')" prop="currentPassword">
               <el-input v-model="pwdForm.currentPassword" type="password" show-password :placeholder="$t('pleaseInputCurrentPassword')" />
             </el-form-item>
@@ -176,11 +176,17 @@ const showPwdDialog = ref(false)
 const pwdLoading = ref(false)
 const refPwdForm = ref(null)
 const pwdForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
+const validatePwdStrength = (rule, value, callback) => {
+  if (!value) { callback(); return }
+  const re = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
+  if (!re.test(value)) callback(new Error($t('passwordStrength')))
+  else callback()
+}
 const pwdRules = {
   currentPassword: [{ required: true, message: () => $t('pleaseInputCurrentPassword'), trigger: 'blur' }],
   newPassword: [
     { required: true, message: () => $t('pleaseInputNewPassword'), trigger: 'blur' },
-    { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+    { validator: validatePwdStrength, trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },

@@ -1470,7 +1470,7 @@
       </div>
       <Transition name="collapse-body">
         <div v-show="sections.myPassword" class="collapse-card-body">
-          <el-form ref="refMyPasswordForm" :model="myPasswordForm" :rules="myPasswordRules" label-width="160px" style="max-width: 500px;">
+          <el-form ref="refMyPasswordForm" :model="myPasswordForm" :rules="myPasswordRules" label-position="top" style="max-width: 500px;">
             <el-form-item :label="$t('currentPassword')" prop="currentPassword">
               <el-input v-model="myPasswordForm.currentPassword" type="password" show-password :placeholder="$t('pleaseInputCurrentPassword')" />
             </el-form-item>
@@ -1669,7 +1669,7 @@
 
     <!-- Create User Dialog -->
     <el-dialog v-model="showCreateDialog" :title="$t('addUser')" width="420px" :close-on-click-modal="false">
-      <el-form ref="refCreateForm" :model="createForm" :rules="createRules" label-width="120px">
+      <el-form ref="refCreateForm" :model="createForm" :rules="createRules" label-position="top">
         <el-form-item :label="$t('username')" prop="username">
           <el-input v-model="createForm.username" :placeholder="$t('pleaseInputUsername')" />
         </el-form-item>
@@ -1694,7 +1694,7 @@
 
     <!-- Change Password Dialog -->
     <el-dialog v-model="showPasswordDialog" :title="$t('changePassword')" width="420px" :close-on-click-modal="false">
-      <el-form ref="refPasswordForm" :model="passwordForm" :rules="passwordRules" label-width="120px">
+      <el-form ref="refPasswordForm" :model="passwordForm" :rules="passwordRules" label-position="top">
         <el-form-item :label="$t('username')">
           <el-input :model-value="passwordForm.username" disabled />
         </el-form-item>
@@ -1729,6 +1729,13 @@ import { useI18n } from 'vue-i18n'
 const { t: $t } = useI18n()
 const basicStore = useBasicStore()
 const isAdmin = computed(() => basicStore.roles.includes('admin'))
+
+const validatePasswordStrength = (rule, value, callback) => {
+  if (!value) { callback(); return }
+  const re = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
+  if (!re.test(value)) callback(new Error($t('passwordStrength')))
+  else callback()
+}
 
 // Collapsible sections state
 const sections = reactive({
@@ -2718,7 +2725,7 @@ const createRules = {
   username: [{ required: true, message: () => $t('pleaseInputUsername'), trigger: 'blur' }],
   password: [
     { required: true, message: () => $t('pleaseInputPassword'), trigger: 'blur' },
-    { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+    { validator: validatePasswordStrength, trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },
@@ -2801,7 +2808,7 @@ const passwordForm = reactive({ userId: null, username: '', newPassword: '', con
 const passwordRules = {
   newPassword: [
     { required: true, message: () => $t('pleaseInputNewPassword'), trigger: 'blur' },
-    { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+    { validator: validatePasswordStrength, trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },
@@ -2851,7 +2858,7 @@ const myPasswordRules = {
   currentPassword: [{ required: true, message: () => $t('pleaseInputCurrentPassword'), trigger: 'blur' }],
   newPassword: [
     { required: true, message: () => $t('pleaseInputNewPassword'), trigger: 'blur' },
-    { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+    { validator: validatePasswordStrength, trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },

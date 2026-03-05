@@ -71,33 +71,33 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="create_time" :label="$t('createdAt')" width="200" />
-            <el-table-column :label="$t('actions')" width="280" fixed="right">
+            <el-table-column :label="$t('createdAt')" width="120">
               <template #default="{ row }">
-                <el-button
-                  :type="row.is_active ? 'warning' : 'success'"
-                  size="small"
-                  plain
-                  @click="onToggleUser(row)"
-                >
-                  {{ row.is_active ? $t('deactivate') : $t('activate') }}
-                </el-button>
-                <el-button
-                  type="primary"
-                  size="small"
-                  plain
-                  @click="onChangePassword(row)"
-                >
-                  {{ $t('changePassword') }}
-                </el-button>
-                <el-button
-                  type="danger"
-                  size="small"
-                  plain
-                  @click="onDeleteUser(row)"
-                >
-                  {{ $t('deleteUser') }}
-                </el-button>
+                <span style="font-size:12px; color:#909399;">
+                  {{ row.create_time ? row.create_time.slice(0, 10) : '-' }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="$t('actions')" width="100" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-dropdown trigger="click" @command="(cmd) => onUserAction(cmd, row)">
+                  <el-button size="small" plain>
+                    {{ $t('actions') }} <el-icon style="margin-left:4px"><ArrowDown /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="toggle" :icon="row.is_active ? 'Lock' : 'Unlock'">
+                        {{ row.is_active ? $t('deactivate') : $t('activate') }}
+                      </el-dropdown-item>
+                      <el-dropdown-item command="password" divided>
+                        {{ $t('changePassword') }}
+                      </el-dropdown-item>
+                      <el-dropdown-item command="delete" divided style="color:#f56c6c;">
+                        {{ $t('deleteUser') }}
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </template>
             </el-table-column>
           </el-table>
@@ -2832,6 +2832,12 @@ const onChangePassword = (row) => {
   passwordForm.newPassword = ''
   passwordForm.confirmPassword = ''
   showPasswordDialog.value = true
+}
+
+const onUserAction = (cmd, row) => {
+  if (cmd === 'toggle') onToggleUser(row)
+  else if (cmd === 'password') onChangePassword(row)
+  else if (cmd === 'delete') onDeleteUser(row)
 }
 
 const onSubmitPassword = () => {

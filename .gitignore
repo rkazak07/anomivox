@@ -1,0 +1,62 @@
+# ═══════════════════════════════════════════
+# Environment & Secrets
+# ═══════════════════════════════════════════
+.env
+.env.*
+!.env.example
+
+# ═══════════════════════════════════════════
+# Python
+# ═══════════════════════════════════════════
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+.Python
+pip-log.txt
+
+# ═══════════════════════════════════════════
+# Runtime Data & Databases
+# ═══════════════════════════════════════════
+chroma_db/
+knowledge_base/*.db
+*.sqlite3
+diagnose_run_data.jsonl
+diagnose_run_data_copy.jsonl
+nohup.out
+logs/
+logs_data/
+
+# ═══════════════════════════════════════════
+# User Configurations (UI tarafindan olusturulan)
+# ═══════════════════════════════════════════
+configs/db_targets.json
+configs/kb_settings.json
+
+# ═══════════════════════════════════════════
+# Node.js / Frontend Build
+# ═══════════════════════════════════════════
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+
+# ═══════════════════════════════════════════
+# IDE & OS
+# ═══════════════════════════════════════════
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ═══════════════════════════════════════════
+# Misc
+# ═══════════════════════════════════════════
+*.log

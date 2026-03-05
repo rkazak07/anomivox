@@ -1,5 +1,6 @@
-import hashlib
+import os
 import secrets
+import bcrypt
 from datetime import datetime, timedelta
 from server.db.models.user_model import UserModel, TokenModel, PasswordResetTokenModel
 from server.db.session import with_session
@@ -8,9 +9,26 @@ from typing import Optional, List, Dict
 RESET_TOKEN_EXPIRY_MINUTES = 30
 
 
-def _hash_password(password: str) -> str:
-    """Hash password with SHA-256."""
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+def _hash_password(sha256_hex: str) -> str:
+    """Hash a SHA-256 hex string with bcrypt for secure storage.
+
+    Client sends SHA-256(plaintext). We bcrypt that to protect against
+    DB leaks — the bcrypt hash cannot be replayed directly as a password.
+    """
+    return bcrypt.hashpw(sha256_hex.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def _verify_password(sha256_hex: str, stored_hash: str) -> bool:
+    """Verify SHA-256 hex against a bcrypt hash."""
+    try:
+        return bcrypt.checkpw(sha256_hex.encode('utf-8'), stored_hash.encode('utf-8'))
+    except Exception:
+        return False
+
+
+def _is_bcrypt_hash(value: str) -> bool:
+    """Return True if value looks like a bcrypt hash."""
+    return value.startswith(('$2b$', '$2a$', '$2y$'))
 
 
 # ── Token expiration (saat) ──────────────────────────────────────────────────
@@ -19,18 +37,36 @@ TOKEN_EXPIRY_HOURS = 24
 
 @with_session
 def init_admin_user(session):
-    """Create default admin user if not exists."""
+    """Create default admin user if not exists. Migrates legacy hash if env var is set."""
+    import hashlib
+    import logging
+    logger = logging.getLogger(__name__)
+    default_pwd = os.environ.get("ADMIN_DEFAULT_PASSWORD")
+
     admin = session.query(UserModel).filter_by(username='admin').first()
     if not admin:
+        pwd = default_pwd or secrets.token_urlsafe(16)
+        sha256_of_pwd = hashlib.sha256(pwd.encode('utf-8')).hexdigest()
         admin = UserModel(
             username='admin',
-            password_hash=_hash_password('Jsue3M6i*42NuNQe9nAosQRFVoxFqMpN1'),
+            password_hash=_hash_password(sha256_of_pwd),
             role='admin',
             is_active=True
         )
         session.add(admin)
-    elif admin.role != 'admin':
-        admin.role = 'admin'
+        if not default_pwd:
+            logger.warning(
+                "ADMIN_DEFAULT_PASSWORD env var not set. "
+                "Generated random admin password — set it via env var before deploying."
+            )
+    else:
+        if admin.role != 'admin':
+            admin.role = 'admin'
+        # Migrate: if DB still has a legacy SHA-256 hash and env var is set, update the password
+        if default_pwd and not _is_bcrypt_hash(admin.password_hash):
+            sha256_of_pwd = hashlib.sha256(default_pwd.encode('utf-8')).hexdigest()
+            admin.password_hash = _hash_password(sha256_of_pwd)
+            logger.info("Admin password migrated to bcrypt with ADMIN_DEFAULT_PASSWORD.")
     return True
 
 
@@ -38,19 +74,23 @@ def init_admin_user(session):
 def authenticate_user(session, username: str, password: str) -> Optional[Dict]:
     """Authenticate user with username and password.
 
-    Password comes pre-hashed (SHA-256 hex) from the client.
-    DB stores SHA-256 hex hash, so we compare directly.
-    For backward compatibility, also try hashing the input
-    in case it's a plain text password.
+    Client sends SHA-256(plaintext). Server stores bcrypt(SHA-256(plaintext)).
+    Legacy accounts still storing a raw SHA-256 hex are migrated to bcrypt on login.
     """
     user = session.query(UserModel).filter_by(username=username).first()
     if not user:
         return None
-    # Client sends SHA-256 hex hash - compare directly
-    if user.password_hash != password:
-        # Backward compat: maybe it's plain text (old client)
-        if user.password_hash != _hash_password(password):
+
+    if _is_bcrypt_hash(user.password_hash):
+        # Modern path: bcrypt verification
+        if not _verify_password(password, user.password_hash):
             return None
+    else:
+        # Legacy path: raw SHA-256 hex in DB — verify then migrate to bcrypt
+        if user.password_hash != password:
+            return None
+        user.password_hash = _hash_password(password)  # upgrade in-place
+
     if not user.is_active:
         return None
     return {
@@ -136,10 +176,9 @@ def create_user(session, username: str, password: str, role: str = "user", email
     existing = session.query(UserModel).filter_by(username=username).first()
     if existing:
         return {"success": False, "msg": "Bu kullanici adi zaten mevcut"}
-    pwd_hash = password if len(password) == 64 else _hash_password(password)
     user = UserModel(
         username=username,
-        password_hash=pwd_hash,
+        password_hash=_hash_password(password),
         email=email,
         role=role,
         is_active=True
@@ -229,8 +268,7 @@ def change_user_password(session, user_id: int, new_password: str) -> Dict:
     user = session.query(UserModel).filter_by(id=user_id).first()
     if not user:
         return {"success": False, "msg": "Kullanici bulunamadi"}
-    pwd_hash = new_password if len(new_password) == 64 else _hash_password(new_password)
-    user.password_hash = pwd_hash
+    user.password_hash = _hash_password(new_password)
     session.query(TokenModel).filter_by(user_id=user_id).delete()
     return {"success": True, "msg": "Sifre basariyla degistirildi"}
 
@@ -242,10 +280,13 @@ def change_own_password(session, user_id: int, current_password: str, new_passwo
     if not user:
         return {"success": False, "msg": "Kullanici bulunamadi"}
     # Mevcut sifre dogrulama
-    current_hash = current_password if len(current_password) == 64 else _hash_password(current_password)
-    if user.password_hash != current_hash:
-        return {"success": False, "msg": "Mevcut sifre yanlis"}
-    new_hash = new_password if len(new_password) == 64 else _hash_password(new_password)
-    user.password_hash = new_hash
+    if _is_bcrypt_hash(user.password_hash):
+        if not _verify_password(current_password, user.password_hash):
+            return {"success": False, "msg": "Mevcut sifre yanlis"}
+    else:
+        # Legacy: raw SHA-256 in DB
+        if user.password_hash != current_password:
+            return {"success": False, "msg": "Mevcut sifre yanlis"}
+    user.password_hash = _hash_password(new_password)
     session.query(TokenModel).filter_by(user_id=user_id).delete()
     return {"success": True, "msg": "Sifre basariyla degistirildi"}

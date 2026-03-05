@@ -26,6 +26,7 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-anomivox-local}
       # DBA Agent bağlantısı
       DBA_AGENT_URL: http://dba-agent:8100
+      ADMIN_DEFAULT_PASSWORD: ${ADMIN_DEFAULT_PASSWORD:-}
     ports:
       - "7861:7861"
     volumes:

@@ -2,7 +2,7 @@
   <div class="login-container columnCC">
     <el-form ref="refLoginForm" class="login-form" :model="subForm" :rules="formRules" autocomplete="off">
       <div class="title-container">
-        <h3 class="title text-center">{{ settings.title }}</h3>
+        <img src="/logo-buyuk.png" class="login-logo" alt="Anomivox" />
       </div>
       <el-form-item prop="keyword" :rules="formRules.isNotNull($t('usernameRequired'))">
         <div class="rowSC">
@@ -165,12 +165,11 @@ $light_gray: #eee;
     width: 360px;
   }
   .title-container {
-    .title {
-      font-size: 22px;
-      color: #eee;
-      margin: 0px auto 25px auto;
-      text-align: center;
-      font-weight: bold;
+    text-align: center;
+    margin-bottom: 25px;
+    .login-logo {
+      max-width: 240px;
+      width: 100%;
     }
   }
 }

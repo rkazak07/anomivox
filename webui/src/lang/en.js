@@ -109,6 +109,7 @@ export default {
   noPermissionDesc: 'You need administrator privileges to access this page.',
   pleaseInputUsername: 'Please input username',
   pleaseInputPassword: 'Please input password',
+  pleaseInputEmail: 'username@domain.com',
   passwordMinLength: 'Password must be at least 8 characters',
   passwordStrength: 'Weak password — need 8+ chars, A-Z, a-z, 0-9, special char',
   newPassword: 'New Password',

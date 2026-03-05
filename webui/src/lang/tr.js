@@ -109,6 +109,7 @@ export default {
   noPermissionDesc: 'Bu sayfaya erişmek için yönetici yetkisine sahip olmanız gerekmektedir.',
   pleaseInputUsername: 'Lütfen kullanıcı adı girin',
   pleaseInputPassword: 'Lütfen şifre girin',
+  pleaseInputEmail: 'kullanici@domain.com',
   passwordMinLength: 'Şifre en az 8 karakter olmalıdır',
   passwordStrength: 'Şifre zayıf — 8+ karakter, A-Z, a-z, 0-9, özel karakter gerekli',
   newPassword: 'Yeni Şifre',

@@ -1686,8 +1686,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="E-posta" prop="email">
-          <el-input v-model="createForm.email" type="email" placeholder="kullanici@sirket.com" />
-          <div style="color:#909399; font-size:12px; margin-top:4px;">Parola sıfırlama için gerekli</div>
+          <el-input v-model="createForm.email" type="email" :placeholder="$t('pleaseInputEmail')" />
         </el-form-item>
       </el-form>
       <template #footer>

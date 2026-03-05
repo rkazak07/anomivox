@@ -37,9 +37,39 @@ async def document():
     return RedirectResponse(url="/docs")
 
 
+def _run_db_migrations():
+    """Apply incremental DB migrations (safe to run on every startup)."""
+    from server.db.base import engine
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        # v2: email column on app_user
+        try:
+            conn.execute(text("ALTER TABLE app_user ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        # v2: password_reset_token table
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS password_reset_token (
+                    id SERIAL PRIMARY KEY,
+                    token VARCHAR(64) UNIQUE NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    expires_at TIMESTAMP NOT NULL,
+                    used BOOLEAN DEFAULT FALSE
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_password_reset_token_token ON password_reset_token(token)"))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
+
 def create_app(run_mode: str = None):
     from server.knowledge_base.migrate import create_tables
     create_tables()
+    _run_db_migrations()
     # Initialize default admin user
     from server.db.repository.user_repository import init_admin_user
     init_admin_user()
@@ -178,7 +208,8 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
 def mount_auth_routes(app: FastAPI):
     from server.auth.auth_api import (
         login, logout, current_user_info, api_list_users, api_create_user,
-        api_toggle_user, api_delete_user, api_change_password, api_change_my_password
+        api_toggle_user, api_delete_user, api_change_password, api_change_my_password,
+        api_update_user_email, api_forgot_password, api_reset_password,
     )
     app.post("/auth/login", tags=["Auth"], response_model=BaseResponse, summary="Kullanici girisi")(login)
     app.post("/auth/logout", tags=["Auth"], response_model=BaseResponse, summary="Kullanici cikisi")(logout)
@@ -189,6 +220,9 @@ def mount_auth_routes(app: FastAPI):
     app.post("/auth/delete_user", tags=["Auth"], response_model=BaseResponse, summary="Kullaniciyi sil (admin)")(api_delete_user)
     app.post("/auth/change_password", tags=["Auth"], response_model=BaseResponse, summary="Kullanici sifresini degistir (admin)")(api_change_password)
     app.post("/auth/change_my_password", tags=["Auth"], response_model=BaseResponse, summary="Kendi sifresini degistir")(api_change_my_password)
+    app.post("/auth/update_user_email", tags=["Auth"], response_model=BaseResponse, summary="Kullanici e-postasini guncelle (admin)")(api_update_user_email)
+    app.post("/auth/forgot_password", tags=["Auth"], response_model=BaseResponse, summary="Parola sifirlama maili gonder")(api_forgot_password)
+    app.post("/auth/reset_password", tags=["Auth"], response_model=BaseResponse, summary="Parola sifirla")(api_reset_password)
 
     # Conversation yönetimi
     from server.chat.conversation_api import (

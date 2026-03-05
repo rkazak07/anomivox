@@ -239,6 +239,29 @@ def send_diagnosis_mail(report: str, status: str = "completed") -> bool:
     return send_mail(subject, body_html, report[:3000])
 
 
+def send_password_reset_mail(email: str, username: str, reset_token: str, base_url: str) -> bool:
+    """Parola sıfırlama linki maili gönder."""
+    reset_url = f"{base_url.rstrip('/')}/#/reset-password?token={reset_token}"
+    content = f"""
+    <h2>🔑 Parola Sıfırlama</h2>
+    <p>Merhaba <strong>{username}</strong>,</p>
+    <p>Hesabınız için parola sıfırlama talebinde bulunuldu. Aşağıdaki butona tıklayarak yeni parolanızı belirleyebilirsiniz.</p>
+    <p style="text-align:center; margin: 24px 0;">
+        <a href="{reset_url}"
+           style="background:#667eea; color:#fff; padding:12px 28px; border-radius:8px;
+                  text-decoration:none; font-weight:600; display:inline-block;">
+            Parolayı Sıfırla
+        </a>
+    </p>
+    <p style="color:#888; font-size:13px;">Bu link <strong>30 dakika</strong> geçerlidir. Eğer bu talebi siz yapmadıysanız bu e-postayı görmezden gelin.</p>
+    <div class="code" style="word-break:break-all;">{reset_url}</div>
+    """
+    subject = "🔑 Anomivox — Parola Sıfırlama"
+    body_html = _html_template("Parola Sıfırlama Talebi", content)
+    body_text = f"Parola sıfırlama linki: {reset_url}\n\nBu link 30 dakika geçerlidir."
+    return send_mail(subject, body_html, body_text, recipients=[email])
+
+
 def send_health_mail(issues: list) -> bool:
     """Sağlık kontrolü uyarı maili gönder."""
     if not CONFIG or not CONFIG.get("notify_on_health"):

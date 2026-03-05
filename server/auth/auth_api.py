@@ -1,5 +1,5 @@
 import secrets
-from fastapi import Body, Header
+from fastapi import Body, Header, Request
 from typing import Optional
 from server.utils import BaseResponse
 from server.db.repository.user_repository import (
@@ -14,6 +14,10 @@ from server.db.repository.user_repository import (
     get_user_by_token,
     delete_token,
     cleanup_expired_tokens,
+    update_user_email,
+    get_user_by_email,
+    create_reset_token,
+    consume_reset_token,
 )
 
 
@@ -112,13 +116,30 @@ async def api_create_user(
     username: str = Body(..., description="New username"),
     password: str = Body(..., description="New password"),
     role: str = Body("user", description="Role: admin or user"),
+    email: Optional[str] = Body(None, description="Email address"),
     authorization: Optional[str] = Header(None),
 ):
     """Create a new user (admin only)."""
     user, err = _require_admin(authorization)
     if err:
         return err
-    result = create_user(username=username, password=password, role=role)
+    result = create_user(username=username, password=password, role=role, email=email)
+    if result["success"]:
+        return BaseResponse(code=200, msg=result["msg"])
+    else:
+        return BaseResponse(code=400, msg=result["msg"])
+
+
+async def api_update_user_email(
+    user_id: int = Body(..., description="User ID", embed=True),
+    email: str = Body(..., description="Email address", embed=True),
+    authorization: Optional[str] = Header(None),
+):
+    """Update a user's email address (admin only)."""
+    user, err = _require_admin(authorization)
+    if err:
+        return err
+    result = update_user_email(user_id=user_id, email=email)
     if result["success"]:
         return BaseResponse(code=200, msg=result["msg"])
     else:
@@ -169,6 +190,42 @@ async def api_change_password(
         return BaseResponse(code=200, msg=result["msg"])
     else:
         return BaseResponse(code=400, msg=result["msg"])
+
+
+async def api_forgot_password(
+    request: Request,
+    email: str = Body(..., description="User email address", embed=True),
+):
+    """Send password reset email. Always returns 200 to prevent user enumeration."""
+    user = get_user_by_email(email=email)
+    if user:
+        token = create_reset_token(user_id=user["id"])
+        base_url = str(request.base_url)
+        try:
+            from server.mail_service.mail_sender import send_password_reset_mail
+            send_password_reset_mail(
+                email=email,
+                username=user["username"],
+                reset_token=token,
+                base_url=base_url,
+            )
+        except Exception:
+            pass
+    return BaseResponse(code=200, msg="Parola sıfırlama linki e-posta adresinize gönderildi")
+
+
+async def api_reset_password(
+    token: str = Body(..., description="Reset token", embed=True),
+    new_password: str = Body(..., description="New password (SHA-256 hex)", embed=True),
+):
+    """Reset password with a valid token."""
+    user_id = consume_reset_token(token=token)
+    if not user_id:
+        return BaseResponse(code=400, msg="Geçersiz veya süresi dolmuş token")
+    result = change_user_password(user_id=user_id, new_password=new_password)
+    if result["success"]:
+        return BaseResponse(code=200, msg="Parola başarıyla sıfırlandı")
+    return BaseResponse(code=400, msg=result["msg"])
 
 
 async def api_change_my_password(

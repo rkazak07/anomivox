@@ -9,6 +9,7 @@ class UserModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, comment='User ID')
     username = Column(String(50), unique=True, nullable=False, comment='Username')
     password_hash = Column(String(128), nullable=False, comment='Hashed password')
+    email = Column(String(255), nullable=True, comment='Email address')
     role = Column(String(20), default='user', nullable=False, comment='Role: admin or user')
     is_active = Column(Boolean, default=True, comment='Active status')
     create_time = Column(DateTime, default=func.now(), comment='Creation time')
@@ -32,3 +33,15 @@ class TokenModel(Base):
     user_id = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=func.now())
     expires_at = Column(DateTime, nullable=False)
+
+
+class PasswordResetTokenModel(Base):
+    """One-time password reset tokens sent via email."""
+    __tablename__ = 'password_reset_token'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)

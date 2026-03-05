@@ -1685,6 +1685,10 @@
             <el-option label="Admin" value="admin" />
           </el-select>
         </el-form-item>
+        <el-form-item label="E-posta" prop="email">
+          <el-input v-model="createForm.email" type="email" placeholder="kullanici@sirket.com" />
+          <div style="color:#909399; font-size:12px; margin-top:4px;">Parola sıfırlama için gerekli</div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">{{ $t('cancel') }}</el-button>
@@ -2720,7 +2724,7 @@ const onSaveAllKbSettings = async () => {
 const showCreateDialog = ref(false)
 const createLoading = ref(false)
 const refCreateForm = ref(null)
-const createForm = reactive({ username: '', password: '', confirmPassword: '', role: 'user' })
+const createForm = reactive({ username: '', password: '', confirmPassword: '', role: 'user', email: '' })
 const createRules = {
   username: [{ required: true, message: () => $t('pleaseInputUsername'), trigger: 'blur' }],
   password: [
@@ -2744,7 +2748,7 @@ const onCreateUser = () => {
     if (!valid) return
     createLoading.value = true
     try {
-      const res = await createUserReq(createForm.username, createForm.password, createForm.role)
+      const res = await createUserReq(createForm.username, createForm.password, createForm.role, createForm.email || null)
       if (res.code === 200) {
         ElMessage.success(res.msg)
         showCreateDialog.value = false
@@ -2752,6 +2756,7 @@ const onCreateUser = () => {
         createForm.password = ''
         createForm.confirmPassword = ''
         createForm.role = 'user'
+        createForm.email = ''
         fetchUsers()
       } else {
         ElMessage.error(res.msg)

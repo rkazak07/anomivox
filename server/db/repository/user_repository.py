@@ -1,8 +1,11 @@
 import hashlib
+import secrets
 from datetime import datetime, timedelta
-from server.db.models.user_model import UserModel, TokenModel
+from server.db.models.user_model import UserModel, TokenModel, PasswordResetTokenModel
 from server.db.session import with_session
 from typing import Optional, List, Dict
+
+RESET_TOKEN_EXPIRY_MINUTES = 30
 
 
 def _hash_password(password: str) -> str:
@@ -126,7 +129,7 @@ def list_users(session) -> List[Dict]:
 
 
 @with_session
-def create_user(session, username: str, password: str, role: str = "user") -> Dict:
+def create_user(session, username: str, password: str, role: str = "user", email: str = None) -> Dict:
     """Create a new user."""
     if role not in ("admin", "user"):
         return {"success": False, "msg": "Gecersiz rol. 'admin' veya 'user' olmali"}
@@ -137,11 +140,55 @@ def create_user(session, username: str, password: str, role: str = "user") -> Di
     user = UserModel(
         username=username,
         password_hash=pwd_hash,
+        email=email,
         role=role,
         is_active=True
     )
     session.add(user)
     return {"success": True, "msg": "Kullanici basariyla olusturuldu"}
+
+
+@with_session
+def update_user_email(session, user_id: int, email: str) -> Dict:
+    """Update a user's email address (admin action)."""
+    user = session.query(UserModel).filter_by(id=user_id).first()
+    if not user:
+        return {"success": False, "msg": "Kullanici bulunamadi"}
+    user.email = email
+    return {"success": True, "msg": "E-posta guncellendi"}
+
+
+@with_session
+def get_user_by_email(session, email: str) -> Optional[Dict]:
+    """Find an active user by email address."""
+    user = session.query(UserModel).filter_by(email=email, is_active=True).first()
+    if not user:
+        return None
+    return {"id": user.id, "username": user.username, "email": user.email}
+
+
+@with_session
+def create_reset_token(session, user_id: int) -> str:
+    """Create a password reset token (invalidates previous ones)."""
+    session.query(PasswordResetTokenModel).filter_by(user_id=user_id).delete()
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRY_MINUTES)
+    rt = PasswordResetTokenModel(token=token, user_id=user_id, expires_at=expires_at, used=False)
+    session.add(rt)
+    return token
+
+
+@with_session
+def consume_reset_token(session, token: str) -> Optional[int]:
+    """Validate and consume a reset token. Returns user_id or None."""
+    rt = session.query(PasswordResetTokenModel).filter_by(token=token, used=False).first()
+    if not rt:
+        return None
+    if datetime.utcnow() > rt.expires_at:
+        session.delete(rt)
+        return None
+    rt.used = True
+    return rt.user_id
 
 
 @with_session

@@ -1,6 +1,15 @@
 <template>
   <div class="login-container columnCC">
-    <el-form ref="refLoginForm" class="login-form" :model="subForm" :rules="formRules" autocomplete="off">
+
+    <!-- Language Toggle -->
+    <div class="lang-toggle">
+      <span :class="{ active: currentLang === 'tr' }" @click="setLang('tr')">TR</span>
+      <span class="lang-sep">|</span>
+      <span :class="{ active: currentLang === 'en' }" @click="setLang('en')">EN</span>
+    </div>
+
+    <!-- Login Form -->
+    <el-form v-if="mode === 'login'" ref="refLoginForm" class="login-form" :model="subForm" :rules="formRules" autocomplete="off">
       <div class="title-container">
         <img src="/logo-buyuk.png" class="login-logo" alt="Anomivox" />
       </div>
@@ -10,11 +19,9 @@
             <svg-icon icon-class="user" />
           </span>
           <el-input v-model="subForm.keyword" :placeholder="$t('usernamePlaceholder')" autocomplete="off" />
-          <!-- placeholder -->
           <div class="show-pwd" />
         </div>
       </el-form-item>
-      <!--<el-form-item prop="password" :rules="formRules.passwordValid">-->
       <el-form-item prop="password" :rules="formRules.isNotNull($t('passwordRequired'))">
         <div class="rowSC flex-1">
           <span class="svg-container">
@@ -39,19 +46,111 @@
       <el-button :loading="subLoading" type="primary" class="login-btn" size="default" @click.prevent="handleLogin">
         {{ $t('loginButton') }}
       </el-button>
+      <div class="forgot-link" @click="mode = 'forgot'">{{ $t('forgotPassword') }}</div>
     </el-form>
+
+    <!-- Forgot Password Form -->
+    <div v-else-if="mode === 'forgot'" class="login-form">
+      <div class="title-container">
+        <img src="/logo-buyuk.png" class="login-logo" alt="Anomivox" />
+      </div>
+      <p class="form-desc">{{ $t('forgotPasswordDesc') }}</p>
+      <el-input v-model="forgotEmail" type="email" :placeholder="$t('emailRequired')" style="margin-bottom:12px;" />
+      <div class="tip-message">{{ forgotMessage }}</div>
+      <el-button :loading="forgotLoading" type="primary" class="login-btn" @click="handleForgot">{{ $t('sendResetLink') }}</el-button>
+      <div class="forgot-link" @click="mode = 'login'">{{ $t('backToLogin') }}</div>
+    </div>
+
+    <!-- Reset Password Form -->
+    <div v-else-if="mode === 'reset'" class="login-form">
+      <div class="title-container">
+        <img src="/logo-buyuk.png" class="login-logo" alt="Anomivox" />
+      </div>
+      <p class="form-desc">{{ $t('resetPasswordDesc') }}</p>
+      <el-input v-model="resetPassword" type="password" show-password :placeholder="$t('newPassword')" style="margin-bottom:8px;" />
+      <el-input v-model="resetPasswordConfirm" type="password" show-password :placeholder="$t('confirmNewPassword')" style="margin-bottom:12px;" />
+      <div class="tip-message">{{ resetMessage }}</div>
+      <el-button :loading="resetLoading" type="primary" class="login-btn" @click="handleReset">{{ $t('resetPasswordBtn') }}</el-button>
+      <div class="forgot-link" @click="mode = 'login'">{{ $t('backToLogin') }}</div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, watch, nextTick } from 'vue'
+import { reactive, ref, watch, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBasicStore } from '@/store/basic'
 import { elMessage, useElement } from '@/hooks/use-element'
-import { loginReq } from '@/api/user'
+import { loginReq, forgotPasswordReq, resetPasswordReq } from '@/api/user'
 import { useI18n } from 'vue-i18n'
+import { useConfigStore } from '@/store/config'
+import { computed } from 'vue'
 
 const { t: $t } = useI18n()
+
+// Language toggle
+const configStore = useConfigStore()
+const currentLang = computed(() => configStore.language)
+const setLang = (lang) => configStore.setLanguage(lang)
+
+// mode: 'login' | 'forgot' | 'reset'
+const mode = ref('login')
+
+// Forgot password
+const forgotEmail = ref('')
+const forgotLoading = ref(false)
+const forgotMessage = ref('')
+
+const handleForgot = async () => {
+  if (!forgotEmail.value) { forgotMessage.value = $t('emailRequired'); return }
+  forgotLoading.value = true
+  forgotMessage.value = ''
+  try {
+    const res = await forgotPasswordReq(forgotEmail.value)
+    forgotMessage.value = res.msg
+  } catch (e) {
+    forgotMessage.value = $t('errorOccurred')
+  } finally {
+    forgotLoading.value = false
+  }
+}
+
+// Reset password
+const resetToken = ref('')
+const resetPassword = ref('')
+const resetPasswordConfirm = ref('')
+const resetLoading = ref(false)
+const resetMessage = ref('')
+
+const handleReset = async () => {
+  if (!resetPassword.value) { resetMessage.value = $t('passwordRequired2'); return }
+  if (resetPassword.value !== resetPasswordConfirm.value) { resetMessage.value = $t('passwordMismatch'); return }
+  resetLoading.value = true
+  resetMessage.value = ''
+  try {
+    const res = await resetPasswordReq(resetToken.value, resetPassword.value)
+    if (res.code === 200) {
+      resetMessage.value = $t('passwordResetSuccess')
+      setTimeout(() => { mode.value = 'login' }, 2000)
+    } else {
+      resetMessage.value = res.msg
+    }
+  } catch (e) {
+    resetMessage.value = $t('errorOccurred')
+  } finally {
+    resetLoading.value = false
+  }
+}
+
+onMounted(() => {
+  const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
+  const token = urlParams.get('token')
+  if (token) {
+    resetToken.value = token
+    mode.value = 'reset'
+  }
+})
 
 /* listen router change and set the query  */
 const { settings } = useBasicStore()
@@ -192,7 +291,46 @@ $light_gray: #eee;
 
 .login-btn {
   width: 100%;
-  margin-bottom: 30px;
+  margin-bottom: 12px;
+}
+
+.forgot-link {
+  text-align: center;
+  color: #a0aec0;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 4px;
+  margin-bottom: 20px;
+  &:hover { color: #fff; }
+}
+
+.form-desc {
+  color: #a0aec0;
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.lang-toggle {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  span {
+    color: #a0aec0;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    &:hover { color: #fff; }
+    &.active { color: #fff; }
+  }
+  .lang-sep {
+    color: #4a5568;
+    cursor: default;
+  }
 }
 .show-pwd {
   width: 50px;

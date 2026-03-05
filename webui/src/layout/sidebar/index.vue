@@ -62,6 +62,10 @@
             <el-icon :size="16"><Setting /></el-icon>
             <span>{{ $t('settingsTitle') }}</span>
           </div>
+          <div class="popover-menu-item" @click="showPwdDialog = true">
+            <el-icon :size="16"><Lock /></el-icon>
+            <span>{{ $t('changeMyPassword') }}</span>
+          </div>
           <div class="popover-menu-divider"></div>
           <div class="popover-menu-item popover-menu-item--danger" @click="handleLogout">
             <el-icon :size="16"><SwitchButton /></el-icon>
@@ -69,8 +73,30 @@
           </div>
         </div>
       </el-popover>
+
+      <!-- Teleport: dialog body'e render edilir, sidebar layout'u etkilemez -->
+      <Teleport to="body">
+        <el-dialog v-model="showPwdDialog" :title="$t('changeMyPassword')" width="420px" :close-on-click-modal="false" @close="resetPwdForm">
+          <el-form ref="refPwdForm" :model="pwdForm" :rules="pwdRules" label-width="140px">
+            <el-form-item :label="$t('currentPassword')" prop="currentPassword">
+              <el-input v-model="pwdForm.currentPassword" type="password" show-password :placeholder="$t('pleaseInputCurrentPassword')" />
+            </el-form-item>
+            <el-form-item :label="$t('newPassword')" prop="newPassword">
+              <el-input v-model="pwdForm.newPassword" type="password" show-password :placeholder="$t('pleaseInputNewPassword')" />
+            </el-form-item>
+            <el-form-item :label="$t('confirmPassword')" prop="confirmPassword">
+              <el-input v-model="pwdForm.confirmPassword" type="password" show-password :placeholder="$t('pleaseConfirmPassword')" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="showPwdDialog = false">{{ $t('cancel') }}</el-button>
+            <el-button type="primary" :loading="pwdLoading" @click="onSubmitPwd">{{ $t('save') }}</el-button>
+          </template>
+        </el-dialog>
+      </Teleport>
     </div>
   </div>
+
 </template>
 
 <script setup lang="ts">
@@ -78,13 +104,14 @@ import { computed, nextTick, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia/dist/pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Setting, SwitchButton } from '@element-plus/icons-vue'
+import { Setting, SwitchButton, Lock } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import Logo from './Logo.vue'
 import SidebarItem from './SidebarItem.vue'
 import { useBasicStore } from '@/store/basic'
 import { resetState } from '@/hooks/use-permission'
 import { elMessage } from '@/hooks/use-element'
-import { loginOutReq } from '@/api/user'
+import { loginOutReq, changeMyPasswordReq } from '@/api/user'
 
 const { t: $t } = useI18n()
 const router = useRouter()
@@ -142,6 +169,53 @@ const handleLogout = () => {
     nextTick(() => {
       resetState()
     })
+  })
+}
+
+const showPwdDialog = ref(false)
+const pwdLoading = ref(false)
+const refPwdForm = ref(null)
+const pwdForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
+const pwdRules = {
+  currentPassword: [{ required: true, message: () => $t('pleaseInputCurrentPassword'), trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: () => $t('pleaseInputNewPassword'), trigger: 'blur' },
+    { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== pwdForm.newPassword) callback(new Error($t('passwordMismatch')))
+        else callback()
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+const resetPwdForm = () => {
+  pwdForm.currentPassword = ''
+  pwdForm.newPassword = ''
+  pwdForm.confirmPassword = ''
+  refPwdForm.value?.clearValidate()
+}
+const onSubmitPwd = () => {
+  refPwdForm.value.validate(async (valid) => {
+    if (!valid) return
+    pwdLoading.value = true
+    try {
+      const res = await changeMyPasswordReq(pwdForm.currentPassword, pwdForm.newPassword)
+      if (res.code === 200) {
+        ElMessage.success(res.msg || $t('success'))
+        showPwdDialog.value = false
+      } else {
+        ElMessage.error(res.msg)
+      }
+    } catch (e) {
+      ElMessage.error(e?.msg || 'Error')
+    } finally {
+      pwdLoading.value = false
+    }
   })
 }
 </script>

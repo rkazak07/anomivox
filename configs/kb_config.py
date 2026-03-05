@@ -52,7 +52,15 @@ if not os.path.exists(KB_ROOT_PATH):
     os.mkdir(KB_ROOT_PATH)
 
 DB_ROOT_PATH = os.path.join(KB_ROOT_PATH, "info.db")
-SQLALCHEMY_DATABASE_URI = f"sqlite:///{DB_ROOT_PATH}"
+
+# PostgreSQL connection (Docker: postgres_db, local: localhost)
+_PG_USER = os.environ.get("PG_USER", os.environ.get("POSTGRES_USER", "test"))
+_PG_PASSWORD = os.environ.get("PG_PASSWORD", os.environ.get("POSTGRES_PASSWORD", "Test123_456"))
+_PG_HOST = os.environ.get("PG_HOST", "localhost")
+_PG_PORT = os.environ.get("PG_PORT", "5432")
+_PG_DB = os.environ.get("PG_DB", os.environ.get("POSTGRES_DB", "anomivox"))
+
+SQLALCHEMY_DATABASE_URI = f"postgresql://{_PG_USER}:{_PG_PASSWORD}@{_PG_HOST}:{_PG_PORT}/{_PG_DB}"
 
 kbs_config = {
     "chromadb": {

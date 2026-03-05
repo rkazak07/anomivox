@@ -12,7 +12,7 @@ from server.knowledge_base.utils import (
 from server.knowledge_base.kb_service.base import KBServiceFactory
 from server.db.models.conversation_model import ConversationModel
 from server.db.models.message_model import MessageModel
-from server.db.models.user_model import UserModel
+from server.db.models.user_model import UserModel, TokenModel
 from server.db.repository.knowledge_file_repository import add_file_to_db # ensure Models are imported
 from server.db.repository.knowledge_metadata_repository import add_summary_to_db
 
@@ -25,17 +25,42 @@ from typing import Literal, List
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
-    # Mevcut DB'ye user_id kolonu ekle (henüz yoksa)
+    import sqlalchemy as sa
+    # Mevcut DB'ye user_id kolonu ekle (henuz yoksa)
+    _safe_add_column(sa, "conversation", "user_id INTEGER")
+    # is_admin -> role migration
+    _safe_add_column(sa, "app_user", "role VARCHAR(20) DEFAULT 'user'")
+    _migrate_is_admin_to_role(sa)
+
+
+def _safe_add_column(sa, table: str, column_def: str):
     try:
         with engine.connect() as conn:
-            conn.execute(
-                __import__('sqlalchemy').text(
-                    "ALTER TABLE conversation ADD COLUMN user_id INTEGER"
-                )
-            )
+            conn.execute(sa.text(
+                f'ALTER TABLE "{table}" ADD COLUMN {column_def}'
+            ))
             conn.commit()
     except Exception:
         pass  # Kolon zaten var
+
+
+def _migrate_is_admin_to_role(sa):
+    """Migrate is_admin boolean to role string for existing users."""
+    try:
+        with engine.connect() as conn:
+            # PostgreSQL: information_schema ile kolon kontrolu
+            result = conn.execute(sa.text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'app_user' AND column_name = 'is_admin'"
+            )).fetchall()
+            if result:
+                conn.execute(sa.text(
+                    "UPDATE app_user SET role = 'admin' "
+                    "WHERE is_admin = true AND (role IS NULL OR role = 'user')"
+                ))
+                conn.commit()
+    except Exception:
+        pass
 
 
 def reset_tables():

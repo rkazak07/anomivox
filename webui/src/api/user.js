@@ -33,11 +33,11 @@ const hashPassword = async (password) => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-export const createUserReq = async (username, password) => {
+export const createUserReq = async (username, password, role = 'user') => {
   const hashed = await hashPassword(password)
   return axiosReq({
     url: 'auth/create_user',
-    data: { username, password: hashed },
+    data: { username, password: hashed, role },
     method: 'post'
   })
 }
@@ -63,6 +63,18 @@ export const changePasswordReq = async (user_id, new_password) => {
   return axiosReq({
     url: 'auth/change_password',
     data: { user_id, new_password: hashed },
+    method: 'post'
+  })
+}
+
+export const changeMyPasswordReq = async (current_password, new_password) => {
+  const [currentHashed, newHashed] = await Promise.all([
+    hashPassword(current_password),
+    hashPassword(new_password)
+  ])
+  return axiosReq({
+    url: 'auth/change_my_password',
+    data: { current_password: currentHashed, new_password: newHashed },
     method: 'post'
   })
 }

@@ -177,16 +177,18 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
 
 def mount_auth_routes(app: FastAPI):
     from server.auth.auth_api import (
-        login, logout, api_list_users, api_create_user,
-        api_toggle_user, api_delete_user, api_change_password
+        login, logout, current_user_info, api_list_users, api_create_user,
+        api_toggle_user, api_delete_user, api_change_password, api_change_my_password
     )
-    app.post("/auth/login", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcı girişi")(login)
-    app.post("/auth/logout", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcı çıkışı")(logout)
-    app.get("/auth/list_users", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcıları listele (admin)")(api_list_users)
-    app.post("/auth/create_user", tags=["Auth"], response_model=BaseResponse, summary="Yeni kullanıcı oluştur (admin)")(api_create_user)
-    app.post("/auth/toggle_user", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcıyı aktif/deaktif et (admin)")(api_toggle_user)
-    app.post("/auth/delete_user", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcıyı sil (admin)")(api_delete_user)
-    app.post("/auth/change_password", tags=["Auth"], response_model=BaseResponse, summary="Kullanıcı şifresini değiştir (admin)")(api_change_password)
+    app.post("/auth/login", tags=["Auth"], response_model=BaseResponse, summary="Kullanici girisi")(login)
+    app.post("/auth/logout", tags=["Auth"], response_model=BaseResponse, summary="Kullanici cikisi")(logout)
+    app.get("/auth/me", tags=["Auth"], response_model=BaseResponse, summary="Mevcut kullanici bilgisi")(current_user_info)
+    app.get("/auth/list_users", tags=["Auth"], response_model=BaseResponse, summary="Kullanicilari listele (admin)")(api_list_users)
+    app.post("/auth/create_user", tags=["Auth"], response_model=BaseResponse, summary="Yeni kullanici olustur (admin)")(api_create_user)
+    app.post("/auth/toggle_user", tags=["Auth"], response_model=BaseResponse, summary="Kullaniciyi aktif/deaktif et (admin)")(api_toggle_user)
+    app.post("/auth/delete_user", tags=["Auth"], response_model=BaseResponse, summary="Kullaniciyi sil (admin)")(api_delete_user)
+    app.post("/auth/change_password", tags=["Auth"], response_model=BaseResponse, summary="Kullanici sifresini degistir (admin)")(api_change_password)
+    app.post("/auth/change_my_password", tags=["Auth"], response_model=BaseResponse, summary="Kendi sifresini degistir")(api_change_my_password)
 
     # Conversation yönetimi
     from server.chat.conversation_api import (

@@ -4,6 +4,13 @@
       <h2>{{ $t('settingsTitle') }}</h2>
     </div>
 
+    <!-- Non-admin: access denied -->
+    <div v-if="!isAdmin" class="no-permission">
+      <el-result icon="warning" :title="$t('noPermission')" :sub-title="$t('noPermissionDesc')" />
+    </div>
+
+    <template v-if="isAdmin">
+
     <!-- ══════════════════════════════════════════════════════════ -->
     <!-- SECTION 1 — User Management (collapsible)                -->
     <!-- ══════════════════════════════════════════════════════════ -->
@@ -42,12 +49,19 @@
               <template #default="{ row }">
                 <div class="rowSC">
                   <el-icon style="margin-right: 8px;" size="16">
-                    <UserFilled v-if="row.is_admin" />
+                    <UserFilled v-if="row.role === 'admin'" />
                     <User v-else />
                   </el-icon>
                   <span>{{ row.username }}</span>
-                  <el-tag v-if="row.is_admin" size="small" type="warning" style="margin-left: 8px">Admin</el-tag>
+                  <el-tag v-if="row.role === 'admin'" size="small" type="warning" style="margin-left: 8px">Admin</el-tag>
                 </div>
+              </template>
+            </el-table-column>
+            <el-table-column :label="$t('role')" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.role === 'admin' ? 'warning' : 'info'" size="small">
+                  {{ row.role === 'admin' ? 'Admin' : 'User' }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column :label="$t('status')" width="150">
@@ -60,35 +74,30 @@
             <el-table-column prop="create_time" :label="$t('createdAt')" width="200" />
             <el-table-column :label="$t('actions')" width="280" fixed="right">
               <template #default="{ row }">
-                <template v-if="!row.is_admin">
-                  <el-button
-                    :type="row.is_active ? 'warning' : 'success'"
-                    size="small"
-                    plain
-                    @click="onToggleUser(row)"
-                  >
-                    {{ row.is_active ? $t('deactivate') : $t('activate') }}
-                  </el-button>
-                  <el-button
-                    type="primary"
-                    size="small"
-                    plain
-                    @click="onChangePassword(row)"
-                  >
-                    {{ $t('changePassword') }}
-                  </el-button>
-                  <el-button
-                    type="danger"
-                    size="small"
-                    plain
-                    @click="onDeleteUser(row)"
-                  >
-                    {{ $t('deleteUser') }}
-                  </el-button>
-                </template>
-                <span v-else style="color: var(--el-text-color-secondary); font-size: 12px;">
-                  {{ $t('adminProtected') }}
-                </span>
+                <el-button
+                  :type="row.is_active ? 'warning' : 'success'"
+                  size="small"
+                  plain
+                  @click="onToggleUser(row)"
+                >
+                  {{ row.is_active ? $t('deactivate') : $t('activate') }}
+                </el-button>
+                <el-button
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="onChangePassword(row)"
+                >
+                  {{ $t('changePassword') }}
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  plain
+                  @click="onDeleteUser(row)"
+                >
+                  {{ $t('deleteUser') }}
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -1443,13 +1452,40 @@
       </Transition>
     </div>
 
-    <!-- Non-admin users see info message -->
-    <div v-if="!isAdmin" class="collapse-card">
-      <el-result icon="info" :title="$t('noPermission')" :sub-title="$t('noPermissionDesc')">
-        <template #icon>
-          <el-icon size="64" color="var(--el-color-info)"><Lock /></el-icon>
-        </template>
-      </el-result>
+    <!-- Change My Password (visible to all users) -->
+    <div class="collapse-card" :class="{ open: sections.myPassword }">
+      <div class="collapse-card-header" @click="toggleSection('myPassword')">
+        <div class="collapse-card-title">
+          <div class="collapse-card-icon" style="background: linear-gradient(135deg,#667eea,#764ba2);">
+            <el-icon :size="20"><Lock /></el-icon>
+          </div>
+          <div>
+            <h3>{{ $t('changeMyPassword') }}</h3>
+            <span class="collapse-card-subtitle">{{ $t('changeMyPasswordDesc') }}</span>
+          </div>
+        </div>
+        <div class="collapse-chevron" :class="{ rotated: sections.myPassword }">
+          <el-icon :size="18"><ArrowDown /></el-icon>
+        </div>
+      </div>
+      <Transition name="collapse-body">
+        <div v-show="sections.myPassword" class="collapse-card-body">
+          <el-form ref="refMyPasswordForm" :model="myPasswordForm" :rules="myPasswordRules" label-width="160px" style="max-width: 500px;">
+            <el-form-item :label="$t('currentPassword')" prop="currentPassword">
+              <el-input v-model="myPasswordForm.currentPassword" type="password" show-password :placeholder="$t('pleaseInputCurrentPassword')" />
+            </el-form-item>
+            <el-form-item :label="$t('newPassword')" prop="newPassword">
+              <el-input v-model="myPasswordForm.newPassword" type="password" show-password :placeholder="$t('pleaseInputNewPassword')" />
+            </el-form-item>
+            <el-form-item :label="$t('confirmPassword')" prop="confirmPassword">
+              <el-input v-model="myPasswordForm.confirmPassword" type="password" show-password :placeholder="$t('pleaseConfirmPassword')" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="myPasswordLoading" @click="onSubmitMyPassword">{{ $t('save') }}</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+      </Transition>
     </div>
 
     <!-- Edit DB Target Dialog -->
@@ -1640,6 +1676,15 @@
         <el-form-item :label="$t('password')" prop="password">
           <el-input v-model="createForm.password" type="password" show-password :placeholder="$t('pleaseInputPassword')" />
         </el-form-item>
+        <el-form-item :label="$t('confirmPassword')" prop="confirmPassword">
+          <el-input v-model="createForm.confirmPassword" type="password" show-password :placeholder="$t('pleaseConfirmPassword')" />
+        </el-form-item>
+        <el-form-item :label="$t('role')" prop="role">
+          <el-select v-model="createForm.role" style="width: 100%">
+            <el-option label="User" value="user" />
+            <el-option label="Admin" value="admin" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">{{ $t('cancel') }}</el-button>
@@ -1656,12 +1701,16 @@
         <el-form-item :label="$t('newPassword')" prop="newPassword">
           <el-input v-model="passwordForm.newPassword" type="password" show-password :placeholder="$t('pleaseInputNewPassword')" />
         </el-form-item>
+        <el-form-item :label="$t('confirmPassword')" prop="confirmPassword">
+          <el-input v-model="passwordForm.confirmPassword" type="password" show-password :placeholder="$t('pleaseConfirmPassword')" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showPasswordDialog = false">{{ $t('cancel') }}</el-button>
         <el-button type="primary" :loading="passwordLoading" @click="onSubmitPassword">{{ $t('save') }}</el-button>
       </template>
     </el-dialog>
+    </template><!-- end v-if="isAdmin" -->
   </div>
 </template>
 
@@ -1669,7 +1718,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useBasicStore } from '@/store/basic'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listUsersReq, createUserReq, toggleUserReq, deleteUserReq, changePasswordReq } from '@/api/user'
+import { listUsersReq, createUserReq, toggleUserReq, deleteUserReq, changePasswordReq, changeMyPasswordReq } from '@/api/user'
 import { litellmHealthReq, litellmModelsReq, litellmAddModelReq, litellmRemoveModelReq, litellmTestModelReq, dbaAgentHealthReq, litellmUpdateSettingsReq } from '@/api/litellm'
 import { getMailConfigReq, saveMailConfigReq, testMailReq } from '@/api/mail'
 import { getTelegramAlertConfigReq, saveTelegramAlertConfigReq, testTelegramAlertReq, telegramGetChatIdReq } from '@/api/telegram'
@@ -1687,6 +1736,7 @@ const sections = reactive({
   litellm: true,
   notifications: false,
   knowledgeBase: false,
+  myPassword: false,
 })
 const innerSections = reactive({
   models: true,
@@ -2663,12 +2713,22 @@ const onSaveAllKbSettings = async () => {
 const showCreateDialog = ref(false)
 const createLoading = ref(false)
 const refCreateForm = ref(null)
-const createForm = reactive({ username: '', password: '' })
+const createForm = reactive({ username: '', password: '', confirmPassword: '', role: 'user' })
 const createRules = {
   username: [{ required: true, message: () => $t('pleaseInputUsername'), trigger: 'blur' }],
   password: [
     { required: true, message: () => $t('pleaseInputPassword'), trigger: 'blur' },
     { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== createForm.password) callback(new Error($t('passwordMismatch')))
+        else callback()
+      },
+      trigger: 'blur'
+    }
   ]
 }
 
@@ -2677,12 +2737,14 @@ const onCreateUser = () => {
     if (!valid) return
     createLoading.value = true
     try {
-      const res = await createUserReq(createForm.username, createForm.password)
+      const res = await createUserReq(createForm.username, createForm.password, createForm.role)
       if (res.code === 200) {
         ElMessage.success(res.msg)
         showCreateDialog.value = false
         createForm.username = ''
         createForm.password = ''
+        createForm.confirmPassword = ''
+        createForm.role = 'user'
         fetchUsers()
       } else {
         ElMessage.error(res.msg)
@@ -2735,11 +2797,21 @@ const onDeleteUser = (row) => {
 const showPasswordDialog = ref(false)
 const passwordLoading = ref(false)
 const refPasswordForm = ref(null)
-const passwordForm = reactive({ userId: null, username: '', newPassword: '' })
+const passwordForm = reactive({ userId: null, username: '', newPassword: '', confirmPassword: '' })
 const passwordRules = {
   newPassword: [
     { required: true, message: () => $t('pleaseInputNewPassword'), trigger: 'blur' },
     { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== passwordForm.newPassword) callback(new Error($t('passwordMismatch')))
+        else callback()
+      },
+      trigger: 'blur'
+    }
   ]
 }
 
@@ -2747,6 +2819,7 @@ const onChangePassword = (row) => {
   passwordForm.userId = row.id
   passwordForm.username = row.username
   passwordForm.newPassword = ''
+  passwordForm.confirmPassword = ''
   showPasswordDialog.value = true
 }
 
@@ -2769,6 +2842,53 @@ const onSubmitPassword = () => {
     }
   })
 }
+
+// ── Change My Own Password ────────────────────────────────────────────────────
+const refMyPasswordForm = ref(null)
+const myPasswordLoading = ref(false)
+const myPasswordForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
+const myPasswordRules = {
+  currentPassword: [{ required: true, message: () => $t('pleaseInputCurrentPassword'), trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: () => $t('pleaseInputNewPassword'), trigger: 'blur' },
+    { min: 6, message: () => $t('passwordMinLength'), trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: () => $t('pleaseConfirmPassword'), trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== myPasswordForm.newPassword) {
+          callback(new Error($t('passwordMismatch')))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+
+const onSubmitMyPassword = () => {
+  refMyPasswordForm.value.validate(async (valid) => {
+    if (!valid) return
+    myPasswordLoading.value = true
+    try {
+      const res = await changeMyPasswordReq(myPasswordForm.currentPassword, myPasswordForm.newPassword)
+      if (res.code === 200) {
+        ElMessage.success(res.msg)
+        myPasswordForm.currentPassword = ''
+        myPasswordForm.newPassword = ''
+        myPasswordForm.confirmPassword = ''
+      } else {
+        ElMessage.error(res.msg)
+      }
+    } catch (e) {
+      ElMessage.error(e?.msg || 'Error')
+    } finally {
+      myPasswordLoading.value = false
+    }
+  })
+}
 </script>
 
 <style lang="scss" scoped>
@@ -2776,6 +2896,13 @@ const onSubmitPassword = () => {
   padding: 24px;
   max-width: 960px;
   margin: 0 auto;
+}
+
+.no-permission {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
 }
 
 .settings-header {

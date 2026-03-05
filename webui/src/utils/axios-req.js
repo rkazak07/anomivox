@@ -3,9 +3,29 @@ import { ElLoading, ElMessage, ElMessageBox } from 'element-plus'
 import { useBasicStore } from '@/store/basic'
 
 const service = axios.create()
-let loadingInstance = null // loading instance
-let tempReqUrlSave = ''
+let loadingInstance = null
+let loadingCount = 0
 let authorTipDoor = true
+
+const showLoading = () => {
+  loadingCount++
+  if (loadingCount === 1) {
+    loadingInstance = ElLoading.service({
+      lock: true,
+      fullscreen: true,
+      text: 'Please wait...',
+      background: 'rgba(0, 0, 0, 0.1)'
+    })
+  }
+}
+
+const hideLoading = () => {
+  if (loadingCount > 0) loadingCount--
+  if (loadingCount === 0 && loadingInstance) {
+    loadingInstance.close()
+    loadingInstance = null
+  }
+}
 
 const noAuthDill = () => {
   authorTipDoor = false
@@ -25,27 +45,14 @@ service.interceptors.request.use(
   (req) => {
     const { token, axiosPromiseArr } = useBasicStore()
     req.cancelToken = new axios.CancelToken((cancel) => {
-      tempReqUrlSave = req.url
-      axiosPromiseArr.push({
-        url: req.url,
-        cancel
-      })
+      axiosPromiseArr.push({ url: req.url, cancel })
     })
 
     if (token) req.headers['Authorization'] = token
     if ('get'.includes(req.method?.toLowerCase()) && !req.params) req.params = req.data
 
-    //req loading
     // @ts-ignore
-    if (req.reqLoading ?? true) {
-      loadingInstance = ElLoading.service({
-        lock: true,
-        fullscreen: true,
-        // spinner: 'CircleCheck',
-        text: 'Please wait...',
-        background: 'rgba(0, 0, 0, 0.1)'
-      })
-    }
+    if (req.reqLoading ?? true) showLoading()
     return req
   },
   (err) => {
@@ -54,11 +61,8 @@ service.interceptors.request.use(
 )
 service.interceptors.response.use(
   (res) => {
-
-    useBasicStore().remotePromiseArrByReqUrl(tempReqUrlSave)
-    if (loadingInstance) {
-      loadingInstance && loadingInstance.close()
-    }
+    useBasicStore().remotePromiseArrByReqUrl(res.config.url)
+    hideLoading()
     //download file
     if (res.data?.type?.includes("sheet")) {
       return res
@@ -93,10 +97,8 @@ service.interceptors.response.use(
     }
   },
   (err) => {
-    useBasicStore().remotePromiseArrByReqUrl(tempReqUrlSave)
-    if (loadingInstance) {
-      loadingInstance && loadingInstance.close()
-    }
+    useBasicStore().remotePromiseArrByReqUrl(err.config?.url)
+    hideLoading()
     ElMessage.error({
       message: err,
       duration: 2 * 1000

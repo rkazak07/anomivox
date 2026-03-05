@@ -1,8 +1,8 @@
 {
-  "name": "anomivox",
-  "version": "0.0.2",
-  "license": "MIT",
-  "author": "",
+  "name": "Anomivox",
+  "version": "Beta-1.0",
+  "license": "Proprietary (Commercial)",
+  "author": "Tecnoi Information Technologies",
   "packageManager": "pnpm@7.9.0",
   "scripts": {
     "dev": "vite --mode serve-dev",

@@ -319,8 +319,6 @@ services:
 # Kalıcı Veri Volumeleri
 # ─────────────────────────────────────────────
 volumes:
-  chroma_data:
-  kb_data:
   logs_data:
   pg_data:
 

@@ -133,7 +133,7 @@ Dokuman Yukleme
 |---|------|-------|------|
 | 1 | DBA Agent | Phase 5 (aksiyon yurutme) implement edilmemis | Oneriler var ama calistirilmiyor |
 | 2 | Guvenlik | `.env` ve `configs/*.py` dosyalarinda hardcoded API key'ler | Repo'ya sizdiysa kritik |
-| 3 | Guvenlik | Auth token'lari sadece bellekte, restart'ta siliniyor | Kullanicilar her restart'ta cikiyor |
+| 3 | Guvenlik | ~~Auth token'lari sadece bellekte, restart'ta siliniyor~~ **TAMAMLANDI** | Redis cache + PostgreSQL kalici token |
 | 4 | KB | ChromaDB silme: source path uyumsuzlugu (duzeltildi) | Dosyalar silinmiyordu |
 | 5 | KB | Desteklenmeyen format 500 donuyordu (duzeltildi) | UI cokuyordu |
 | 6 | Bagimlılık | LangChain 0.0.344 (cok eski) | Guvenlik/uyumluluk riski |
@@ -157,13 +157,12 @@ Dokuman Yukleme
 - `configs/*.py` (sadece `.example` dosyalari commit edilmeli)
 - `.env`, `*.jsonl` (veri dosyalari), `chroma_db/`, `knowledge_base/`, `logs/` ekle
 
-#### 3.2 Auth Token'larini Kalici Yap
-**Sorun:** `server/auth/` session token'lari sadece Python `dict` bellekte tutuluyor. API restart edildiginde tum kullanicilar cikmis oluyor.
-**Yapilacak:**
-- Token'lari PostgreSQL'deki `app_user` tablosuna veya ayri bir `session` tablosuna yaz
-- Alternatif: Redis (yeni servis) veya mevcut PostgreSQL
-
-**Dosyalar:** `server/auth/auth_api.py`, `server/db/repository/user_repository.py`
+#### ~~3.2 Auth Token'larini Kalici Yap~~ — TAMAMLANDI (2026-03-07)
+- Token'lar PostgreSQL `auth_token` tablosunda kalici
+- Redis 7 (docker-compose) token cache katmani eklendi
+- Her API istegi once Redis'ten okur (< 1ms), cache miss → PostgreSQL fallback
+- Logout / sifre degisiklik / kullanici silme aninda Redis invalidate eder
+- **Dosyalar:** `server/db/redis_client.py` (yeni), `server/db/repository/user_repository.py`, `docker-compose.yml`, `requirements.txt`
 
 #### 3.3 ChromaDB Volume Mount Duzelt
 **Sorun:** `docker-compose.yml`'de `chroma_data` volume tanimli ama `api` servisinde `./chroma_db:/app/chroma_db` seklinde bind mount var. Volume ve bind mount karisik.

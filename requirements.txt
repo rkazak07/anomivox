@@ -21,6 +21,7 @@ matplotlib>=3.7.0
 opencv-python-headless>=4.8.0
 SQLAlchemy==2.0.19
 bcrypt>=4.0.0
+redis>=5.0.0
 accelerate==0.23.0
 bitsandbytes
 spacy>=3.7.2

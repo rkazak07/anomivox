@@ -106,44 +106,78 @@ def authenticate_user(session, username: str, password: str) -> Optional[Dict]:
 
 @with_session
 def save_token(session, token: str, user_id: int) -> None:
-    """Persist token to database with expiration."""
+    """Persist token to PostgreSQL and write to Redis cache."""
     expires_at = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRY_HOURS)
     t = TokenModel(token=token, user_id=user_id, expires_at=expires_at)
     session.add(t)
+    # Flush to get any DB errors before caching
+    session.flush()
+
+    user = session.query(UserModel).filter_by(id=user_id).first()
+    if user:
+        from server.db.redis_client import cache_token
+        user_data = {
+            "id": user.id,
+            "username": user.username,
+            "role": user.role,
+            "is_admin": user.is_admin,
+            "is_active": user.is_active,
+        }
+        cache_token(token, user_data, ttl_seconds=TOKEN_EXPIRY_HOURS * 3600)
 
 
 @with_session
 def get_user_by_token(session, token: str) -> Optional[Dict]:
-    """Retrieve user by valid (non-expired) token."""
+    """Retrieve user by valid (non-expired) token.
+
+    1. Redis cache'e bak (hızlı yol)
+    2. Cache miss ise PostgreSQL'den oku, bulunursa cache'e yaz
+    """
+    from server.db.redis_client import get_cached_token, cache_token, invalidate_token
+
+    # 1. Redis cache
+    cached = get_cached_token(token)
+    if cached:
+        return cached
+
+    # 2. PostgreSQL fallback
     t = session.query(TokenModel).filter_by(token=token).first()
     if not t:
         return None
     if datetime.utcnow() > t.expires_at:
         session.delete(t)
+        invalidate_token(token)
         return None
     user = session.query(UserModel).filter_by(id=t.user_id).first()
     if not user or not user.is_active:
         return None
-    return {
+    user_data = {
         "id": user.id,
         "username": user.username,
         "role": user.role,
         "is_admin": user.is_admin,
-        "is_active": user.is_active
+        "is_active": user.is_active,
     }
+    # Cache'e yaz (kalan TTL hesapla)
+    remaining = int((t.expires_at - datetime.utcnow()).total_seconds())
+    if remaining > 0:
+        cache_token(token, user_data, ttl_seconds=remaining)
+    return user_data
 
 
 @with_session
 def delete_token(session, token: str) -> None:
-    """Remove token from database (logout)."""
+    """Remove token from PostgreSQL and Redis (logout)."""
+    from server.db.redis_client import invalidate_token
     t = session.query(TokenModel).filter_by(token=token).first()
     if t:
         session.delete(t)
+    invalidate_token(token)
 
 
 @with_session
 def cleanup_expired_tokens(session) -> int:
-    """Remove all expired tokens. Returns count deleted."""
+    """Remove all expired tokens from PostgreSQL. Returns count deleted."""
     now = datetime.utcnow()
     count = session.query(TokenModel).filter(TokenModel.expires_at < now).delete()
     return count
@@ -257,8 +291,11 @@ def delete_user(session, user_id: int) -> Dict:
         admin_count = session.query(UserModel).filter_by(role='admin').count()
         if admin_count <= 1:
             return {"success": False, "msg": "Son admin kullanici silinemez"}
+    tokens = [t.token for t in session.query(TokenModel).filter_by(user_id=user_id).all()]
     session.query(TokenModel).filter_by(user_id=user_id).delete()
     session.delete(user)
+    from server.db.redis_client import invalidate_user_tokens
+    invalidate_user_tokens(user_id, tokens)
     return {"success": True, "msg": "Kullanici silindi"}
 
 
@@ -269,7 +306,10 @@ def change_user_password(session, user_id: int, new_password: str) -> Dict:
     if not user:
         return {"success": False, "msg": "Kullanici bulunamadi"}
     user.password_hash = _hash_password(new_password)
+    tokens = [t.token for t in session.query(TokenModel).filter_by(user_id=user_id).all()]
     session.query(TokenModel).filter_by(user_id=user_id).delete()
+    from server.db.redis_client import invalidate_user_tokens
+    invalidate_user_tokens(user_id, tokens)
     return {"success": True, "msg": "Sifre basariyla degistirildi"}
 
 
@@ -288,5 +328,8 @@ def change_own_password(session, user_id: int, current_password: str, new_passwo
         if user.password_hash != current_password:
             return {"success": False, "msg": "Mevcut sifre yanlis"}
     user.password_hash = _hash_password(new_password)
+    tokens = [t.token for t in session.query(TokenModel).filter_by(user_id=user_id).all()]
     session.query(TokenModel).filter_by(user_id=user_id).delete()
+    from server.db.redis_client import invalidate_user_tokens
+    invalidate_user_tokens(user_id, tokens)
     return {"success": True, "msg": "Sifre basariyla degistirildi"}

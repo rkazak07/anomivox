@@ -98,9 +98,12 @@ class ChromaKBService(KBService):
     def do_delete_doc(self,
                       kb_file: KnowledgeFile,
                       **kwargs):
-        ids = self.chroma.get(where={"source": kb_file.filename}).get('ids')
-        if len(ids) > 0:
-            self.chroma.delete(ids)
+        # source may be stored as filename only or as full filepath
+        ids = set()
+        ids.update(self.chroma.get(where={"source": kb_file.filename}).get('ids', []))
+        ids.update(self.chroma.get(where={"source": kb_file.filepath}).get('ids', []))
+        if ids:
+            self.chroma.delete(list(ids))
 
     def do_clear_vs(self):
         logger.info("Clearing ChromaDB vector store: %s", self.kb_name)

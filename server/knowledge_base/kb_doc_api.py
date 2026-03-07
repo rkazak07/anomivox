@@ -82,12 +82,13 @@ def kb_file_details(
 
     knowledge_base_name = urllib.parse.unquote(knowledge_base_name)
 
+    kb = KBServiceFactory.get_service_by_name(knowledge_base_name, DEFAULT_VS_TYPES[0])
+    if kb is None:
+        return BaseResponse(code=404, msg=f"Knowledge base not found: {knowledge_base_name}", data=[])
+
     details = get_kb_file_details(knowledge_base_name)
 
-    if not details:
-        return BaseResponse(code=404, msg=f"Knowledge base not found: file for {knowledge_base_name}", data=[])
-    else:
-        return BaseResponse(code=200, msg=f"Successfully queried files for knowledge base {knowledge_base_name}", data=details)
+    return BaseResponse(code=200, msg=f"Successfully queried files for knowledge base {knowledge_base_name}", data=details)
 
 
 def list_files(
@@ -97,16 +98,21 @@ def list_files(
         return ListResponse(code=403, msg="Don't attack me", data=[])
 
     knowledge_base_name = urllib.parse.unquote(knowledge_base_name)
+
+    kb_exists = any(
+        KBServiceFactory.get_service_by_name(knowledge_base_name, vs_type) is not None
+        for vs_type in DEFAULT_VS_TYPES
+    )
+    if not kb_exists:
+        return ListResponse(code=404, msg=f"Knowledge base not found: {knowledge_base_name}", data=[])
+
     all_doc_names = []
     for vs_type in DEFAULT_VS_TYPES:
-        kb = KBServiceFactory.get_service(knowledge_base_name, vs_type)
+        kb = KBServiceFactory.get_service_by_name(knowledge_base_name, vs_type)
         if kb is not None:
             all_doc_names.extend(kb.list_files())
 
-    if not all_doc_names:
-        return ListResponse(code=404, msg=f"Knowledge base not found: files for {knowledge_base_name}", data=[])
-    else:
-        return ListResponse(data=list(set(all_doc_names)))
+    return ListResponse(data=list(set(all_doc_names)))
 
 
 def _save_files_in_thread(files: List[UploadFile],
@@ -383,23 +389,22 @@ def docs_text_split_content(
         if kb is None:
             continue
         kb_results = []
-        try:
-            for file_name in file_names:
+        for file_name in file_names:
+            kb_file = None
+            try:
                 kb_file = KnowledgeFile(filename=file_name,
                                         knowledge_base_name=knowledge_base_name)
                 if not os.path.exists(kb_file.filepath):
                     continue
-                text_splitter = None
-                splited_docs = kb_file.file2text(text_splitter=text_splitter)
-                splited_doc_page_contents = []
-                for i, doc in enumerate(splited_docs):
-                    splited_doc_page_contents.append(doc.page_content)
+                splited_docs = kb_file.file2text(text_splitter=None)
+                splited_doc_page_contents = [doc.page_content for doc in splited_docs]
                 kb_results.append({"file_name": kb_file.filename, "contents": splited_doc_page_contents})
-        except Exception as e:
-            msg = f"Failed to read file {kb_file.filename}, error: {e}"
-            logger.error(f'{e.__class__.__name__}: {msg}',
-                         exc_info=e if log_verbose else None)
-            return BaseResponse(code=500, msg=msg)
+            except Exception as e:
+                fname = kb_file.filename if kb_file else file_name
+                msg = f"Failed to read file {fname}, error: {e}"
+                logger.error(f'{e.__class__.__name__}: {msg}',
+                             exc_info=e if log_verbose else None)
+                kb_results.append({"file_name": fname, "error": str(e), "contents": []})
         results.append({"vs_type": vs_type, "data": kb_results})
     return BaseResponse(code=200, msg=f"Successfully retrieved document split content", data=results)
 

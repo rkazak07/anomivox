@@ -505,6 +505,402 @@ def check_port(port: int, ssh_target: str = None) -> Dict[str, Any]:
     }
 
 
+def get_cpu_detail(ssh_target: str = None) -> Dict[str, Any]:
+    """
+    CPU kullanımını detaylı analiz et.
+    mpstat, vmstat, /proc/stat kullanır.
+
+    Returns:
+        {"cpu_count": int, "usage_pct": float, "user_pct": float,
+         "system_pct": float, "iowait_pct": float, "load_avg": dict,
+         "top_processes": list}
+    """
+    target = _get_ssh_target(ssh_target)
+    executor = _get_executor(target)
+    result = {"host": target.host}
+
+    # Load average
+    r = executor.run("cat /proc/loadavg")
+    if r.success:
+        parts = r.stdout.strip().split()
+        if len(parts) >= 3:
+            result["load_avg"] = {
+                "1min": float(parts[0]),
+                "5min": float(parts[1]),
+                "15min": float(parts[2]),
+            }
+
+    # CPU count
+    r = executor.run("nproc")
+    result["cpu_count"] = int(r.stdout.strip()) if r.success else 0
+
+    # mpstat — eğer varsa en iyi kaynak
+    r = executor.run("mpstat 1 1 2>/dev/null | tail -2 | head -1")
+    if r.success and r.stdout.strip():
+        parts = r.stdout.strip().split()
+        # mpstat çıktısı: time CPU %usr %nice %sys %iowait %irq %soft %steal %guest %idle
+        try:
+            if len(parts) >= 11:
+                idle = float(parts[-1])
+                result["usage_pct"] = round(100.0 - idle, 1)
+                result["user_pct"] = float(parts[2])
+                result["system_pct"] = float(parts[4])
+                result["iowait_pct"] = float(parts[5])
+        except (ValueError, IndexError):
+            pass
+
+    # Fallback: /proc/stat
+    if "usage_pct" not in result:
+        r = executor.run("head -1 /proc/stat")
+        if r.success:
+            parts = r.stdout.strip().split()
+            if len(parts) >= 5:
+                try:
+                    user, nice, system, idle = int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4])
+                    total = user + nice + system + idle
+                    result["usage_pct"] = round((total - idle) / max(total, 1) * 100, 1)
+                    result["user_pct"] = round(user / max(total, 1) * 100, 1)
+                    result["system_pct"] = round(system / max(total, 1) * 100, 1)
+                except (ValueError, IndexError):
+                    pass
+
+    # Top 10 process by CPU
+    r = executor.run("ps aux --sort=-%cpu | head -11 | tail -10")
+    if r.success:
+        top_procs = []
+        for line in r.stdout.strip().splitlines():
+            parts = line.split(None, 10)
+            if len(parts) >= 11:
+                try:
+                    top_procs.append({
+                        "pid": parts[1],
+                        "user": parts[0],
+                        "cpu_pct": float(parts[2]),
+                        "mem_pct": float(parts[3]),
+                        "command": parts[10][:80],
+                    })
+                except ValueError:
+                    pass
+        result["top_processes"] = top_procs
+
+    # vmstat — bellek baskısı ve IO beklemesi
+    r = executor.run("vmstat 1 2 2>/dev/null | tail -1")
+    if r.success and r.stdout.strip():
+        parts = r.stdout.strip().split()
+        if len(parts) >= 17:
+            try:
+                result["vmstat"] = {
+                    "run_queue": int(parts[0]),
+                    "blocked": int(parts[1]),
+                    "swap_in": int(parts[6]),
+                    "swap_out": int(parts[7]),
+                    "io_bi": int(parts[8]),
+                    "io_bo": int(parts[9]),
+                    "cs": int(parts[11]),    # context switches
+                    "us": int(parts[12]),
+                    "sy": int(parts[13]),
+                    "id": int(parts[14]),
+                    "wa": int(parts[15]),    # IO wait
+                }
+            except (ValueError, IndexError):
+                pass
+
+    return result
+
+
+def get_memory_detail(ssh_target: str = None) -> Dict[str, Any]:
+    """
+    Bellek kullanımını detaylı analiz et.
+    /proc/meminfo, free, swap bilgileri.
+
+    Returns:
+        {"total_mb": int, "used_mb": int, "free_mb": int, "cached_mb": int,
+         "buffers_mb": int, "swap_total_mb": int, "swap_used_mb": int,
+         "usage_pct": float, "swap_usage_pct": float}
+    """
+    target = _get_ssh_target(ssh_target)
+    executor = _get_executor(target)
+    result = {"host": target.host}
+
+    # /proc/meminfo — en detaylı kaynak
+    r = executor.run("cat /proc/meminfo 2>/dev/null | head -20")
+    if r.success:
+        meminfo = {}
+        for line in r.stdout.strip().splitlines():
+            if ":" in line:
+                key, val = line.split(":", 1)
+                val_parts = val.strip().split()
+                if val_parts:
+                    try:
+                        meminfo[key.strip()] = int(val_parts[0])  # kB
+                    except ValueError:
+                        pass
+
+        total_kb = meminfo.get("MemTotal", 0)
+        free_kb = meminfo.get("MemFree", 0)
+        available_kb = meminfo.get("MemAvailable", free_kb)
+        buffers_kb = meminfo.get("Buffers", 0)
+        cached_kb = meminfo.get("Cached", 0) + meminfo.get("SReclaimable", 0)
+        swap_total_kb = meminfo.get("SwapTotal", 0)
+        swap_free_kb = meminfo.get("SwapFree", 0)
+        swap_used_kb = swap_total_kb - swap_free_kb
+
+        used_kb = total_kb - available_kb
+
+        result.update({
+            "total_mb": round(total_kb / 1024, 1),
+            "used_mb": round(used_kb / 1024, 1),
+            "free_mb": round(free_kb / 1024, 1),
+            "available_mb": round(available_kb / 1024, 1),
+            "cached_mb": round(cached_kb / 1024, 1),
+            "buffers_mb": round(buffers_kb / 1024, 1),
+            "usage_pct": round(used_kb / max(total_kb, 1) * 100, 1),
+            "swap_total_mb": round(swap_total_kb / 1024, 1),
+            "swap_used_mb": round(swap_used_kb / 1024, 1),
+            "swap_usage_pct": round(swap_used_kb / max(swap_total_kb, 1) * 100, 1),
+        })
+
+    # Top 10 process by memory
+    r = executor.run("ps aux --sort=-%mem | head -11 | tail -10")
+    if r.success:
+        top_procs = []
+        for line in r.stdout.strip().splitlines():
+            parts = line.split(None, 10)
+            if len(parts) >= 11:
+                try:
+                    top_procs.append({
+                        "pid": parts[1],
+                        "user": parts[0],
+                        "cpu_pct": float(parts[2]),
+                        "mem_pct": float(parts[3]),
+                        "rss_kb": int(parts[5]),
+                        "command": parts[10][:80],
+                    })
+                except (ValueError, IndexError):
+                    pass
+        result["top_processes"] = top_procs
+
+    return result
+
+
+def get_network_stats(ssh_target: str = None) -> Dict[str, Any]:
+    """
+    Ağ istatistiklerini getir (ss, /proc/net, netstat).
+
+    Returns:
+        {"connections": dict, "listening_ports": list,
+         "established_count": int, "time_wait_count": int}
+    """
+    target = _get_ssh_target(ssh_target)
+    executor = _get_executor(target)
+    result = {"host": target.host}
+
+    # Bağlantı durumu özeti
+    r = executor.run("ss -s 2>/dev/null")
+    if r.success:
+        result["ss_summary"] = r.stdout.strip()[:500]
+
+    # Bağlantı sayısı by state
+    r = executor.run("ss -tn 2>/dev/null | awk 'NR>1 {print $1}' | sort | uniq -c | sort -rn")
+    if r.success:
+        states = {}
+        for line in r.stdout.strip().splitlines():
+            parts = line.strip().split(None, 1)
+            if len(parts) == 2:
+                try:
+                    states[parts[1]] = int(parts[0])
+                except ValueError:
+                    pass
+        result["connection_states"] = states
+        result["established_count"] = states.get("ESTABLISHED", 0)
+        result["time_wait_count"] = states.get("TIME-WAIT", 0)
+        result["close_wait_count"] = states.get("CLOSE-WAIT", 0)
+
+    # Dinleyen portlar
+    r = executor.run("ss -tlnp 2>/dev/null | tail -n +2")
+    if r.success:
+        listening = []
+        for line in r.stdout.strip().splitlines():
+            parts = line.split()
+            if len(parts) >= 5:
+                listening.append({
+                    "state": parts[0],
+                    "recv_q": parts[1],
+                    "send_q": parts[2],
+                    "local": parts[3],
+                    "process": parts[5] if len(parts) > 5 else "",
+                })
+        result["listening_ports"] = listening[:20]
+
+    # Ağ arayüzü istatistikleri
+    r = executor.run("cat /proc/net/dev 2>/dev/null | tail -n +3")
+    if r.success:
+        interfaces = []
+        for line in r.stdout.strip().splitlines():
+            if ":" in line:
+                iface, stats = line.split(":", 1)
+                parts = stats.strip().split()
+                if len(parts) >= 16:
+                    try:
+                        interfaces.append({
+                            "interface": iface.strip(),
+                            "rx_bytes": int(parts[0]),
+                            "rx_packets": int(parts[1]),
+                            "rx_errors": int(parts[2]),
+                            "tx_bytes": int(parts[8]),
+                            "tx_packets": int(parts[9]),
+                            "tx_errors": int(parts[10]),
+                        })
+                    except ValueError:
+                        pass
+        result["interfaces"] = interfaces
+
+    return result
+
+
+def get_iostat(duration: int = 3, ssh_target: str = None) -> Dict[str, Any]:
+    """
+    Disk I/O istatistiklerini getir (iostat).
+
+    Args:
+        duration: Ölçüm süresi (saniye, max 10)
+        ssh_target: SSH hedef adı
+
+    Returns:
+        {"devices": list, "summary": str}
+    """
+    target = _get_ssh_target(ssh_target)
+    executor = _get_executor(target)
+    duration = min(duration, 10)
+
+    result = {"host": target.host, "duration_sec": duration}
+
+    # iostat
+    r = executor.run(f"iostat -x {duration} 1 2>/dev/null | tail -n +4")
+    if r.success and r.stdout.strip():
+        result["raw"] = r.stdout.strip()[:2000]
+        devices = []
+        lines = r.stdout.strip().splitlines()
+        # Header satırı bul
+        header_idx = next((i for i, l in enumerate(lines) if "Device" in l), -1)
+        if header_idx >= 0 and header_idx + 1 < len(lines):
+            for line in lines[header_idx + 1:]:
+                parts = line.split()
+                if len(parts) >= 6:
+                    try:
+                        devices.append({
+                            "device": parts[0],
+                            "r_await_ms": float(parts[-5]) if len(parts) >= 12 else 0,
+                            "w_await_ms": float(parts[-4]) if len(parts) >= 12 else 0,
+                            "util_pct": float(parts[-1]),
+                            "tps": float(parts[1]) if len(parts) > 1 else 0,
+                        })
+                    except (ValueError, IndexError):
+                        pass
+        result["devices"] = devices
+    else:
+        # Fallback: /proc/diskstats
+        r = executor.run("cat /proc/diskstats 2>/dev/null | grep -v 'loop\\|ram'")
+        if r.success:
+            result["diskstats_raw"] = r.stdout.strip()[:1000]
+
+    return result
+
+
+def read_pg_log(
+    lines: int = 100,
+    since_minutes: int = 60,
+    grep_pattern: str = "ERROR|FATAL|PANIC|slow",
+    ssh_target: str = None,
+) -> Dict[str, Any]:
+    """
+    PostgreSQL log dosyasını oku ve analiz et.
+    Yaygın log konumlarını otomatik bulur.
+
+    Args:
+        lines: Satır sayısı (max 500)
+        since_minutes: Son kaç dakika (varsayılan: 60)
+        grep_pattern: Filtre deseni (varsayılan: hata + yavaş sorgu)
+        ssh_target: SSH hedef adı
+
+    Returns:
+        {"log_path": str, "log_lines": list, "error_count": int,
+         "slow_query_count": int, "fatal_count": int}
+    """
+    target = _get_ssh_target(ssh_target)
+    executor = _get_executor(target)
+    lines = min(lines, 500)
+
+    # PostgreSQL log konumlarını bul
+    find_cmd = (
+        "find /var/log/postgresql /var/lib/pgsql/*/data/pg_log "
+        "/var/lib/postgresql/*/main/pg_log "
+        "-name '*.log' -newer /tmp/.pg_log_check 2>/dev/null | head -1 ; "
+        "ls -t /var/log/postgresql/*.log 2>/dev/null | head -1 ; "
+        "ls -t /var/lib/pgsql/*/data/pg_log/*.log 2>/dev/null | head -1"
+    )
+    r = executor.run(find_cmd)
+    log_path = None
+    if r.success:
+        for line in r.stdout.strip().splitlines():
+            line = line.strip()
+            if line and ".log" in line:
+                log_path = line
+                break
+
+    # Fallback: journalctl
+    if not log_path:
+        since_str = f"{since_minutes} minutes ago"
+        jcmd = (
+            f"journalctl -u postgresql --no-pager -n {lines} "
+            f"--since '{since_str}' 2>/dev/null"
+        )
+        if grep_pattern:
+            jcmd += f" | grep -E '{grep_pattern}'"
+        r = executor.run(jcmd)
+        log_lines = r.stdout.splitlines() if r.success else []
+        error_count = sum(1 for l in log_lines if re.search(r'\b(ERROR|FATAL|PANIC)\b', l))
+        slow_count = sum(1 for l in log_lines if "duration:" in l.lower())
+        return {
+            "host": target.host,
+            "log_source": "journalctl",
+            "log_path": None,
+            "log_lines": log_lines[-lines:],
+            "total_lines": len(log_lines),
+            "error_count": error_count,
+            "fatal_count": sum(1 for l in log_lines if re.search(r'\b(FATAL|PANIC)\b', l)),
+            "slow_query_count": slow_count,
+            "since_minutes": since_minutes,
+        }
+
+    # Dosyadan oku
+    cmd = f"tail -n {lines * 3} '{log_path}' 2>/dev/null"
+    if grep_pattern:
+        cmd += f" | grep -E '{grep_pattern}' | tail -n {lines}"
+    else:
+        cmd = f"tail -n {lines} '{log_path}' 2>/dev/null"
+
+    r = executor.run(cmd)
+    log_lines = r.stdout.splitlines() if r.success else []
+
+    error_count = sum(1 for l in log_lines if re.search(r'\b(ERROR|FATAL|PANIC)\b', l))
+    slow_count = sum(1 for l in log_lines if "duration:" in l.lower())
+    fatal_count = sum(1 for l in log_lines if re.search(r'\b(FATAL|PANIC)\b', l))
+
+    return {
+        "host": target.host,
+        "log_source": "file",
+        "log_path": log_path,
+        "log_lines": log_lines[-lines:],
+        "total_lines": len(log_lines),
+        "error_count": error_count,
+        "fatal_count": fatal_count,
+        "slow_query_count": slow_count,
+        "since_minutes": since_minutes,
+        "grep_pattern": grep_pattern,
+    }
+
+
 # ─────────────────────────────────────────────
 # Tool Registration
 # ─────────────────────────────────────────────
@@ -607,6 +1003,65 @@ def register_os_tools() -> None:
             func=check_port,
             args_schema={
                 "port": "int — Port numarası",
+                "ssh_target": "str|None — SSH hedef adı",
+            },
+            risk_level="safe",
+            requires_ssh=True,
+        ),
+        ToolDef(
+            name="get_cpu_detail",
+            description="CPU kullanımını detaylı analiz et (mpstat, vmstat, top process'ler)",
+            category="os",
+            func=get_cpu_detail,
+            args_schema={
+                "ssh_target": "str|None — SSH hedef adı",
+            },
+            risk_level="safe",
+            requires_ssh=True,
+        ),
+        ToolDef(
+            name="get_memory_detail",
+            description="Bellek kullanımını detaylı analiz et (/proc/meminfo, swap, top process'ler)",
+            category="os",
+            func=get_memory_detail,
+            args_schema={
+                "ssh_target": "str|None — SSH hedef adı",
+            },
+            risk_level="safe",
+            requires_ssh=True,
+        ),
+        ToolDef(
+            name="get_network_stats",
+            description="Ağ istatistiklerini getir (bağlantı durumu, dinleyen portlar, arayüz istatistikleri)",
+            category="os",
+            func=get_network_stats,
+            args_schema={
+                "ssh_target": "str|None — SSH hedef adı",
+            },
+            risk_level="safe",
+            requires_ssh=True,
+        ),
+        ToolDef(
+            name="get_iostat",
+            description="Disk I/O istatistiklerini getir (iostat — await, util%)",
+            category="os",
+            func=get_iostat,
+            args_schema={
+                "duration": "int — Ölçüm süresi saniye (varsayılan: 3, max: 10)",
+                "ssh_target": "str|None — SSH hedef adı",
+            },
+            risk_level="safe",
+            requires_ssh=True,
+        ),
+        ToolDef(
+            name="read_pg_log",
+            description="PostgreSQL log dosyasını oku ve analiz et (ERROR, FATAL, yavaş sorgu)",
+            category="os",
+            func=read_pg_log,
+            args_schema={
+                "lines": "int — Satır sayısı (varsayılan: 100, max: 500)",
+                "since_minutes": "int — Son kaç dakika (varsayılan: 60)",
+                "grep_pattern": "str — Filtre (varsayılan: ERROR|FATAL|PANIC|slow)",
                 "ssh_target": "str|None — SSH hedef adı",
             },
             risk_level="safe",

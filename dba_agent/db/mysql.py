@@ -66,7 +66,11 @@ class MySQLAdapter(DatabaseAdapter):
         start = time.time()
         try:
             cur = self._connection.cursor()
-            cur.execute(f"SET SESSION MAX_EXECUTION_TIME = {timeout * 1000}")
+            # MAX_EXECUTION_TIME is MySQL 5.7.8+ only; not supported on MariaDB
+            try:
+                cur.execute(f"SET SESSION MAX_EXECUTION_TIME = {timeout * 1000}")
+            except Exception:
+                pass  # Silently skip on MariaDB / older MySQL
             cur.execute(sql, params)
             elapsed_ms = (time.time() - start) * 1000
 

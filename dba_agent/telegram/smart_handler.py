@@ -147,6 +147,40 @@ INTENT_PATTERNS: List[Tuple[str, List[str], Dict[str, Any]]] = [
         r"port\s*\d+|hangi.*port",
     ], {"port": 5432}),
 
+    # ── CPU Detay ─────────────────────────────
+    ("get_cpu_detail", [
+        r"cpu.*detay|cpu.*analiz|işlemci.*detay|cpu.*yük.*detay",
+        r"iowait|context.*switch|vmstat|mpstat|top.*process",
+        r"cpu.*kim.*kullanıyor|hangi.*process.*cpu",
+    ], {}),
+
+    # ── Bellek Detay ─────────────────────────
+    ("get_memory_detail", [
+        r"bellek.*detay|ram.*detay|memory.*detail|swap.*kullan",
+        r"buffer.*cache|meminfo|bellek.*kim.*kullanıyor",
+        r"oom|out.*of.*memory|swap.*dolu",
+    ], {}),
+
+    # ── Ağ İstatistikleri ────────────────────
+    ("get_network_stats", [
+        r"ağ.*istatistik|network.*stat|bağlantı.*sayı|connection.*count",
+        r"time.wait|close.wait|established.*sayı|netstat|port.*list",
+        r"ağ.*durum|network.*durum|interface.*stat",
+    ], {}),
+
+    # ── Disk I/O ─────────────────────────────
+    ("get_iostat", [
+        r"iostat|disk.*io.*detay|await|util.*disk|read.*write.*detay",
+        r"disk.*gecikme|io.*latency|disk.*performans",
+    ], {"duration": 3}),
+
+    # ── PostgreSQL Log ────────────────────────
+    ("read_pg_log", [
+        r"pg.*log|postgresql.*log|postgres.*hata.*log|db.*log.*oku",
+        r"yavaş.*sorgu.*log|slow.*query.*log|log.*analiz",
+        r"fatal.*hata|pg.*fatal|postgres.*error.*log",
+    ], {"lines": 100, "since_minutes": 60}),
+
     # ═══════════════════════════════════════════
     # DB Action Tools — Faz 5
     # ═══════════════════════════════════════════
@@ -211,56 +245,73 @@ DB_NAME_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Sunucu adı tespiti: "x sunucusunda", "x serverında", "x hostunda"
+SERVER_NAME_PATTERN = re.compile(
+    r"(\w[\w\-\.]*)\s+(?:sunucu(?:sund[ae]|da|de)?|server(?:ında|da|de)?|host(?:unda|da|de)?|makine(?:sinde|de)?)",
+    re.IGNORECASE,
+)
+
+# DB tipi tespiti: "postgresql", "mysql", "mariadb", "postgres"
+DB_TYPE_PATTERN = re.compile(
+    r"\b(postgresql|postgres|mysql|mariadb)\b",
+    re.IGNORECASE,
+)
+
 
 def detect_intent(text: str) -> Tuple[Optional[str], Dict[str, Any], float]:
     """
     Kullanıcı metninden intent tespit et.
-    
+
+    Doğal dil ifadeleri desteklenir:
+      "prod sunucusundaki postgresql'de uzun sorgu var mı?"
+      "mysql'deki kilitli bağlantıları göster"
+      "analytics db'sinde vacuum yap"
+
     Returns:
         (tool_name, args, confidence)
         tool_name=None ise intent tespit edilemedi
     """
     text_lower = text.lower().strip()
-    
+
     # SQL sorgusu mu?
     if SQL_PATTERN.match(text):
         return "execute_diagnostic_query", {"sql": text.strip()}, 0.95
-    
-    # DB adı tespiti
-    db_name = _extract_db_name(text_lower)
-    
+
+    # Hedef DB bağlamını çıkar (sunucu adı, db adı, db tipi)
+    ctx = _extract_target_context(text_lower)
+
     best_tool = None
     best_score = 0.0
     best_args = {}
-    
+
     for tool_name, patterns, default_args in INTENT_PATTERNS:
         score = 0.0
         for pattern in patterns:
             matches = re.findall(pattern, text_lower)
             if matches:
                 score += len(matches) * 0.3
-        
+
         if score > best_score:
             best_score = score
             best_tool = tool_name
             best_args = dict(default_args)
-    
+
     if best_tool and best_score >= 0.3:
-        if db_name:
-            best_args["db_name"] = db_name
-        
+        if ctx["db_name"]:
+            best_args["db_name"] = ctx["db_name"]
+
         # Threshold parametresi metinden çıkar
         time_match = re.search(r"(\d+)\s*(saniye|sn|sec|s)\b", text_lower)
         if time_match and "threshold_sec" in best_args:
             best_args["threshold_sec"] = float(time_match.group(1))
-        
+
         # Limit parametresi
         limit_match = re.search(r"(?:ilk|top|en\s*fazla|limit)\s*(\d+)", text_lower)
         if limit_match and "limit" in best_args:
             best_args["limit"] = int(limit_match.group(1))
-        
+
         return best_tool, best_args, min(best_score, 1.0)
-    
+
     return None, {}, 0.0
 
 
@@ -268,16 +319,76 @@ def _extract_db_name(text: str) -> Optional[str]:
     """Metinden DB adını çıkarmaya çalış."""
     config = get_config()
     known_names = [t.name.lower() for t in config.database.targets]
-    
+
     # Bilinen DB adlarını ara
     for name in known_names:
         if name in text:
-            # Orijinal case'ini bul
             for t in config.database.targets:
                 if t.name.lower() == name:
                     return t.name
-    
+
     return None
+
+
+def _extract_target_context(text: str) -> Dict[str, Optional[str]]:
+    """
+    Doğal dil metninden hedef DB bağlamını çıkar.
+
+    Desteklenen ifadeler:
+      "prod sunucusundaki postgresql'de ..."
+      "db1 veritabanında ..."
+      "mysql sunucusuna bağlan"
+      "analytics db'sinde yavaş sorgu"
+
+    Returns:
+        {"db_name": str|None, "db_type": str|None, "server_name": str|None}
+    """
+    config = get_config()
+    result: Dict[str, Optional[str]] = {
+        "db_name": None,
+        "db_type": None,
+        "server_name": None,
+    }
+
+    text_lower = text.lower()
+
+    # 1. Kayıtlı DB target adlarını ara (en güvenilir)
+    for t in config.database.targets:
+        if t.name.lower() in text_lower:
+            result["db_name"] = t.name
+            result["db_type"] = t.db_type
+            break
+
+    # 2. Sunucu adı ile target eşleştir
+    if result["db_name"] is None:
+        server_match = SERVER_NAME_PATTERN.search(text_lower)
+        if server_match:
+            server_token = server_match.group(1).lower()
+            result["server_name"] = server_token
+            # Kayıtlı target'larla eşleştir (isim veya host üzerinden)
+            for t in config.database.targets:
+                if (
+                    server_token in t.name.lower()
+                    or server_token in t.host.lower()
+                    or (t.ssh_host and server_token in t.ssh_host.lower())
+                ):
+                    result["db_name"] = t.name
+                    result["db_type"] = t.db_type
+                    break
+
+    # 3. DB tipi ile target eşleştir (son çare)
+    if result["db_name"] is None:
+        type_match = DB_TYPE_PATTERN.search(text_lower)
+        if type_match:
+            db_type_raw = type_match.group(1).lower()
+            norm = "postgresql" if db_type_raw in ("postgresql", "postgres") else db_type_raw
+            result["db_type"] = norm
+            for t in config.database.targets:
+                if t.db_type.lower() == norm:
+                    result["db_name"] = t.name
+                    break
+
+    return result
 
 
 async def execute_tool(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -335,6 +446,11 @@ def format_tool_result(tool_name: str, result: Dict[str, Any]) -> str:
         "read_os_log": _fmt_os_log,
         "restart_service": _fmt_restart_service,
         "check_port": _fmt_check_port,
+        "get_cpu_detail": _fmt_cpu_detail,
+        "get_memory_detail": _fmt_memory_detail,
+        "get_network_stats": _fmt_network_stats,
+        "get_iostat": _fmt_iostat,
+        "read_pg_log": _fmt_pg_log,
         # DB Action Tools
         "cancel_query": _fmt_action_result,
         "kill_session": _fmt_action_result,
@@ -874,6 +990,195 @@ def _fmt_config_result(data: Dict) -> str:
     )
 
 
+def _fmt_cpu_detail(data: Dict) -> str:
+    usage = data.get("usage_pct", "?")
+    iowait = data.get("iowait_pct", 0)
+    load = data.get("load_avg", {})
+    cpu_count = data.get("cpu_count", "?")
+
+    iowait_emoji = "🔴" if iowait > 30 else "🟡" if iowait > 10 else "🟢"
+    usage_emoji = "🔴" if usage != "?" and usage > 90 else "🟡" if usage != "?" and usage > 70 else "🟢"
+
+    lines = [
+        f"🖥️ *CPU Detaylı Analiz*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Çekirdek: {cpu_count}\n"
+        f"  {usage_emoji} Kullanım: %{usage}\n"
+        f"  👤 User: %{data.get('user_pct', '?')}\n"
+        f"  ⚙️ System: %{data.get('system_pct', '?')}\n"
+        f"  {iowait_emoji} IO Wait: %{iowait}\n"
+        f"  📊 Load: {load.get('1min', '?')} / {load.get('5min', '?')} / {load.get('15min', '?')}\n"
+    ]
+
+    vm = data.get("vmstat", {})
+    if vm:
+        lines.append(
+            f"\n*vmstat:*\n"
+            f"  Run Queue: {vm.get('run_queue', '?')}\n"
+            f"  Blocked: {vm.get('blocked', '?')}\n"
+            f"  IO BI/BO: {vm.get('io_bi', '?')}/{vm.get('io_bo', '?')}\n"
+            f"  Ctx Switch: {vm.get('cs', '?')}/s\n"
+        )
+
+    procs = data.get("top_processes", [])
+    if procs:
+        lines.append(f"\n*CPU Yiyen Process'ler:*")
+        for p in procs[:5]:
+            lines.append(
+                f"  • PID {p.get('pid')} | {p.get('user', '?')} | "
+                f"CPU: %{p.get('cpu_pct', '?')} | MEM: %{p.get('mem_pct', '?')}\n"
+                f"    `{p.get('command', '')[:70]}`"
+            )
+
+    return "\n".join(lines)
+
+
+def _fmt_memory_detail(data: Dict) -> str:
+    total = data.get("total_mb", "?")
+    used = data.get("used_mb", "?")
+    usage_pct = data.get("usage_pct", 0)
+    swap_used = data.get("swap_used_mb", 0)
+    swap_total = data.get("swap_total_mb", 0)
+    swap_pct = data.get("swap_usage_pct", 0)
+
+    usage_emoji = "🔴" if usage_pct > 90 else "🟡" if usage_pct > 75 else "🟢"
+    swap_emoji = "🔴" if swap_pct > 50 else "🟡" if swap_pct > 20 else "🟢"
+
+    lines = [
+        f"🧠 *Bellek Detaylı Analiz*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  {usage_emoji} Kullanım: {used}MB / {total}MB (%{usage_pct})\n"
+        f"  🆓 Kullanılabilir: {data.get('available_mb', '?')}MB\n"
+        f"  💾 Cache: {data.get('cached_mb', '?')}MB\n"
+        f"  📦 Buffer: {data.get('buffers_mb', '?')}MB\n"
+        f"  {swap_emoji} Swap: {swap_used}MB / {swap_total}MB (%{swap_pct})\n"
+    ]
+
+    procs = data.get("top_processes", [])
+    if procs:
+        lines.append(f"\n*Bellek Yiyen Process'ler:*")
+        for p in procs[:5]:
+            lines.append(
+                f"  • PID {p.get('pid')} | {p.get('user', '?')} | "
+                f"MEM: %{p.get('mem_pct', '?')} ({round(p.get('rss_kb', 0)/1024, 1)}MB)\n"
+                f"    `{p.get('command', '')[:70]}`"
+            )
+
+    return "\n".join(lines)
+
+
+def _fmt_network_stats(data: Dict) -> str:
+    established = data.get("established_count", 0)
+    time_wait = data.get("time_wait_count", 0)
+    close_wait = data.get("close_wait_count", 0)
+
+    time_wait_emoji = "🟡" if time_wait > 100 else "🟢"
+    close_wait_emoji = "🔴" if close_wait > 20 else "🟢"
+
+    lines = [
+        f"🌐 *Ağ İstatistikleri*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  🟢 ESTABLISHED: {established}\n"
+        f"  {time_wait_emoji} TIME_WAIT: {time_wait}\n"
+        f"  {close_wait_emoji} CLOSE_WAIT: {close_wait}\n"
+    ]
+
+    states = data.get("connection_states", {})
+    if states:
+        lines.append(f"\n*Tüm Durumlar:*")
+        for state, count in sorted(states.items(), key=lambda x: -x[1])[:8]:
+            lines.append(f"  • {state}: {count}")
+
+    listening = data.get("listening_ports", [])
+    if listening:
+        lines.append(f"\n*Dinleyen Portlar ({len(listening)}):*")
+        for p in listening[:10]:
+            lines.append(f"  • {p.get('local', '?')}")
+
+    ifaces = data.get("interfaces", [])
+    if ifaces:
+        lines.append(f"\n*Arayüz İstatistikleri:*")
+        for iface in ifaces[:5]:
+            rx_mb = round(iface.get("rx_bytes", 0) / 1024 / 1024, 1)
+            tx_mb = round(iface.get("tx_bytes", 0) / 1024 / 1024, 1)
+            err = iface.get("rx_errors", 0) + iface.get("tx_errors", 0)
+            err_str = f" ⚠️ {err} hata" if err > 0 else ""
+            lines.append(f"  • {iface['interface']}: RX {rx_mb}MB / TX {tx_mb}MB{err_str}")
+
+    return "\n".join(lines)
+
+
+def _fmt_iostat(data: Dict) -> str:
+    devices = data.get("devices", [])
+
+    lines = [
+        f"💿 *Disk I/O Detay (iostat)*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Ölçüm: {data.get('duration_sec', '?')}s\n"
+    ]
+
+    if devices:
+        lines.append(f"\n*Cihaz Detayları:*")
+        for d in devices[:10]:
+            r_await = d.get("r_await_ms", 0)
+            w_await = d.get("w_await_ms", 0)
+            util = d.get("util_pct", 0)
+            util_emoji = "🔴" if util > 90 else "🟡" if util > 70 else "🟢"
+            lines.append(
+                f"  • `{d.get('device', '?')}` — "
+                f"{util_emoji} Util: %{util} | "
+                f"R-wait: {r_await}ms | W-wait: {w_await}ms | "
+                f"TPS: {d.get('tps', '?')}"
+            )
+    elif data.get("raw"):
+        lines.append(f"\n```\n{data['raw'][:1000]}\n```")
+
+    return "\n".join(lines)
+
+
+def _fmt_pg_log(data: Dict) -> str:
+    error_count = data.get("error_count", 0)
+    fatal_count = data.get("fatal_count", 0)
+    slow_count = data.get("slow_query_count", 0)
+    log_lines = data.get("log_lines", [])
+
+    err_emoji = "🔴" if error_count > 0 else "🟢"
+    fatal_emoji = "🔴" if fatal_count > 0 else "🟢"
+    slow_emoji = "🟡" if slow_count > 0 else "🟢"
+
+    lines = [
+        f"📋 *PostgreSQL Log Analizi*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"  Sunucu: {data.get('host', '?')}\n"
+        f"  Kaynak: {data.get('log_source', '?')}\n"
+    ]
+
+    if data.get("log_path"):
+        lines.append(f"  Dosya: `{data['log_path']}`\n")
+
+    lines.extend([
+        f"  Son: {data.get('since_minutes', '?')} dakika\n"
+        f"  Toplam satır: {data.get('total_lines', 0)}\n"
+        f"  {err_emoji} ERROR: {error_count}\n"
+        f"  {fatal_emoji} FATAL/PANIC: {fatal_count}\n"
+        f"  {slow_emoji} Yavaş Sorgu: {slow_count}\n"
+    ])
+
+    if log_lines:
+        # Son 20 satır
+        shown = log_lines[-20:]
+        lines.append(f"\n```")
+        for l in shown:
+            lines.append(l[:120])
+        lines.append("```")
+
+    return "\n".join(lines)
+
+
 def _fmt_bulk_kill_result(data: Dict) -> str:
     count = data.get("killed_count", 0)
     emoji = "✅" if count > 0 else "ℹ️"
@@ -903,6 +1208,30 @@ def _fmt_bulk_kill_result(data: Dict) -> str:
 # Ana akıllı mesaj işleme fonksiyonu
 # ─────────────────────────────────────────────
 
+def _extract_table_name(text: str) -> Optional[str]:
+    """Metinden tablo adı çıkarmaya çalış."""
+    # "users tablosunu", "orders tablosu", "table users" vb.
+    patterns = [
+        r"(\w+)\s+tablo(?:su|sunu|sunda|suna)",
+        r"tablo[:\s]+(\w+)",
+        r"table[:\s]+(\w+)",
+        r"\btable\s+(\w+)\b",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _extract_pid(text: str) -> Optional[int]:
+    """Metinden PID numarası çıkar."""
+    m = re.search(r"\bpid[:\s#]+(\d+)\b|sorgu\s+(\d+)\s+iptal", text, re.IGNORECASE)
+    if m:
+        return int(m.group(1) or m.group(2))
+    return None
+
+
 async def handle_smart_message(
     user_text: str,
     chat_id: str,
@@ -914,38 +1243,91 @@ async def handle_smart_message(
     2. Sonucu formatla
     3. LLM ile zenginleştir (opsiyonel)
     4. Gönder
-    
+
+    Doğal dil desteği:
+      "prod sunucusundaki postgresql'de uzun sorgu var mı?"
+      "analytics db'sinde users tablosunu vacuum yap"
+      "mysql'deki kilitli bağlantıları göster"
+
     Args:
         user_text: Kullanıcı mesajı
         chat_id: Telegram chat ID
         send_func: async send_message(chat_id, text, parse_mode) fonksiyonu
     """
     from telegram.constants import ParseMode
-    
+
     # ── Intent tespiti ───────────────────────
     tool_name, args, confidence = detect_intent(user_text)
     
     if tool_name and confidence >= 0.3:
-        # Tool çalıştır
+        # Tablo adı gerektiren tool'lar için doğal dilden çıkar
+        if tool_name in ("vacuum_table", "vacuum_full_table", "reindex_table", "analyze_table"):
+            table = _extract_table_name(user_text.lower())
+            if table and "table_name" not in args:
+                args["table_name"] = table
+
+        # PID gerektiren tool'lar için
+        if tool_name in ("cancel_query", "kill_session"):
+            pid = _extract_pid(user_text)
+            if pid and "pid" not in args:
+                args["pid"] = pid
+
+        # Bağlam bilgisi
+        ctx_info = []
+        if args.get("db_name"):
+            ctx_info.append(f"DB: {args['db_name']}")
+        if args.get("table_name"):
+            ctx_info.append(f"Tablo: {args['table_name']}")
+        if args.get("pid"):
+            ctx_info.append(f"PID: {args['pid']}")
+        ctx_str = f" ({', '.join(ctx_info)})" if ctx_info else ""
+
+        # ── Aksiyon tool'ları için ONAY GEREKİR ──────────────────────
+        # Read-only (diagnostik) tool'lar direkt çalışır.
+        # Yazma/değiştirme tool'ları onay gerektirir.
+        ACTION_TOOLS = {
+            "cancel_query",
+            "kill_session",
+            "kill_long_running_queries",
+            "vacuum_table",
+            "vacuum_full_table",
+            "reindex_table",
+            "analyze_table",
+            "set_db_config",
+            "reload_db_config",
+            "restart_service",
+        }
+
+        if tool_name in ACTION_TOOLS:
+            await _request_action_approval(
+                tool_name=tool_name,
+                args=args,
+                user_text=user_text,
+                ctx_str=ctx_str,
+                chat_id=chat_id,
+                send_func=send_func,
+            )
+            return
+
+        # ── Diagnostik tool'lar — direkt çalıştır ────────────────────
         await send_func(
             chat_id,
-            f"🔧 `{tool_name}` çalıştırılıyor..." +
-            (f" (DB: {args['db_name']})" if args.get("db_name") else ""),
+            f"🔧 `{tool_name}` çalıştırılıyor...{ctx_str}",
             ParseMode.MARKDOWN,
         )
-        
+
         try:
             result = await execute_tool(tool_name, args)
             formatted = format_tool_result(tool_name, result)
             await send_func(chat_id, formatted, ParseMode.MARKDOWN)
-            
+
             # Tool sonucunu LLM ile yorumla
             if result.get("success"):
                 await _send_llm_interpretation(
                     user_text, tool_name, result.get("result", {}),
                     chat_id, send_func,
                 )
-            
+
         except Exception as e:
             logger.error(f"Smart handler tool hatası: {e}", exc_info=True)
             await send_func(
@@ -1016,6 +1398,136 @@ def _detect_multi_intent(text: str) -> List[Tuple[str, Dict[str, Any]]]:
         return tools
     
     return []
+
+
+async def _request_action_approval(
+    tool_name: str,
+    args: Dict[str, Any],
+    user_text: str,
+    ctx_str: str,
+    chat_id: str,
+    send_func,
+) -> None:
+    """
+    Aksiyon tool'ları için Telegram inline keyboard onayı iste.
+    Kullanıcı onaylamazsa hiçbir şey çalıştırılmaz.
+    """
+    import json as _json
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.constants import ParseMode
+
+    # Risk seviyesi
+    TOOL_RISK = {
+        "cancel_query": "low",
+        "kill_session": "medium",
+        "kill_long_running_queries": "medium",
+        "vacuum_table": "low",
+        "vacuum_full_table": "high",
+        "reindex_table": "medium",
+        "analyze_table": "low",
+        "set_db_config": "medium",
+        "reload_db_config": "low",
+        "restart_service": "high",
+    }
+    RISK_EMOJI = {
+        "low": "🟡 LOW",
+        "medium": "🟠 MEDIUM",
+        "high": "🔴 HIGH",
+    }
+
+    risk = TOOL_RISK.get(tool_name, "medium")
+    risk_label = RISK_EMOJI.get(risk, "⚠️")
+
+    # Args'ı kısa metin olarak göster
+    args_display = ", ".join(f"{k}={v}" for k, v in args.items() if v is not None)
+
+    # Onay callback — args'ı JSON olarak kodla (max 64 byte Telegram limiti için kısalt)
+    import uuid
+    approval_token = uuid.uuid4().hex[:8]
+
+    # Pending işlemi kaydet
+    _PENDING_SMART_ACTIONS[approval_token] = {
+        "tool_name": tool_name,
+        "args": args,
+        "chat_id": chat_id,
+        "user_text": user_text,
+    }
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "✅ Onayla & Çalıştır",
+                callback_data=f"smartact_ok:{approval_token}",
+            ),
+            InlineKeyboardButton(
+                "❌ İptal",
+                callback_data=f"smartact_cancel:{approval_token}",
+            ),
+        ]
+    ])
+
+    msg = (
+        f"⚠️ *Aksiyon Onayı Gerekiyor*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🔧 Araç: `{tool_name}`\n"
+        f"📝 Parametreler: `{args_display or '—'}`\n"
+        f"⚡ Risk: {risk_label}\n\n"
+        f"💬 İstek: _{user_text[:150]}_\n\n"
+        f"Bu işlemi onaylıyor musunuz?"
+    )
+
+    await send_func(chat_id, msg, ParseMode.MARKDOWN, keyboard)
+
+
+# Onay bekleyen smart aksiyonlar (bot restart'ta sıfırlanır)
+_PENDING_SMART_ACTIONS: Dict[str, Dict[str, Any]] = {}
+
+
+async def execute_pending_smart_action(token: str, chat_id: str, send_func) -> None:
+    """Onaylanan smart aksiyon token'ını çalıştır."""
+    from telegram.constants import ParseMode
+
+    action = _PENDING_SMART_ACTIONS.pop(token, None)
+    if not action:
+        await send_func(chat_id, "❌ Onay süresi dolmuş veya bulunamadı.", ParseMode.MARKDOWN)
+        return
+
+    tool_name = action["tool_name"]
+    args = action["args"]
+
+    await send_func(
+        chat_id,
+        f"✅ *Onaylandı* — `{tool_name}` çalıştırılıyor...",
+        ParseMode.MARKDOWN,
+    )
+
+    try:
+        result = await execute_tool(tool_name, args)
+        formatted = format_tool_result(tool_name, result)
+        await send_func(chat_id, formatted, ParseMode.MARKDOWN)
+
+        # Audit log
+        try:
+            from dba_agent.security.audit import AuditLogger
+            audit = AuditLogger()
+            audit.log(
+                action_type="smart_action_approved",
+                target=args.get("db_name", "unknown"),
+                command=tool_name,
+                risk_level=action.get("risk", "medium"),
+                result="success" if result.get("success") else "failed",
+                metadata={"args": args, "user_text": action.get("user_text", "")},
+            )
+        except Exception:
+            pass
+
+    except Exception as e:
+        logger.error(f"Smart aksiyon çalıştırma hatası: {e}", exc_info=True)
+        await send_func(
+            chat_id,
+            f"❌ Aksiyon hatası: `{str(e)[:200]}`",
+            ParseMode.MARKDOWN,
+        )
 
 
 async def _send_llm_interpretation(

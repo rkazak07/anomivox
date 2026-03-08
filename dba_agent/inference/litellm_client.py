@@ -325,14 +325,25 @@ class LLMClient:
         except Exception as e:
             result["ollama_error"] = str(e)
 
+        # Normalize status key — used by orchestrator and /status command
+        result["status"] = "ok" if (result["litellm"] or result["ollama_direct"]) else "error"
+
         return result
 
     @property
     def stats(self) -> Dict[str, Any]:
         """Çağrı istatistikleri."""
+        success = self._call_count - self._error_count
         return {
             "total_calls": self._call_count,
+            "success": success,
             "avg_latency_sec": (
+                round(self._total_latency / self._call_count, 2)
+                if self._call_count > 0
+                else 0
+            ),
+            # legacy key — kept for backwards compat
+            "avg_duration_sec": (
                 round(self._total_latency / self._call_count, 2)
                 if self._call_count > 0
                 else 0

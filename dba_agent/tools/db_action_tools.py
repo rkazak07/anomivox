@@ -83,26 +83,51 @@ def cancel_query(pid: int, db_name: str = None) -> Dict[str, Any]:
         {"pid": int, "cancelled": bool, "message": str}
     """
     with get_adapter(db_name) as adapter:
-        # PID'in gerçekten var olduğunu doğrula
-        check = adapter.execute_query(
-            "SELECT pid, usename, state, query FROM pg_stat_activity WHERE pid = %s",
-            (pid,),
-        )
-        if not check.rows:
+        db_type = adapter.target.db_type.lower()
+
+        if db_type in ("postgresql", "postgres"):
+            check = adapter.execute_query(
+                "SELECT pid, usename, state, query FROM pg_stat_activity WHERE pid = %s",
+                (pid,),
+            )
+            if not check.rows:
+                return {
+                    "pid": pid,
+                    "cancelled": False,
+                    "message": f"PID {pid} bulunamadı veya zaten sonlanmış.",
+                }
+            query_info = {
+                "user": str(check.rows[0][1]),
+                "state": str(check.rows[0][2]),
+                "query": str(check.rows[0][3])[:200],
+            }
+            sql = f"SELECT pg_cancel_backend({pid})"
+
+        elif db_type in ("mysql", "mariadb"):
+            check = adapter.execute_query(
+                "SELECT ID, USER, COMMAND, INFO FROM information_schema.PROCESSLIST WHERE ID = %s",
+                (pid,),
+            )
+            if not check.rows:
+                return {
+                    "pid": pid,
+                    "cancelled": False,
+                    "message": f"Thread ID {pid} bulunamadı veya zaten sonlanmış.",
+                }
+            query_info = {
+                "user": str(check.rows[0][1]),
+                "state": str(check.rows[0][2]),
+                "query": str(check.rows[0][3] or "")[:200],
+            }
+            sql = f"KILL QUERY {pid}"
+
+        else:
             return {
                 "pid": pid,
                 "cancelled": False,
-                "message": f"PID {pid} bulunamadı veya zaten sonlanmış.",
+                "message": f"Desteklenmeyen DB tipi: {db_type}",
             }
 
-        query_info = {
-            "user": str(check.rows[0][1]),
-            "state": str(check.rows[0][2]),
-            "query": str(check.rows[0][3])[:200],
-        }
-
-        # Cancel
-        sql = f"SELECT pg_cancel_backend({pid})"
         result = adapter.execute_action(sql, RiskLevel.LOW)
 
         _audit_action(
@@ -115,6 +140,7 @@ def cancel_query(pid: int, db_name: str = None) -> Dict[str, Any]:
         return {
             "pid": pid,
             "cancelled": result.success,
+            "db_type": db_type,
             "message": result.message,
             "query_info": query_info,
             "execution_time_ms": result.execution_time_ms,
@@ -220,9 +246,13 @@ def vacuum_table(
         schema, tbl = _parse_table_name(table_name)
         before = _get_table_snapshot(adapter, schema, tbl)
 
-        # VACUUM
-        analyze_str = " ANALYZE" if analyze else ""
-        sql = f"VACUUM{analyze_str} {table_name}"
+        db_type = adapter.target.db_type.lower()
+        if db_type in ("mysql", "mariadb"):
+            # MySQL/MariaDB: OPTIMIZE TABLE (dead rows temizle + istatistik güncelle)
+            sql = f"OPTIMIZE TABLE {table_name}"
+        else:
+            analyze_str = " ANALYZE" if analyze else ""
+            sql = f"VACUUM{analyze_str} {table_name}"
 
         # VACUUM autocommit gerektirir
         result = adapter.execute_action(sql, RiskLevel.LOW)
@@ -271,7 +301,12 @@ def vacuum_full_table(
         schema, tbl = _parse_table_name(table_name)
         before = _get_table_snapshot(adapter, schema, tbl)
 
-        sql = f"VACUUM FULL ANALYZE {table_name}"
+        db_type = adapter.target.db_type.lower()
+        if db_type in ("mysql", "mariadb"):
+            # MySQL'de VACUUM FULL yok — OPTIMIZE TABLE en yakın eşdeğer
+            sql = f"OPTIMIZE TABLE {table_name}"
+        else:
+            sql = f"VACUUM FULL ANALYZE {table_name}"
         result = adapter.execute_action(sql, RiskLevel.HIGH)
 
         after = _get_table_snapshot(adapter, schema, tbl) if result.success else None
@@ -647,26 +682,41 @@ def _parse_table_name(table_name: str):
 
 
 def _get_table_snapshot(adapter, schema: str, table_name: str) -> Dict[str, Any]:
-    """Tablo anlık durumu."""
+    """Tablo anlık durumu — PostgreSQL ve MySQL destekli."""
+    db_type = adapter.target.db_type.lower()
     try:
-        r = adapter.execute_query("""
-            SELECT n_live_tup, n_dead_tup,
-                   pg_total_relation_size(relid) as total_size,
-                   last_vacuum, last_autovacuum, last_analyze
-            FROM pg_stat_user_tables
-            WHERE schemaname = %s AND relname = %s
-        """, (schema, table_name))
-
-        if r.rows:
-            return {
-                "live_rows": int(r.rows[0][0] or 0),
-                "dead_rows": int(r.rows[0][1] or 0),
-                "total_size_bytes": int(r.rows[0][2] or 0),
-                "total_size_mb": round(int(r.rows[0][2] or 0) / (1024 * 1024), 2),
-                "last_vacuum": str(r.rows[0][3]) if r.rows[0][3] else None,
-                "last_autovacuum": str(r.rows[0][4]) if r.rows[0][4] else None,
-                "last_analyze": str(r.rows[0][5]) if r.rows[0][5] else None,
-            }
+        if db_type in ("postgresql", "postgres"):
+            r = adapter.execute_query("""
+                SELECT n_live_tup, n_dead_tup,
+                       pg_total_relation_size(relid) as total_size,
+                       last_vacuum, last_autovacuum, last_analyze
+                FROM pg_stat_user_tables
+                WHERE schemaname = %s AND relname = %s
+            """, (schema, table_name))
+            if r.rows:
+                return {
+                    "live_rows": int(r.rows[0][0] or 0),
+                    "dead_rows": int(r.rows[0][1] or 0),
+                    "total_size_bytes": int(r.rows[0][2] or 0),
+                    "total_size_mb": round(int(r.rows[0][2] or 0) / (1024 * 1024), 2),
+                    "last_vacuum": str(r.rows[0][3]) if r.rows[0][3] else None,
+                    "last_autovacuum": str(r.rows[0][4]) if r.rows[0][4] else None,
+                    "last_analyze": str(r.rows[0][5]) if r.rows[0][5] else None,
+                }
+        elif db_type in ("mysql", "mariadb"):
+            r = adapter.execute_query("""
+                SELECT TABLE_ROWS,
+                       DATA_LENGTH + INDEX_LENGTH AS total_size
+                FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+            """, (schema, table_name))
+            if r.rows:
+                return {
+                    "live_rows": int(r.rows[0][0] or 0),
+                    "dead_rows": 0,
+                    "total_size_bytes": int(r.rows[0][1] or 0),
+                    "total_size_mb": round(int(r.rows[0][1] or 0) / (1024 * 1024), 2),
+                }
     except Exception as e:
         logger.debug(f"Table snapshot hatası: {e}")
 

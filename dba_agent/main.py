@@ -33,7 +33,7 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
-    """Uygulama başlarken tool'ları kaydet ve Telegram bot'u başlat."""
+    """Uygulama başlarken tool'ları kaydet, Telegram bot ve monitoring başlat."""
     from dba_agent.tools import register_all_tools
     registry = register_all_tools()
     logger.info(f"Registered {len(registry.list_tools())} tools")
@@ -50,10 +50,28 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Telegram bot başlatma hatası: {e}", exc_info=True)
 
+    # ── Proaktif İzleme Başlat ───────────────
+    try:
+        from dba_agent.monitoring import get_health_monitor
+        monitor = get_health_monitor()
+        await monitor.start()
+        logger.info(
+            f"✅ Proaktif izleme aktif — interval: {monitor.thresholds.check_interval_sec}s"
+        )
+    except Exception as e:
+        logger.error(f"Proaktif izleme başlatma hatası: {e}", exc_info=True)
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Uygulama kapanırken Telegram bot'u durdur."""
+    """Uygulama kapanırken Telegram bot ve monitoring'i durdur."""
+    try:
+        from dba_agent.monitoring import get_health_monitor
+        monitor = get_health_monitor()
+        await monitor.stop()
+    except Exception as e:
+        logger.error(f"Proaktif izleme durdurma hatası: {e}")
+
     try:
         from dba_agent.telegram.bot import get_bot
         bot = get_bot()
@@ -107,6 +125,34 @@ async def health_db():
         finally:
             adapter.disconnect()
     return results
+
+
+@app.get("/health/monitor")
+async def health_monitor():
+    """Proaktif izleme durumu."""
+    from dba_agent.monitoring import get_health_monitor
+    monitor = get_health_monitor()
+    return monitor.stats
+
+
+@app.post("/api/agent/monitor/start")
+async def monitor_start():
+    """Proaktif izlemeyi başlat."""
+    from dba_agent.monitoring import get_health_monitor
+    monitor = get_health_monitor()
+    if not monitor.is_running:
+        await monitor.start()
+        return {"status": "started"}
+    return {"status": "already_running"}
+
+
+@app.post("/api/agent/monitor/stop")
+async def monitor_stop():
+    """Proaktif izlemeyi durdur."""
+    from dba_agent.monitoring import get_health_monitor
+    monitor = get_health_monitor()
+    await monitor.stop()
+    return {"status": "stopped"}
 
 
 @app.get("/health/telegram")

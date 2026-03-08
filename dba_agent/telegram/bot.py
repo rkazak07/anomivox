@@ -107,6 +107,7 @@ class DBABot:
         self.app.add_handler(CommandHandler("kill", self._cmd_kill))
         self.app.add_handler(CommandHandler("vacuum", self._cmd_vacuum))
         self.app.add_handler(CommandHandler("ssh", self._cmd_ssh))
+        self.app.add_handler(CommandHandler("monitor", self._cmd_monitor))
 
         # ── Callback handler (inline keyboard) ─
         self.app.add_handler(CallbackQueryHandler(self._callback_handler))
@@ -130,6 +131,7 @@ class DBABot:
             BotCommand("kill", "Oturum/sorgu öldür"),
             BotCommand("vacuum", "Tablo VACUUM"),
             BotCommand("ssh", "SSH sistem bilgisi"),
+            BotCommand("monitor", "Proaktif izleme durumu / kontrol"),
             BotCommand("cancel", "Tanıyı iptal et"),
         ]
 
@@ -267,18 +269,23 @@ class DBABot:
             "  /ssh port 5432 — Port kontrolü\n\n"
             "*Sunucu Metrikleri:*\n"
             "  /status — Genel sistem durumu\n\n"
-            "*Serbest Metin (Akıllı DBA):*\n"
-            "  Doğrudan soru yazabilirsiniz:\n"
-            '  _"Veritabanı sağlık durumu nasıl?"_\n'
-            '  _"Aktif bağlantıları göster"_\n'
-            '  _"Yavaş sorguları listele"_\n'
+            "*Proaktif İzleme:*\n"
+            "  /monitor — İzleme durumu\n"
+            "  /monitor start — Başlat\n"
+            "  /monitor stop — Durdur\n"
+            "  /monitor interval 120 — Aralık ayarla\n\n"
+            "*Junior DBA — Doğal Dil (komut gerekmez):*\n"
+            "  Sunucu/DB adı ile birlikte yazabilirsiniz:\n"
+            '  _"prod sunucusundaki postgresql uzun sorgu var mı?"_\n'
+            '  _"analytics db\'sinde yavaş sorguları göster"_\n'
+            '  _"mysql\'deki kilitli bağlantıları listele"_\n'
+            '  _"users tablosunu vacuum yap"_\n'
             '  _"CPU ve disk durumu nedir?"_\n'
             '  _"PostgreSQL servisi çalışıyor mu?"_\n'
-            '  _"Sistem bilgisi göster"_\n'
-            '  _"SELECT count(*) FROM users"_\n\n'
-            "💡 Mesajınız otomatik analiz edilir,\n"
-            "  ilgili DBA aracı çalıştırılır ve\n"
-            "  sonuç gerçek verilerle döner."
+            '  _"SELECT count(*) FROM orders"_\n\n'
+            "💡 Sistem; sunucu adı, DB tipi ve işlem niyetini\n"
+            "  otomatik tespit eder — komut yazmanıza gerek yok.\n"
+            "  Proaktif izleme anormal durumlarda sizi bildirir."
         )
         await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
@@ -331,6 +338,22 @@ class DBABot:
             success = stats.get("success", 0)
             avg_dur = stats.get("avg_duration_sec", 0)
 
+            # Monitoring durumu
+            mon_line = "  ❓ Bilinmiyor"
+            try:
+                from dba_agent.monitoring import get_health_monitor
+                mon = get_health_monitor()
+                mon_stats = mon.stats
+                mon_emoji = "✅" if mon_stats["running"] else "⏸️"
+                mon_line = (
+                    f"  {mon_emoji} {'Aktif' if mon_stats['running'] else 'Pasif'} — "
+                    f"Kontrol: {mon_stats['check_count']} | "
+                    f"Alert: {mon_stats['alert_count']} | "
+                    f"Aralık: {mon_stats['check_interval_sec']}s"
+                )
+            except Exception:
+                pass
+
             text = (
                 "📊 *Anomivox DBA Agent — Durum*\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -339,6 +362,8 @@ class DBABot:
                 f"🔧 Araçlar: {tool_count} kayıtlı\n\n"
                 f"🖥️ *Veritabanları:*\n"
                 f"{chr(10).join(db_status_lines) if db_status_lines else '  Hedef yok'}\n\n"
+                f"👁️ *Proaktif İzleme:*\n"
+                f"{mon_line}\n\n"
                 f"📈 *LLM İstatistikleri:*\n"
                 f"  Toplam çağrı: {total_calls}\n"
                 f"  Başarılı: {success}\n"
@@ -498,13 +523,14 @@ class DBABot:
                 try:
                     adapter.connect()
                     health = adapter.get_health()
+                    uptime_h = round(health.uptime_sec / 3600, 1)
                     lines.append(
                         f"\n✅ *{name}*\n"
                         f"  Versiyon: {health.version}\n"
                         f"  Bağlantı: {health.active_connections}/{health.max_connections}\n"
                         f"  Cache Hit: {health.cache_hit_ratio:.1%}\n"
-                        f"  DB Boyut: {health.db_size}\n"
-                        f"  Uptime: {health.uptime}"
+                        f"  DB Boyut: {round(health.database_size_mb, 1)} MB\n"
+                        f"  Uptime: {uptime_h} saat"
                     )
                 except Exception as e:
                     lines.append(f"\n❌ *{name}*\n  Hata: {str(e)[:100]}")
@@ -807,6 +833,74 @@ class DBABot:
         except Exception as e:
             await update.message.reply_text(f"❌ SSH hatası: {str(e)[:300]}")
 
+    async def _cmd_monitor(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Proaktif izleme durumu ve kontrolü.
+
+        Kullanım:
+          /monitor           — Durum göster
+          /monitor start     — İzlemeyi başlat
+          /monitor stop      — İzlemeyi durdur
+          /monitor interval 120 — Kontrol aralığını değiştir (saniye)
+        """
+        if not self._is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Yetkisiz erişim.")
+            return
+
+        from dba_agent.monitoring import get_health_monitor
+        monitor = get_health_monitor()
+        sub = context.args[0].lower() if context.args else "status"
+
+        if sub == "start":
+            if monitor.is_running:
+                await update.message.reply_text("⚠️ İzleme zaten çalışıyor.")
+            else:
+                await monitor.start()
+                await update.message.reply_text(
+                    f"✅ Proaktif izleme başlatıldı\n"
+                    f"  Aralık: {monitor.thresholds.check_interval_sec}s\n"
+                    f"  Long query eşiği: {monitor.thresholds.long_query_sec}s\n"
+                    f"  Cooldown: {monitor.thresholds.alert_cooldown_sec}s"
+                )
+
+        elif sub == "stop":
+            await monitor.stop()
+            await update.message.reply_text("⏸️ Proaktif izleme durduruldu.")
+
+        elif sub == "interval" and len(context.args) > 1:
+            try:
+                secs = int(context.args[1])
+                monitor.thresholds.check_interval_sec = secs
+                await update.message.reply_text(f"✅ Kontrol aralığı {secs}s olarak ayarlandı.")
+            except ValueError:
+                await update.message.reply_text("❌ Geçersiz değer. Örnek: /monitor interval 120")
+
+        else:
+            # Durum göster
+            stats = monitor.stats
+            running_emoji = "✅" if stats["running"] else "⏸️"
+            thr = monitor.thresholds
+            text = (
+                "👁️ *Proaktif İzleme Durumu*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"  {running_emoji} Durum: {'Aktif' if stats['running'] else 'Pasif'}\n"
+                f"  🔁 Kontrol sayısı: {stats['check_count']}\n"
+                f"  🚨 Alert sayısı: {stats['alert_count']}\n"
+                f"  ⏱️ Aralık: {stats['check_interval_sec']}s\n"
+                f"  🕒 Cooldown: {thr.alert_cooldown_sec}s\n\n"
+                f"*Eşik Değerleri:*\n"
+                f"  🐌 Uzun sorgu: >{thr.long_query_sec}s\n"
+                f"  🔒 Kilitler: >={thr.blocked_lock_count}\n"
+                f"  🔗 Bağlantı: >%{thr.connection_usage_pct}\n"
+                f"  💾 Cache hit min: %{thr.cache_hit_min_pct}\n"
+                f"  🔄 Rep. lag: >{thr.replication_lag_sec}s\n"
+                f"  🏥 Min. skor: {thr.health_score_min}/100\n\n"
+                f"*Kontrol:*\n"
+                f"  /monitor start — Başlat\n"
+                f"  /monitor stop — Durdur\n"
+                f"  /monitor interval 60 — Aralık ayarla"
+            )
+            await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Serbest metin — Akıllı DBA Agent mesaj işleyici."""
         if not self._is_authorized(update.effective_chat.id):
@@ -916,6 +1010,27 @@ class DBABot:
 
         elif data == "dbaction_cancel":
             await query.edit_message_text("❌ İşlem iptal edildi.")
+
+        elif data.startswith("smartact_ok:"):
+            # Doğal dil ile istenen aksiyon onaylandı
+            token = data[len("smartact_ok:"):]
+            await query.edit_message_text(
+                "✅ *Onaylandı* — aksiyon uygulanıyor...",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            from dba_agent.telegram.smart_handler import execute_pending_smart_action
+            await execute_pending_smart_action(
+                token=token,
+                chat_id=chat_id,
+                send_func=self.send_message,
+            )
+
+        elif data.startswith("smartact_cancel:"):
+            token = data[len("smartact_cancel:"):]
+            # Bekleyen aksiyonu temizle
+            from dba_agent.telegram.smart_handler import _PENDING_SMART_ACTIONS
+            _PENDING_SMART_ACTIONS.pop(token, None)
+            await query.edit_message_text("❌ Aksiyon iptal edildi.")
 
 
 # ─────────────────────────────────────────────

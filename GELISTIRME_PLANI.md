@@ -215,12 +215,11 @@ Phase 5 **~%90 tamamlanmis** durumda. Yalnizca B7 ve B8 kaldi.
 
 **Dosyalar:** `server/knowledge_base/utils.py`
 
-#### 3.6 Desteklenmeyen Dosya Formatlari Icin Kullanici Dostu Hata
-**Sorun:** `.log`, `.jsonl` gibi desteklenmeyen formatlar yukleniyor ama hic bir uyari verilmiyor.
-**Yapilacak:**
-- `upload_docs()` icinde format kontrolu ekle
-- Desteklenmeyen formatlarda anlik kullaniciya bilgi ver (UI'da)
-- `LOADER_DICT` sabiti ekranda goster
+#### ~~3.6 Desteklenmeyen Dosya Formatlari Icin Kullanici Dostu Hata~~ — TAMAMLANDI (2026-03-08)
+**Yapilan:**
+- `upload_docs()` icinde format kontrolu eklendi: yuklenmeden once uzanti kontrolu, desteklenmeyen dosyalar `failed_files`'a eklenir, kaydedilmez
+- UI'da (knowledge_base.py): `failed_files` varsa her dosya icin `st.warning()`, desteklenen formatlar `st.info()` ile gosterilir
+- `LOADER_DICT` import'u `kb_doc_api.py`'ye eklendi
 
 **Dosyalar:** `server/knowledge_base/kb_doc_api.py`, `webui_pages/knowledge_base/knowledge_base.py`
 
@@ -329,7 +328,7 @@ Hafta 1-2:
 Hafta 3-4:
   [ ] LangChain surumu guncelle
   [ ] Notify Worker hata yonetimi guclendir
-  [ ] Desteklenmeyen format UI uyarisi
+  [x] Desteklenmeyen format UI uyarisi
 
 Ay 2:
   [x] DBA Agent Phase 5 — A1: Aksiyon eslestirme duzelt

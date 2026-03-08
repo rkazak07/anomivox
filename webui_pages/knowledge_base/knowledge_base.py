@@ -142,11 +142,11 @@ def knowledge_base_page(api: ApiRequest, is_lite: bool = None):
     elif selected_kb:
         kb = selected_kb
         st.session_state["selected_kb_info"] = kb_list[kb]['kb_info']
-        files = st.file_uploader("Upload Knowledge Document：",
+        files = st.file_uploader(get_text(lang, "upload_kb_doc_label"),
                                  [i for ls in LOADER_DICT.values() for i in ls],
                                  accept_multiple_files=True,
                                  )
-        kb_info = st.text_area("Please Input Knowledge base Introduction:", value=st.session_state["selected_kb_info"], max_chars=None, key=None,
+        kb_info = st.text_area(get_text(lang, "kb_intro_text"), value=st.session_state["selected_kb_info"], max_chars=None, key=None,
                                help=None, on_change=None, args=None, kwargs=None)
 
         if kb_info != st.session_state["selected_kb_info"]:
@@ -155,18 +155,18 @@ def knowledge_base_page(api: ApiRequest, is_lite: bool = None):
 
         # with st.sidebar:
         with st.expander(
-                "Document processing configuration",
+                get_text(lang, "doc_processing_config"),
                 expanded=True,
         ):
             cols = st.columns(3)
-            chunk_size = cols[0].number_input("Maximum length of a single chunk", 1, 1000, CHUNK_SIZE)
-            chunk_overlap = cols[1].number_input("Adjacent text overlap length:", 0, chunk_size, OVERLAP_SIZE)
+            chunk_size = cols[0].number_input(get_text(lang, "max_chunk_length"), 1, 1000, CHUNK_SIZE)
+            chunk_overlap = cols[1].number_input(get_text(lang, "chunk_overlap_length"), 0, chunk_size, OVERLAP_SIZE)
             cols[2].write("")
             cols[2].write("")
-            zh_title_enhance = cols[2].checkbox("Enable title enhancement", ZH_TITLE_ENHANCE)
+            zh_title_enhance = cols[2].checkbox(get_text(lang, "enable_title_enhance"), ZH_TITLE_ENHANCE)
 
         if st.button(
-                "Add files to the knowledge base",
+                get_text(lang, "add_files_to_kb"),
                 # use_container_width=True,
                 disabled=len(files) == 0,
         ):
@@ -176,19 +176,26 @@ def knowledge_base_page(api: ApiRequest, is_lite: bool = None):
                                      chunk_size=chunk_size,
                                      chunk_overlap=chunk_overlap,
                                      zh_title_enhance=zh_title_enhance)
-            if msg := check_success_msg(ret):
-                st.toast(msg, icon="✔")
-            elif msg := check_error_msg(ret):
+            if msg := check_error_msg(ret):
                 st.toast(msg, icon="✖")
+            else:
+                failed = ret.get("data", {}).get("failed_files", {}) if isinstance(ret, dict) else {}
+                if failed:
+                    for fname, reason in failed.items():
+                        st.warning(f"⚠️ **{fname}**: {reason}")
+                    supported_extensions = sorted({ext for exts in LOADER_DICT.values() for ext in exts})
+                    st.info(f"{get_text(lang, 'supported_formats_info')} `{'`, `'.join(supported_extensions)}`")
+                elif msg := check_success_msg(ret):
+                    st.toast(msg, icon="✔")
 
         st.divider()
 
         doc_details = pd.DataFrame(get_kb_file_details(kb))
         if not len(doc_details):
-            st.info(f"Knowledge base `{kb}` is empty")
+            st.info(get_text(lang, "kb_empty").format(kb=kb))
         else:
-            st.write(f"Existing documents in Knowledge base `{kb}`:")
-            st.info("The knowledge base contains source files and vector libraries. Please select the files from the table below and operate.")
+            st.write(get_text(lang, "existing_docs_title").format(kb=kb))
+            st.info(get_text(lang, "kb_source_hint"))
             doc_details.drop(columns=["kb_name"], inplace=True)
             doc_details = doc_details[[
                 "No", "file_name", "document_loader", "text_splitter", "docs_count", "in_folder", "in_db",

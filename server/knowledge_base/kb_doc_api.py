@@ -7,7 +7,7 @@ from configs import (EMBEDDING_MODEL,
                      logger, log_verbose, DEFAULT_VS_TYPES)
 from server.utils import BaseResponse, ListResponse, run_in_thread_pool
 from server.knowledge_base.utils import (validate_kb_name, list_files_from_folder, get_file_path,
-                                         files2docs_in_thread, KnowledgeFile)
+                                         files2docs_in_thread, KnowledgeFile, LOADER_DICT)
 from fastapi.responses import StreamingResponse, FileResponse
 from server.knowledge_base.kb_service.base import get_kb_details
 from pydantic import Json
@@ -177,6 +177,26 @@ def upload_docs(
 
     failed_files = {}
     file_names = list(docs.keys())
+
+    # Desteklenmeyen format kontrolü — kaydetmeden önce filtrele
+    supported_extensions = {ext for exts in LOADER_DICT.values() for ext in exts}
+    unsupported_files = []
+    supported_files = []
+    for f in files:
+        ext = os.path.splitext(f.filename)[1].lower()
+        if ext not in supported_extensions:
+            failed_files[f.filename] = (
+                f"Unsupported file format: '{ext}'. "
+                f"Supported formats: {sorted(supported_extensions)}"
+            )
+            unsupported_files.append(f.filename)
+        else:
+            supported_files.append(f)
+
+    if unsupported_files:
+        logger.warning("Unsupported format upload attempt: %s", unsupported_files)
+
+    files = supported_files
 
     for result in _save_files_in_thread(files, knowledge_base_name=knowledge_base_name, override=override):
         filename = result["data"]["file_name"]

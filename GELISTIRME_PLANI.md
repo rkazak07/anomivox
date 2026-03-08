@@ -176,174 +176,34 @@ Dokuman Yukleme
 
 #### 3.4 DBA Agent Phase 5 — Aksiyon Yurutme
 
-**Mevcut durum (2026-03-08 detayli analiz):**
+**Mevcut durum (2026-03-08 guncellendi — A1-A5, B1-B6, C1-C4 TAMAMLANDI):**
 
-Phase 5 yaklasik **%40 tamamlanmis** durumda:
+Phase 5 **~%90 tamamlanmis** durumda. Yalnizca B7 ve B8 kaldi.
 
-| Bilesен | Durum | Dosya | Aciklama |
+| Bilesen | Durum | Dosya | Aciklama |
 |---|---|---|---|
-| Approval mekanizmasi | ✅ Calisiyor | `approval.py` | Inline keyboard, onay/red, timeout |
-| SQL/SSH aksiyon yurutme | ✅ Calisiyor | `approval.py`, `db_action_tools.py` | `adapter.execute_action()` + `SSHExecutor` |
-| Guvenlik kontrolleri | ✅ Calisiyor | `db_action_tools.py` | `_check_sql_forbidden()`, risk level validation |
-| Audit logging | ✅ Calisiyor | `audit.py`, `approval.py` | Aksiyonlar kaydediliyor |
-| Verifier | ⚠️ Yazilmis ama baglanmamis | `verifier.py` | Orphaned code — hicbir yerden cagrilmiyor |
-| Orchestrator → Approval | ❌ Eksik | `orchestrator.py` | Tani bitince aksiyonlar approval'a iletilmiyor |
-| Before/After snapshot | ❌ Eksik | `approval.py` | Aksiyon oncesi/sonrasi metrik karsilastirmasi yok |
-| Rollback | ❌ Eksik | — | Hicbir rollback mekanizmasi yok |
-| Kendi kendine ogrenme | ❌ Tamamen eksik | `memory/__init__.py` | 3 satirlik placeholder: "Faz 4'te implement edilecek" |
+| Approval mekanizmasi | ✅ Tamamlandi | `approval.py` | Inline keyboard, onay/red, timeout; TR/EN dil destegi |
+| SQL/SSH aksiyon yurutme | ✅ Tamamlandi | `approval.py`, `db_action_tools.py` | `adapter.execute_action()` + `SSHExecutor` |
+| Guvenlik kontrolleri | ✅ Tamamlandi | `db_action_tools.py` | `_check_sql_forbidden()`, risk level validation |
+| Audit logging | ✅ Tamamlandi | `audit.py` | Aksiyonlar + rollback bilgisi + gecmis sorgusu |
+| Verifier entegrasyonu | ✅ Tamamlandi | `verifier.py`, `approval.py` | Before/after snapshot + LLM karsilastirma |
+| Orchestrator → Approval | ✅ Tamamlandi | `orchestrator.py` | `_handle_actions()` — risk bazli yonlendirme |
+| Rollback kaydi | ✅ Tamamlandi | `audit.py` | `log_rollback_info()` |
+| Staged Execution | ✅ Tamamlandi | `approval.py` | `staged_stopped` flag — verifier basarisizsa dur |
+| Cooldown | ✅ Tamamlandi | `approval.py` | `_cooldown_registry` + `DBA_COOLDOWN_MINUTES` |
+| Dry-run modu | ✅ Tamamlandi | `config.py`, `approval.py` | `DBA_DRY_RUN=true` |
+| Maintenance Window | ✅ Tamamlandi | `config.py`, `approval.py` | HIGH risk icin saat kisitlamasi |
+| /history komutu | ✅ Tamamlandi | `bot.py`, `audit.py` | `get_recent_actions()` |
+| Incident Memory Store | ✅ Tamamlandi | `memory/incident_store.py` | JSONL + ChromaDB (graceful fallback) |
+| RAG Retrieval | ✅ Tamamlandi | `orchestrator.py` | `find_similar()` → LLM prompt'una enjekte |
+| /stats komutu | ✅ Tamamlandi | `bot.py`, `incident_store.py` | Aksiyon basari oranlari |
+| Feedback loop | ✅ Tamamlandi | `bot.py`, `approval.py` | 👍/👎/😐 butonlari + `update_feedback()` |
+| TR/EN dil uyumu | ✅ Tamamlandi | `approval.py`, `orchestrator.py` | Tum Telegram mesajlari `DBA_AGENT_LANGUAGE`'a uygun |
+| Fire-and-forget duzelt | ✅ Tamamlandi | `approval.py` | `_pending_tasks` set + `_on_action_task_done` |
+| Multi-DB target | ✅ Tamamlandi | `approval.py`, `db/factory.py` | `resolve_target_name()` ile dogrulama + fallback; audit log'a `target_db` yaziliyor |
+| Multi-approval | ✅ Tamamlandi | `approval.py`, `config.py` | `DBA_APPROVERS` + `DBA_REQUIRED_APPROVALS`; ilerleme "1/2 onay alindi" mesaji |
 
-**Kod kaniti — orphaned verifier:**
-```python
-# orchestrator.py:95 — olusturuluyor ama HICBIR YERDE kullanilmiyor
-self.verifier = Verifier()
-
-# orchestrator.py:305-312 — gecmis kayit placeholder
-"Henuz gecmis kayit yok (Faz 4'te eklenecek)"
-```
-
-**Kod kaniti — fire-and-forget sorunu:**
-```python
-# approval.py:141 — aksiyon ateslenip unutuluyor
-asyncio.create_task(_execute_approved_actions(...))  # bot cokerse sonuc kaybolur
-```
-
-**Gercek eksikler:**
-
-| Eksik | Nerede | Etki |
-|---|---|---|
-| Orchestrator → Approval baglantisi yok | `orchestrator.py` tani bitince approval'a iletmiyor | Aksiyonlar hic Telegram'a gelmiyor |
-| Risk bazli otomatik yurutme yok | `SAFE` aksiyonlar onay beklemeden calismali | Her sey manuel onay bekliyor |
-| Verifier entegrasyonu yok | Aksiyon sonrasi `verifier.py` calismiyor | Before/after karsilastirmasi yapilmiyor |
-| Aksiyon tipi tespiti zayif | `action.get("type", "")` ama executor SQL'i `action.get("sql")` ile koyuyor | SQL'ler calismayabilir |
-| `detail` callback implement edilmemis | `bot.py`'de `detail:{alert_id}` callback handler yok | Buton gosterilip tiklaninca hata |
-| Async fire-and-forget | `approval.py:141` `asyncio.create_task()` | Bot cokerse kullanici sonucu ogrenemez |
-| Approval timeout yetersiz | Default 3600s (1 saat) | VACUUM FULL buyuk tabloda 2+ saat surebilir |
-| Multi-DB target eksik | `approval.py:226` `get_adapter()` hedef DB belirtmiyor | Hangi DB'ye aksiyon uygulandigi belirsiz |
-
-**Yapilacak (oncelik sirasina gore):**
-
-##### A — Kritik Baglanti Eksikleri (bunlar olmadan Phase 5 calismaz)
-
-**A1. Aksiyon eslestirme duzelt** (~30dk)
-- `approval.py:202` — `action.get("type", "")` yerine `action.get("sql", "")` kontrolu zaten var ama ust kosulda `type` kontrol ediliyor
-- Executor'un dondugu `{"action": "...", "sql": "...", "risk": "..."}` formatina uyumlu hale getir
-- **Dosyalar:** `dba_agent/telegram/approval.py`
-
-**A2. Orchestrator → Approval pipeline kur** (~2-3 saat)
-- `orchestrator.diagnose()` tamamlaninca onerilen aksiyonlari risk bazinda yonlendir:
-  ```
-  SAFE aksiyonlar     → otomatik yurut → Verifier
-  LOW aksiyonlar      → otomatik yurut (config toggle: DBA_AUTO_APPROVE_LOW)
-  MEDIUM/HIGH         → Telegram approval mesaji gonder → onay/red → yurut/logla
-  ```
-- `orchestrator.py`'ye `_handle_actions()` metodu ekle
-- **Dosyalar:** `dba_agent/agent/orchestrator.py`, `dba_agent/telegram/approval.py`
-
-**A3. Verifier entegrasyonu + Before/After Snapshot** (~2-3 saat)
-- `approval.py`'de aksiyon oncesi `verifier.take_snapshot()` cagir
-- Aksiyon sonrasi tekrar snapshot al ve `verifier.verify()` ile karsilastir
-- Verifier sonucunu Telegram'a gonder (health_score, cache_hit_ratio, active_connections degisimi)
-- Rollback gerektiriyorsa uyar
-- **Dosyalar:** `dba_agent/agent/orchestrator.py`, `dba_agent/agent/verifier.py`, `dba_agent/telegram/approval.py`
-
-**A4. `detail` callback handler** (~30dk)
-- `bot.py`'ye `detail:{alert_id}` icin callback handler ekle
-- Tiklaninca aksiyonlarin detaylarini (SQL, risk, reason) gostersin
-- **Dosyalar:** `dba_agent/telegram/bot.py`
-
-**A5. Async fire-and-forget duzelt** (~1 saat)
-- `approval.py:141`'deki `asyncio.create_task()` yerine task tracking ekle
-- Aksiyon tamamlaninca veya hata olunca Telegram'a bildirim gonder
-- Task referanslarini `_pending_tasks` dict'inde tut (GC icin)
-- **Dosyalar:** `dba_agent/telegram/approval.py`
-
-##### B — Kalite Gelistirmeleri
-
-**B1. Dry-run modu** (~1 saat)
-- `DBA_DRY_RUN=true` env ile aksiyonlar yurutulmuyor, sadece ne yapilacagi loglanir
-- Test ve demo icin kritik
-- **Dosyalar:** `dba_agent/config.py`, `dba_agent/telegram/approval.py`
-
-**B2. Bakim zaman penceresi (Maintenance Window)** (~1 saat)
-- HIGH riskli aksiyonlar icin `DBA_MAINTENANCE_START=02:00` / `DBA_MAINTENANCE_END=05:00` config
-- Pencere disinda: "Bu aksiyon sadece bakim saatlerinde uygulanabilir" uyarisi
-- SAFE/LOW aksiyonlar pencereden bagimsiz calisir
-- **Dosyalar:** `dba_agent/config.py`, `dba_agent/telegram/approval.py`
-
-**B3. Rollback kaydi** (~1 saat)
-- Her yurutulen aksiyonun geri alinabilir versiyonu audit log'a yazilir
-- Ornek: `{"action": "set_db_config", "param": "work_mem", "old_value": "4MB", "new_value": "64MB", "rollback_sql": "ALTER SYSTEM SET work_mem = '4MB'"}`
-- **Dosyalar:** `dba_agent/security/audit.py`, `dba_agent/telegram/approval.py`
-
-**B4. Aksiyon gecmisi komutu (/history)** (~1 saat)
-- Telegram'da `/history` komutu: son 10 uygulanan aksiyonu listele
-- Audit log'dan okur
-- **Dosyalar:** `dba_agent/telegram/bot.py`, `dba_agent/security/audit.py`
-
-**B5. Kademeli yurutme (Staged Execution)** (~2 saat)
-- Birden fazla aksiyon onerildiginde hepsini birden degil, sirayla calistir
-- Her adim sonrasi verifier kontrol etsin, iyilesme yoksa dursun
-- Gereksiz HIGH risk aksiyonlardan kacin
-- **Dosyalar:** `dba_agent/telegram/approval.py`, `dba_agent/agent/verifier.py`
-
-**B6. Cooldown mekanizmasi** (~1 saat)
-- Ayni anomali icin kisa surede tekrar aksiyon tetiklenmesini engelle
-- Ornek: `VACUUM ANALYZE` calistiktan sonra 30 dk ayni tablo icin tekrar tetiklenmesin
-- `_cooldown_registry` dict: `{action_key: last_executed_at}`
-- **Dosyalar:** `dba_agent/telegram/approval.py`, `dba_agent/config.py`
-
-**B7. Multi-DB target destegi** (~2 saat)
-- `approval.py:226`'da `get_adapter()` hedef DB belirtmeden cagriliyor
-- Aksiyon formatina `target_db` alani ekle
-- Hangi DB'ye aksiyon uygulandigini audit log'a yaz
-- **Dosyalar:** `dba_agent/telegram/approval.py`, `dba_agent/db/factory.py`
-
-**B8. Multi-approval (coklu onay)** (~2 saat)
-- Telegram'da birden fazla DBA tanimla (`DBA_APPROVERS` env)
-- HIGH risk aksiyonlar icin 2/3 onay zorunlulugu
-- Onay durumunu Telegram'da canli goster: "1/2 onay alindi"
-- **Dosyalar:** `dba_agent/telegram/approval.py`, `dba_agent/config.py`
-
-##### C — Kendi Kendine Ogrenme (Phase 4 Memory/RAG)
-
-**C1. Incident Memory Store** (~3-4 saat)
-- Her tani + aksiyon + sonucu ChromaDB'ye kaydet
-- Schema: `{alert_type, root_cause, actions_taken, success_rate, health_before, health_after, timestamp}`
-- `dba_agent/memory/incident_store.py` olustur
-- **Dosyalar:** `dba_agent/memory/incident_store.py` (yeni), `dba_agent/agent/orchestrator.py`
-
-**C2. Benzer vaka getirme (RAG Retrieval)** (~2-3 saat)
-- Yeni anomalide ChromaDB'den benzer gecmis vakalari getir (top-3 similarity)
-- LLM'e "gecmiste bu sorunda X cozumu %90 basarili oldu" baglamini ver
-- Orchestrator planning asamasinda gecmis deneyimi kullan
-- **Dosyalar:** `dba_agent/memory/incident_store.py`, `dba_agent/agent/orchestrator.py`, `dba_agent/agent/prompts.py`
-
-**C3. Aksiyon basari skoru & trend** (~2 saat)
-- Her aksiyon sonrasi `health_score` degisimini kaydet
-- Zaman icinde hangi aksiyonlarin en etkili oldugunu raporla
-- Dusuk basarili aksiyonlari otomatik deprioritize et
-- Telegram'da `/stats` komutu ile basari oranlari goster
-- **Dosyalar:** `dba_agent/memory/incident_store.py`, `dba_agent/telegram/bot.py`
-
-**C4. Feedback loop** (~2 saat)
-- DBA aksiyon sonrasi Telegram'da "Bu cozum ise yaradi mi?" butonlari goster
-- Kullanici geri bildirimi incident_store'a kaydet
-- Gelecek onerileri siralama sirasinda bu skora gore agirliklandir
-- **Dosyalar:** `dba_agent/telegram/bot.py`, `dba_agent/telegram/approval.py`, `dba_agent/memory/incident_store.py`
-
-**Uygulama sirasi:**
-```
-A1 → A2 → A3 → A4 → A5
-→ B1 → B2 → B3 → B5 → B4 → B6
-→ C1 → C2 → C3 → C4
-→ B7 → B8
-```
-
-**Faz aciklamasi:**
-- A1-A5: Phase 5'in calismasi icin zorunlu. Bunlar olmadan aksiyon pipeline'i calismaz.
-- B1-B6: Guvenlik ve kalite katmanlari. Uretim ortaminda olmasi gereken ozellikler.
-- C1-C4: Kendi kendine ogrenme. Sistem her anomaliden ders cikarir, zaman icinde daha iyi oneriler sunar.
-- B7-B8: Ileri seviye ozellikler. Multi-DB ve multi-approval destegi.
+**3.4 Phase 5 — %100 TAMAMLANDI** (2026-03-08)
 
 #### 3.5 JSONL Format Destegi Duzelt
 **Sorun:** `diagnose_run_data_copy.jsonl` yuklediginde `JSONLoader` her satirin `dict` olmasi bekliyor ama satirlar `str` olabilir.
@@ -471,11 +331,23 @@ Hafta 3-4:
   [ ] Desteklenmeyen format UI uyarisi
 
 Ay 2:
-  [ ] DBA Agent Phase 5 — A1: Aksiyon eslestirme duzelt
-  [ ] DBA Agent Phase 5 — A2: Orchestrator → Approval pipeline
-  [ ] DBA Agent Phase 5 — A3: Verifier entegrasyonu
-  [ ] DBA Agent Phase 5 — A4: detail callback handler
-  [ ] DBA Agent Phase 5 — B1-B4: Dry-run, Maintenance Window, Rollback, /history
+  [x] DBA Agent Phase 5 — A1: Aksiyon eslestirme duzelt
+  [x] DBA Agent Phase 5 — A2: Orchestrator → Approval pipeline
+  [x] DBA Agent Phase 5 — A3: Verifier entegrasyonu + Before/After snapshot
+  [x] DBA Agent Phase 5 — A4: detail callback handler
+  [x] DBA Agent Phase 5 — A5: Fire-and-forget duzelt
+  [x] DBA Agent Phase 5 — B1: Dry-run modu
+  [x] DBA Agent Phase 5 — B2: Maintenance Window
+  [x] DBA Agent Phase 5 — B3: Rollback kaydi
+  [x] DBA Agent Phase 5 — B4: /history komutu
+  [x] DBA Agent Phase 5 — B5: Staged Execution
+  [x] DBA Agent Phase 5 — B6: Cooldown mekanizmasi
+  [x] DBA Agent Phase 5 — C1: Incident Memory Store
+  [x] DBA Agent Phase 5 — C2: RAG Retrieval
+  [x] DBA Agent Phase 5 — C3: /stats komutu
+  [x] DBA Agent Phase 5 — C4: Feedback loop
+  [x] DBA Agent Phase 5 — B7: Multi-DB target
+  [x] DBA Agent Phase 5 — B8: Multi-approval
   [ ] Temel test altyapisi
   [ ] Dashboard grafikleri
 

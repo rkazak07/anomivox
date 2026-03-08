@@ -6,9 +6,9 @@ Mevcut prometheus_service_docker/app.py'deki multi-DB kodundan türetildi.
 """
 
 from dba_agent.db.adapter import DatabaseAdapter, QueryResult, ConnectionInfo
-from dba_agent.db.factory import get_adapter, get_all_adapters
+from dba_agent.db.factory import get_adapter, get_all_adapters, resolve_target_name
 
 __all__ = [
     "DatabaseAdapter", "QueryResult", "ConnectionInfo",
-    "get_adapter", "get_all_adapters",
+    "get_adapter", "get_all_adapters", "resolve_target_name",
 ]

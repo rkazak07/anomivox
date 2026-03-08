@@ -332,6 +332,12 @@ class TelegramConfig:
         os.getenv("DBA_APPROVAL_TIMEOUT", "3600")
     )  # 1 saat
 
+    # Multi-approval: DBA_APPROVERS = "123456,789012" (virgül ayrımlı chat ID'leri)
+    # Boş ise sadece TELEGRAM_ADMIN_CHAT_ID kullanılır
+    approvers_raw: str = os.getenv("DBA_APPROVERS", "")
+    # HIGH risk için gereken minimum onay sayısı (varsayılan: 1)
+    required_approvals: int = int(os.getenv("DBA_REQUIRED_APPROVALS", "1"))
+
     @property
     def all_chat_ids(self) -> List[str]:
         ids = []
@@ -339,6 +345,16 @@ class TelegramConfig:
             ids.append(self.admin_chat_id)
         if self.extra_chat_ids:
             ids.extend([c.strip() for c in self.extra_chat_ids.split(",") if c.strip()])
+        return ids
+
+    @property
+    def approver_ids(self) -> List[str]:
+        """Multi-approval için yetkili DBA chat ID'leri."""
+        ids = []
+        if self.approvers_raw:
+            ids = [c.strip() for c in self.approvers_raw.split(",") if c.strip()]
+        if not ids and self.admin_chat_id:
+            ids = [self.admin_chat_id]
         return ids
 
 
@@ -385,8 +401,17 @@ class SecurityConfig:
         "> /dev/sda",
     ])
 
-    # Otomatik onay (SAFE seviyesi)
+    # Otomatik onay seviyeleri
     auto_approve_safe: bool = True
+    auto_approve_low: bool = os.getenv("DBA_AUTO_APPROVE_LOW", "false").lower() == "true"
+
+    # Dry-run: aksiyonlar yürütülmez, sadece loglanır
+    dry_run: bool = os.getenv("DBA_DRY_RUN", "false").lower() == "true"
+
+    # Bakım penceresi — HIGH riskli aksiyonlar sadece bu saatler arasında uygulanır
+    # Format: "HH:MM" (24 saat), boş string = kısıtlama yok
+    maintenance_start: str = os.getenv("DBA_MAINTENANCE_START", "")
+    maintenance_end: str = os.getenv("DBA_MAINTENANCE_END", "")
 
 
 # ─────────────────────────────────────────────

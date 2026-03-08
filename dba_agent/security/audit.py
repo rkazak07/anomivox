@@ -133,6 +133,62 @@ class AuditLogger:
             result=decision,  # "approved", "rejected", "deferred"
         )
 
+    def log_rollback_info(
+        self,
+        target: str,
+        action: str,
+        applied_sql: str,
+        rollback_sql: str,
+        param: Optional[str] = None,
+        old_value: Optional[str] = None,
+        new_value: Optional[str] = None,
+    ) -> None:
+        """
+        Uygulanan aksiyonun rollback bilgisini kaydet.
+        Gerektiğinde geri alınabilmesi için audit log'a yazar.
+        """
+        self.log(
+            action_type="rollback_info",
+            target=target,
+            command=applied_sql,
+            risk_level="info",
+            result="recorded",
+            metadata={
+                "action": action,
+                "rollback_sql": rollback_sql,
+                "param": param,
+                "old_value": old_value,
+                "new_value": new_value,
+            },
+        )
+
+    def get_recent_actions(self, limit: int = 10) -> list:
+        """
+        Son N başarılı aksiyonu audit log'dan oku.
+        /history komutu için kullanılır.
+        """
+        records = []
+        try:
+            if not os.path.exists(self.log_path):
+                return []
+            with open(self.log_path, "r") as f:
+                lines = f.readlines()
+            for line in reversed(lines):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    if rec.get("action_type") == "approved_action" and rec.get("result") in ("success", "failed"):
+                        records.append(rec)
+                        if len(records) >= limit:
+                            break
+                except json.JSONDecodeError:
+                    continue
+        except Exception as e:
+            logger.error(f"Audit log okuma hatası: {e}")
+        return records
+
 
 # ─── Singleton ────────────────────────────────
 _audit: Optional[AuditLogger] = None

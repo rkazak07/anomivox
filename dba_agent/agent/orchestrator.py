@@ -277,6 +277,10 @@ class Orchestrator:
                 metadata={"root_cause": report.root_cause[:200], "duration": report.total_duration_sec},
             )
 
+            # ── STEP 5: Aksiyon Yönetimi (Phase 5) ──────
+            if report.recommended_actions:
+                await self._handle_actions(report)
+
             return report
 
         except Exception as e:
@@ -293,6 +297,82 @@ class Orchestrator:
                 metadata={"error": str(e)[:200]},
             )
             return report
+
+    async def _handle_actions(self, report: DiagnosisReport) -> None:
+        """
+        Önerilen aksiyonları risk seviyesine göre yönlendir.
+
+        SAFE  → auto_approve_safe=True ise otomatik yürüt
+        LOW   → DBA_AUTO_APPROVE_LOW=true ise otomatik yürüt
+        MEDIUM/HIGH → Telegram approval kuyruğuna kaydet
+        """
+        from dba_agent.telegram.approval import (
+            register_pending_approval,
+            _execute_approved_actions,
+            _pending_tasks,
+            _on_action_task_done,
+        )
+
+        config = get_config().security
+        actions = report.recommended_actions
+
+        safe_actions = [a for a in actions if a.get("risk", "safe") == "safe"]
+        low_actions = [a for a in actions if a.get("risk", "safe") == "low"]
+        approval_actions = [
+            a for a in actions
+            if a.get("risk", "safe") in ("medium", "high")
+        ]
+
+        # SAFE aksiyonlar — otomatik yürüt
+        config_telegram = get_config().telegram
+
+        if safe_actions and config.auto_approve_safe:
+            logger.info(
+                f"[Phase5] {len(safe_actions)} SAFE aksiyon otomatik yürütülüyor "
+                f"(alert={report.alert_id})"
+            )
+            if config_telegram.admin_chat_id:
+                task = asyncio.create_task(
+                    _execute_approved_actions(
+                        config_telegram.admin_chat_id,
+                        report.alert_id,
+                        safe_actions,
+                    )
+                )
+                _pending_tasks.add(task)
+                task.add_done_callback(_on_action_task_done)
+
+        # LOW aksiyonlar — config toggle ile otomatik
+        if low_actions and config.auto_approve_low:
+            logger.info(
+                f"[Phase5] {len(low_actions)} LOW aksiyon otomatik yürütülüyor "
+                f"(DBA_AUTO_APPROVE_LOW=true, alert={report.alert_id})"
+            )
+            if config_telegram.admin_chat_id:
+                task = asyncio.create_task(
+                    _execute_approved_actions(
+                        config_telegram.admin_chat_id,
+                        report.alert_id,
+                        low_actions,
+                    )
+                )
+                _pending_tasks.add(task)
+                task.add_done_callback(_on_action_task_done)
+        elif low_actions:
+            # LOW ama otomatik onay kapalı → approval kuyruğuna ekle
+            approval_actions = low_actions + approval_actions
+
+        # MEDIUM/HIGH → Telegram approval kuyruğuna kaydet
+        if approval_actions:
+            logger.info(
+                f"[Phase5] {len(approval_actions)} MEDIUM/HIGH aksiyon "
+                f"Telegram onayına gönderiliyor (alert={report.alert_id})"
+            )
+            register_pending_approval(
+                alert_id=report.alert_id,
+                actions=approval_actions,
+                report_dict=report.to_dict(),
+            )
 
     async def _generate_report(self, report: DiagnosisReport) -> str:
         """LLM ile Telegram formatında rapor oluştur."""
@@ -321,6 +401,27 @@ class Orchestrator:
             for a in report.recommended_actions
         ) if report.recommended_actions else none_label
 
+        # RAG: benzer geçmiş vakaları çek
+        similar_context = no_history
+        health_delta_label = "health Δ" if lang == "en" else "sağlık Δ"
+        rag_error_msg = "RAG similar cases unavailable" if lang == "en" else "RAG benzer vaka alınamadı"
+        try:
+            from dba_agent.memory import get_incident_store
+            store = get_incident_store()
+            similar = store.find_similar(report.alert_text, top_k=3)
+            if similar:
+                lines = []
+                for s in similar:
+                    success_label = "✅" if s["success"] else "❌"
+                    delta = s.get("health_delta", "")
+                    delta_str = f", {health_delta_label}{delta}" if delta else ""
+                    lines.append(
+                        f"- {success_label} [{s['alert_type']}] {s['root_cause'][:100]}{delta_str}"
+                    )
+                similar_context = "\n".join(lines)
+        except Exception as e:
+            logger.debug(f"{rag_error_msg}: {e}")
+
         prompt = prompts["REPORT_USER"].format(
             alert_type=report.category,
             db_name=report.db_name,
@@ -328,7 +429,7 @@ class Orchestrator:
             root_cause=report.root_cause,
             evidence=evidence_text,
             recommended_actions=actions_text,
-            similar_incidents=no_history,
+            similar_incidents=similar_context,
         )
 
         try:

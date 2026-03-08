@@ -108,6 +108,8 @@ class DBABot:
         self.app.add_handler(CommandHandler("vacuum", self._cmd_vacuum))
         self.app.add_handler(CommandHandler("ssh", self._cmd_ssh))
         self.app.add_handler(CommandHandler("monitor", self._cmd_monitor))
+        self.app.add_handler(CommandHandler("history", self._cmd_history))
+        self.app.add_handler(CommandHandler("stats", self._cmd_stats))
 
         # ── Callback handler (inline keyboard) ─
         self.app.add_handler(CallbackQueryHandler(self._callback_handler))
@@ -133,6 +135,8 @@ class DBABot:
             BotCommand("ssh", "SSH sistem bilgisi"),
             BotCommand("monitor", "Proaktif izleme durumu / kontrol"),
             BotCommand("cancel", "Tanıyı iptal et"),
+            BotCommand("history", "Son uygulanan aksiyonlar"),
+            BotCommand("stats", "Aksiyon başarı istatistikleri"),
         ]
 
         # ── Initialize + Start ─────────────────
@@ -445,21 +449,39 @@ class DBABot:
                 text = format_diagnosis_report(report)
                 await self.send_message(chat_id, text)
 
-            # Aksiyonlar varsa onay butonları göster
+            # MEDIUM/HIGH aksiyonlar varsa Telegram onay butonlarını göster
+            # (Orchestrator zaten register_pending_approval yaptı)
             if report.recommended_actions:
-                risky = [
+                approval_needed = [
                     a for a in report.recommended_actions
-                    if a.get("risk", "safe") != "safe"
+                    if a.get("risk", "safe") in ("medium", "high")
                 ]
-                if risky:
-                    from dba_agent.telegram.approval import create_approval_keyboard
-                    keyboard = create_approval_keyboard(report.alert_id)
-                    await self.send_message(
-                        chat_id,
-                        "⚠️ *Riskli aksiyonlar önerildi.*\n"
-                        "Uygulamak ister misiniz?",
-                        reply_markup=keyboard,
+                # LOW aksiyonlar auto_approve_low kapalıysa onay listesine girer
+                from dba_agent.config import get_config as _get_cfg
+                if not _get_cfg().security.auto_approve_low:
+                    approval_needed += [
+                        a for a in report.recommended_actions
+                        if a.get("risk", "safe") == "low"
+                    ]
+
+                if approval_needed:
+                    from dba_agent.telegram.approval import (
+                        create_approval_keyboard,
+                        get_pending_approval,
                     )
+                    # Sadece gerçekten kuyruğa alındıysa buton göster
+                    if get_pending_approval(report.alert_id):
+                        keyboard = create_approval_keyboard(report.alert_id)
+                        risk_levels = ", ".join(
+                            sorted({a.get("risk", "safe") for a in approval_needed})
+                        )
+                        await self.send_message(
+                            chat_id,
+                            f"⚠️ *Onay Gerekiyor*\n\n"
+                            f"Risk: `{risk_levels}` — {len(approval_needed)} aksiyon\n"
+                            f"Uygulamak ister misiniz?",
+                            reply_markup=keyboard,
+                        )
 
         except asyncio.CancelledError:
             await self.send_message(chat_id, "🚫 Tanı iptal edildi.")
@@ -541,6 +563,96 @@ class DBABot:
 
         except Exception as e:
             await update.message.reply_text(f"❌ DB durumu alınamadı:\n{str(e)[:200]}")
+
+    async def _cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Son uygulanan aksiyonları listele."""
+        if not self._is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Yetkisiz erişim.")
+            return
+
+        limit = 10
+        if context.args:
+            try:
+                limit = min(int(context.args[0]), 50)
+            except ValueError:
+                pass
+
+        try:
+            from dba_agent.security.audit import AuditLogger
+            audit = AuditLogger()
+            records = audit.get_recent_actions(limit)
+
+            if not records:
+                await update.message.reply_text(
+                    "📋 *Aksiyon Geçmişi*\n\nHenüz kayıtlı aksiyon yok.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+                return
+
+            risk_emojis = {"safe": "🟢", "low": "🟡", "medium": "🟠", "high": "🔴"}
+            lines = [f"📋 *Son {len(records)} Aksiyon*\n━━━━━━━━━━━━━━━━━━\n"]
+            for rec in records:
+                ts = rec.get("timestamp", "")[:16].replace("T", " ")
+                risk = rec.get("risk_level", "safe")
+                emoji = risk_emojis.get(risk, "⚪")
+                result = rec.get("result", "?")
+                result_emoji = "✅" if result == "success" else "❌"
+                cmd = rec.get("command", "")[:60]
+                target = rec.get("target", "")
+                lines.append(
+                    f"{result_emoji} {emoji} `{ts}`\n"
+                    f"   📍 {target}\n"
+                    f"   💬 `{cmd}`"
+                )
+
+            await self.send_message(
+                update.effective_chat.id,
+                "\n\n".join(lines),
+            )
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ Geçmiş alınamadı:\n{str(e)[:200]}")
+
+    async def _cmd_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Aksiyon başarı istatistiklerini göster."""
+        if not self._is_authorized(update.effective_chat.id):
+            await update.message.reply_text("⛔ Yetkisiz erişim.")
+            return
+
+        try:
+            from dba_agent.memory import get_incident_store
+            store = get_incident_store()
+            stats = store.get_action_stats()
+
+            if stats["total"] == 0:
+                await update.message.reply_text(
+                    "📊 *Aksiyon İstatistikleri*\n\nHenüz kayıtlı incident yok.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+                return
+
+            lines = [
+                f"📊 *Aksiyon İstatistikleri*\n━━━━━━━━━━━━━━━━━━",
+                f"📈 Toplam incident: *{stats['total']}*",
+                f"✅ Başarı oranı: *{stats['success_rate']*100:.0f}%*",
+                f"💊 Ort. sağlık iyileşmesi: *{stats['avg_health_delta']:+.1f}*",
+                "",
+                "🔧 *Aksiyon Bazlı:*",
+            ]
+            for action_name, s in stats["by_action"].items():
+                bar = "█" * int(s["success_rate"] * 10) + "░" * (10 - int(s["success_rate"] * 10))
+                lines.append(
+                    f"  `{action_name[:25]}`\n"
+                    f"  {bar} {s['success_rate']*100:.0f}% ({s['count']} kez)"
+                )
+
+            await self.send_message(
+                update.effective_chat.id,
+                "\n".join(lines),
+            )
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ İstatistikler alınamadı:\n{str(e)[:200]}")
 
     async def _cmd_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Aktif tanıyı iptal et."""
@@ -987,6 +1099,32 @@ class DBABot:
             from dba_agent.telegram.approval import handle_approval
             await handle_approval(query, data, approved=False)
 
+        elif data.startswith("detail:"):
+            alert_id = data[len("detail:"):]
+            from dba_agent.telegram.approval import get_pending_approval
+            approval = get_pending_approval(alert_id)
+            if not approval:
+                await query.answer("⏰ Onay süresi doldu veya bulunamadı.", show_alert=True)
+                return
+            actions = approval.get("actions", [])
+            lines = [f"📋 *Aksiyon Detayları*\n🏷️ Alert: `{alert_id}`\n"]
+            risk_emojis = {"safe": "🟢", "low": "🟡", "medium": "🟠", "high": "🔴"}
+            for i, a in enumerate(actions, 1):
+                risk = a.get("risk", "safe")
+                emoji = risk_emojis.get(risk, "⚪")
+                lines.append(
+                    f"{i}. {emoji} *{a.get('action', 'Bilinmeyen')}*\n"
+                    f"   Risk: `{risk}`\n"
+                    f"   SQL: `{a.get('sql', '-')[:120]}`\n"
+                    f"   Sebep: _{a.get('reason', '-')[:100]}_"
+                )
+            await query.answer()
+            await bot.send_message(
+                chat_id,
+                "\n\n".join(lines),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
         elif data.startswith("dbaction:"):
             # DB action onay — format: dbaction:tool_name:pid:db_name
             parts = data.split(":")
@@ -1031,6 +1169,28 @@ class DBABot:
             from dba_agent.telegram.smart_handler import _PENDING_SMART_ACTIONS
             _PENDING_SMART_ACTIONS.pop(token, None)
             await query.edit_message_text("❌ Aksiyon iptal edildi.")
+
+        elif data.startswith("feedback_"):
+            # feedback_good:incident_id | feedback_bad:incident_id | feedback_partial:incident_id
+            parts = data.split(":", 1)
+            if len(parts) == 2:
+                sentiment, incident_id = parts[0].replace("feedback_", ""), parts[1]
+                score_map = {"good": 1.0, "partial": 0.5, "bad": 0.0}
+                score = score_map.get(sentiment, 0.5)
+                emoji_map = {"good": "👍", "partial": "😐", "bad": "👎"}
+                emoji = emoji_map.get(sentiment, "💬")
+                try:
+                    from dba_agent.memory import get_incident_store
+                    store = get_incident_store()
+                    updated = store.update_feedback(incident_id, score)
+                    msg = (
+                        f"{emoji} *Geri bildirim kaydedildi*\n"
+                        f"Incident: `{incident_id}`\n"
+                        f"Skor: {score}"
+                    ) if updated else f"⚠️ Incident bulunamadı: `{incident_id}`"
+                    await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN)
+                except Exception as e:
+                    await query.edit_message_text(f"❌ Geri bildirim kaydedilemedi:\n{str(e)[:200]}")
 
 
 # ─────────────────────────────────────────────

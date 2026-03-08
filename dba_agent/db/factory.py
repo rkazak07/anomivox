@@ -52,13 +52,15 @@ def create_adapter(target: DatabaseTarget) -> DatabaseAdapter:
 def get_adapter(
     name: Optional[str] = None,
     config: Optional[DatabaseConfig] = None,
+    fallback_to_primary: bool = True,
 ) -> DatabaseAdapter:
     """
     İsme göre veya varsayılan DB adapter'ı döndürür.
-    
+
     Args:
-        name: DB target adı (None → ilk target)
+        name: DB target adı (None → primary/ilk target)
         config: DatabaseConfig (None → global config)
+        fallback_to_primary: True ise name bulunamazsa primary'e düşer (uyarı loglar)
     """
     config = config or get_config().database
 
@@ -74,11 +76,41 @@ def get_adapter(
         )
         if target is None:
             available = [t.name for t in config.targets]
-            raise ValueError(
-                f"DB target '{name}' bulunamadı. Mevcut: {available}"
-            )
+            if fallback_to_primary:
+                logger.warning(
+                    f"DB target '{name}' bulunamadı, primary'e fallback yapılıyor. "
+                    f"Mevcut: {available}"
+                )
+                target = config.targets[0]
+            else:
+                raise ValueError(
+                    f"DB target '{name}' bulunamadı. Mevcut: {available}"
+                )
 
     return create_adapter(target)
+
+
+def resolve_target_name(name: Optional[str]) -> str:
+    """
+    Aksiyon içindeki target_db adını doğrula ve normalize et.
+    Bulunamazsa primary target adını döndürür.
+
+    Args:
+        name: action.get("target_db") değeri
+
+    Returns:
+        Geçerli DB target adı
+    """
+    config = get_config().database
+    if not config.targets:
+        return ""
+    if not name:
+        return config.targets[0].name
+    match = next((t.name for t in config.targets if t.name == name), None)
+    if match:
+        return match
+    logger.warning(f"target_db '{name}' config'de yok, primary kullanılacak.")
+    return config.targets[0].name
 
 
 def get_all_adapters(

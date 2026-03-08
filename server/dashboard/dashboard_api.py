@@ -34,6 +34,8 @@ SERVICES = {
     "dba_agent":     {"url": os.environ.get("DBA_AGENT_URL",     "http://dba-agent:8100"),    "check": "/health",              "method": "GET"},
 }
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
 DB_TARGETS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "db_targets.json")
 
 TIMEOUT = aiohttp.ClientTimeout(total=5)
@@ -56,8 +58,38 @@ async def _check_service(name: str, info: dict) -> dict:
         return {"name": name, "status": "offline", "code": None, "error": str(e)[:80]}
 
 
+async def _check_redis() -> dict:
+    """Redis'i PING komutu ile kontrol et"""
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(REDIS_URL, socket_connect_timeout=3, socket_timeout=3)
+        pong = await r.ping()
+        await r.aclose()
+        if pong:
+            return {"name": "redis", "status": "online", "code": None}
+        return {"name": "redis", "status": "degraded", "code": None}
+    except ImportError:
+        # redis paketi yüklü değilse, TCP socket ile kontrol et
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(REDIS_URL)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 6379
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port), timeout=3
+            )
+            writer.close()
+            await writer.wait_closed()
+            return {"name": "redis", "status": "online", "code": None}
+        except Exception as e:
+            return {"name": "redis", "status": "offline", "code": None, "error": str(e)[:80]}
+    except Exception as e:
+        return {"name": "redis", "status": "offline", "code": None, "error": str(e)[:80]}
+
+
 async def _all_health_checks() -> List[dict]:
     tasks = [_check_service(name, info) for name, info in SERVICES.items()]
+    tasks.append(_check_redis())
     return await asyncio.gather(*tasks)
 
 

@@ -314,6 +314,7 @@ const svcLabel = (name) => {
     alertmanager: 'Alertmanager',
     notify_worker: 'Notify Worker',
     dba_agent: 'DBA Agent',
+    redis: 'Redis Cache',
   }
   return map[name] || name
 }

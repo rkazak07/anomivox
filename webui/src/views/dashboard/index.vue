@@ -1,161 +1,261 @@
 <template>
-  <div class="dashboard-wrap" style="height: calc(100vh - 30px); overflow-y: auto; padding: 20px 24px; box-sizing: border-box;">
+  <div class="dashboard-wrap">
 
-    <!-- ── Başlık + Yenile ── -->
-    <div class="rowBC" style="margin-bottom: 20px;">
-      <div>
-        <div style="font-size: 22px; font-weight: bold;">{{ $t('dashboardTitle') }}</div>
-        <div style="font-size: 12px; color: var(--el-text-color-secondary); margin-top: 2px;">
-          {{ $t('dashboardSubtitle') }} &nbsp;·&nbsp; {{ lastRefreshed }}
+    <!-- ── Header ── -->
+    <div class="dash-header">
+      <div class="dash-header-left">
+        <div class="dash-logo-area">
+          <div class="dash-logo-icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div>
+            <div class="dash-title">{{ $t('dashboardTitle') }}</div>
+            <div class="dash-subtitle">{{ $t('dashboardSubtitle') }}</div>
+          </div>
         </div>
       </div>
-      <div class="rowSC" style="gap: 10px;">
-        <el-select v-model="periodHours" style="width: 120px;" @change="loadAll">
-          <el-option :value="6"  label="6 saat" />
-          <el-option :value="24" label="24 saat" />
-          <el-option :value="48" label="48 saat" />
-          <el-option :value="168" label="7 gün" />
+      <div class="dash-header-right">
+        <el-select v-model="periodHours" size="small" style="width: 110px;" @change="loadAll">
+          <el-option :value="6"  label="6h" />
+          <el-option :value="24" label="24h" />
+          <el-option :value="48" label="48h" />
+          <el-option :value="168" label="7d" />
         </el-select>
-        <el-button :loading="loading" type="primary" circle @click="loadAll">
-          <el-icon><Refresh /></el-icon>
-        </el-button>
+        <el-button :loading="loading" size="small" type="primary" @click="loadAll" :icon="Refresh" circle />
+        <span class="dash-time">{{ lastRefreshed }}</span>
       </div>
     </div>
 
-    <!-- ── Bölüm 1: Servis Sağlık Kartları ── -->
-    <div style="margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--el-text-color-secondary); letter-spacing: 0.5px; text-transform: uppercase;">
-      {{ $t('dashboardServices') }}
-    </div>
-    <div class="cards-grid" style="margin-bottom: 24px;">
-      <div
-        v-for="svc in services"
-        :key="svc.name"
-        class="svc-card"
-        :class="svc.status"
-      >
-        <div class="svc-icon">
-          <el-icon :size="22"><component :is="svcIcon(svc.name)" /></el-icon>
-        </div>
-        <div style="flex:1; min-width: 0;">
-          <div class="svc-name">{{ svcLabel(svc.name) }}</div>
-          <div class="svc-status-text" :class="svc.status">{{ $t('svc_' + svc.status) }}</div>
-        </div>
-        <div class="svc-badge" :class="svc.status">
-          <span class="svc-dot" />
-        </div>
-      </div>
-      <!-- Skeleton yükleme -->
-      <template v-if="loadingHealth && services.length === 0">
-        <div v-for="i in 6" :key="i" class="svc-card skeleton" />
-      </template>
-    </div>
+    <!-- ── Platform Score + KPI Row ── -->
+    <div class="score-kpi-row">
 
-    <!-- ── Bölüm 2: Özet Kartlar + Pipeline ── -->
-    <div class="two-col" style="margin-bottom: 24px;">
-
-      <!-- Sol: Teşhis Özet Kartları -->
-      <div>
-        <div style="margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--el-text-color-secondary); letter-spacing: 0.5px; text-transform: uppercase;">
-          {{ $t('dashboardDiagnosis') }} ({{ periodHours }}h)
+      <!-- Platform Health Score -->
+      <div class="score-card" :class="overviewData.platform_status || 'healthy'">
+        <div class="score-ring-wrap">
+          <svg class="score-ring" viewBox="0 0 120 120">
+            <circle class="ring-bg" cx="60" cy="60" r="52" />
+            <circle class="ring-fill" cx="60" cy="60" r="52"
+              :style="{ strokeDashoffset: ringOffset }" />
+          </svg>
+          <div class="score-value">{{ Math.round(overviewData.platform_score || 0) }}</div>
         </div>
-        <div class="stat-cards">
-          <div class="stat-card">
-            <div class="stat-value">{{ summary.total ?? '—' }}</div>
-            <div class="stat-label">{{ $t('dashboardTotal') }}</div>
-          </div>
-          <div class="stat-card success">
-            <div class="stat-value">{{ summary.success ?? '—' }}</div>
-            <div class="stat-label">{{ $t('dashboardSuccess') }}</div>
-          </div>
-          <div class="stat-card danger">
-            <div class="stat-value">{{ summary.failed ?? '—' }}</div>
-            <div class="stat-label">{{ $t('dashboardFailed') }}</div>
-          </div>
-          <div class="stat-card info">
-            <div class="stat-value">{{ summary.success_rate != null ? summary.success_rate + '%' : '—' }}</div>
-            <div class="stat-label">{{ $t('dashboardSuccessRate') }}</div>
-          </div>
-        </div>
-
-        <!-- Severity sayıları -->
-        <div class="severity-row" style="margin-top: 12px;">
-          <div class="severity-badge critical">
-            <span>🔥 CRITICAL</span>
-            <strong>{{ summary.severity_counts?.CRITICAL ?? 0 }}</strong>
-          </div>
-          <div class="severity-badge warning">
-            <span>⚠️ WARNING</span>
-            <strong>{{ summary.severity_counts?.WARNING ?? 0 }}</strong>
-          </div>
-          <div class="severity-badge info">
-            <span>ℹ️ INFO</span>
-            <strong>{{ summary.severity_counts?.INFO ?? 0 }}</strong>
-          </div>
+        <div class="score-label">{{ $t('dashboardPlatformScore') }}</div>
+        <div class="score-status" :class="overviewData.platform_status || 'healthy'">
+          {{ $t('dashboard' + capitalize(overviewData.platform_status || 'healthy')) }}
         </div>
       </div>
 
-      <!-- Sağ: Pipeline Zinciri -->
-      <div>
-        <div style="margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--el-text-color-secondary); letter-spacing: 0.5px; text-transform: uppercase;">
-          {{ $t('dashboardPipeline') }}
+      <!-- KPI Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon services"><el-icon :size="20"><Monitor /></el-icon></div>
+          <div class="kpi-body">
+            <div class="kpi-value">{{ kpi.services_online ?? '—' }}<span class="kpi-sub">/{{ kpi.services_total ?? 0 }}</span></div>
+            <div class="kpi-label">{{ $t('dashboardServicesOnline') }}</div>
+          </div>
         </div>
-        <div class="pipeline-card">
-          <div
-            v-for="(step, idx) in pipelineSteps"
-            :key="step.step"
-            class="pipeline-step"
-          >
-            <div class="pipe-dot" :class="step.status" />
-            <div style="flex:1; min-width: 0;">
-              <div class="pipe-step-name">{{ step.step }}</div>
+        <div class="kpi-card">
+          <div class="kpi-icon targets"><el-icon :size="20"><Coin /></el-icon></div>
+          <div class="kpi-body">
+            <div class="kpi-value">{{ kpi.targets_total ?? '—' }}<span class="kpi-sub" v-if="kpi.targets_ok != null"> ({{ kpi.targets_ok }} ok)</span></div>
+            <div class="kpi-label">{{ $t('dashboardTargets') }}</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon diagnoses"><el-icon :size="20"><DataAnalysis /></el-icon></div>
+          <div class="kpi-body">
+            <div class="kpi-value">{{ kpi.diagnoses_total ?? '—' }}</div>
+            <div class="kpi-label">{{ $t('dashboardDiagnoses') }} ({{ periodHours }}h)</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon rate"><el-icon :size="20"><TrendCharts /></el-icon></div>
+          <div class="kpi-body">
+            <div class="kpi-value">{{ kpi.diagnoses_success_rate != null ? kpi.diagnoses_success_rate + '%' : '—' }}</div>
+            <div class="kpi-label">{{ $t('dashboardSuccessRate') }}</div>
+          </div>
+        </div>
+        <div class="kpi-card" :class="{ 'alert-pulse': (kpi.critical_alerts || 0) > 0 }">
+          <div class="kpi-icon critical"><el-icon :size="20"><WarningFilled /></el-icon></div>
+          <div class="kpi-body">
+            <div class="kpi-value">{{ kpi.critical_alerts ?? 0 }}</div>
+            <div class="kpi-label">{{ $t('dashboardCriticalAlerts') }}</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon warning"><el-icon :size="20"><Bell /></el-icon></div>
+          <div class="kpi-body">
+            <div class="kpi-value">{{ kpi.warning_alerts ?? 0 }}</div>
+            <div class="kpi-label">{{ $t('dashboardWarningAlerts') }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Main Grid: Services + Pipeline ── -->
+    <div class="main-grid">
+
+      <!-- Platform Services -->
+      <div class="panel">
+        <div class="panel-header">
+          <el-icon :size="16"><Monitor /></el-icon>
+          <span>{{ $t('dashboardServices') }}</span>
+        </div>
+        <div class="services-list">
+          <div v-for="svc in services" :key="svc.name" class="svc-row" :class="svc.status">
+            <div class="svc-dot" :class="svc.status" />
+            <div class="svc-info">
+              <span class="svc-name">{{ svcLabel(svc.name) }}</span>
+            </div>
+            <el-tag size="small" :type="statusTagType(svc.status)" effect="light">
+              {{ $t('svc_' + svc.status) }}
+            </el-tag>
+          </div>
+          <template v-if="loading && services.length === 0">
+            <div v-for="i in 6" :key="i" class="svc-row skeleton" />
+          </template>
+        </div>
+      </div>
+
+      <!-- Pipeline Status -->
+      <div class="panel">
+        <div class="panel-header">
+          <el-icon :size="16"><Connection /></el-icon>
+          <span>{{ $t('dashboardPipeline') }}</span>
+          <el-tag v-if="pipelineOverall" size="small" :type="pipelineOverall === 'healthy' ? 'success' : (pipelineOverall === 'warning' ? 'warning' : 'danger')" effect="dark" style="margin-left: auto;">
+            {{ $t('pipeline_' + pipelineOverall) }}
+          </el-tag>
+        </div>
+        <div class="pipeline-flow">
+          <div v-for="(step, idx) in pipelineSteps" :key="step.step" class="pipe-item">
+            <div class="pipe-node" :class="step.status">
+              <span class="pipe-node-dot" />
+            </div>
+            <div class="pipe-info">
+              <div class="pipe-name">{{ step.step }}</div>
               <div class="pipe-detail">{{ step.detail }}</div>
             </div>
-            <div class="pipe-status-label" :class="step.status">{{ $t('pipe_' + step.status) }}</div>
-            <div v-if="idx < pipelineSteps.length - 1" class="pipe-arrow">↓</div>
+            <div v-if="idx < pipelineSteps.length - 1" class="pipe-connector" :class="pipelineSteps[idx+1]?.status" />
           </div>
-          <div v-if="pipelineSteps.length === 0 && loadingPipeline" class="columnCC" style="padding: 30px 0; color: var(--el-text-color-secondary);">
-            <el-icon class="is-loading"><Loading /></el-icon>
+        </div>
+      </div>
+
+      <!-- Infrastructure Targets -->
+      <div class="panel">
+        <div class="panel-header">
+          <el-icon :size="16"><Coin /></el-icon>
+          <span>{{ $t('dashboardInfrastructure') }}</span>
+          <div class="db-type-badges" style="margin-left: auto;">
+            <el-tag v-for="(count, dbType) in infra.db_types" :key="dbType" size="small" type="info" effect="plain">
+              {{ dbType.toUpperCase() }} ({{ count }})
+            </el-tag>
           </div>
-          <!-- Genel durum -->
-          <div v-if="pipelineOverall" class="pipeline-overall" :class="pipelineOverall">
-            <el-icon><component :is="overallIcon" /></el-icon>
-            {{ $t('pipeline_' + pipelineOverall) }}
+        </div>
+        <div class="targets-list">
+          <div v-for="target in infra.targets" :key="target.name" class="target-row">
+            <div class="target-icon" :class="target.db_type">
+              <span>{{ dbIcon(target.db_type) }}</span>
+            </div>
+            <div class="target-info">
+              <div class="target-name">{{ target.name }}</div>
+              <div class="target-host">{{ target.host }}</div>
+            </div>
+            <el-tag size="small" effect="light" :type="target.status === 'ok' ? 'success' : 'info'">
+              {{ target.status === 'ok' ? $t('target_ok') : $t('target_unknown') }}
+            </el-tag>
+            <el-tag v-if="target.ssh" size="small" type="warning" effect="plain">SSH</el-tag>
+          </div>
+          <el-empty v-if="!loading && (!infra.targets || infra.targets.length === 0)" :description="$t('dashboardNoData')" :image-size="60" />
+        </div>
+      </div>
+
+      <!-- Diagnosis Analytics -->
+      <div class="panel">
+        <div class="panel-header">
+          <el-icon :size="16"><DataAnalysis /></el-icon>
+          <span>{{ $t('dashboardDiagnosisStats') }}</span>
+        </div>
+        <div class="diag-stats">
+          <div class="diag-bar-row">
+            <span class="diag-bar-label">{{ $t('dashboardDone') }}</span>
+            <div class="diag-bar-track">
+              <div class="diag-bar-fill success" :style="{ width: successBarWidth }" />
+            </div>
+            <span class="diag-bar-val">{{ diagStats.success || 0 }}</span>
+          </div>
+          <div class="diag-bar-row">
+            <span class="diag-bar-label">{{ $t('dashboardFailed') }}</span>
+            <div class="diag-bar-track">
+              <div class="diag-bar-fill danger" :style="{ width: failedBarWidth }" />
+            </div>
+            <span class="diag-bar-val">{{ diagStats.failed || 0 }}</span>
+          </div>
+          <div class="severity-chips">
+            <div class="sev-chip critical">
+              <span class="sev-dot" />
+              <span>CRITICAL</span>
+              <strong>{{ diagStats.severity_counts?.CRITICAL ?? 0 }}</strong>
+            </div>
+            <div class="sev-chip warning">
+              <span class="sev-dot" />
+              <span>WARNING</span>
+              <strong>{{ diagStats.severity_counts?.WARNING ?? 0 }}</strong>
+            </div>
+            <div class="sev-chip info">
+              <span class="sev-dot" />
+              <span>INFO</span>
+              <strong>{{ diagStats.severity_counts?.INFO ?? 0 }}</strong>
+            </div>
+          </div>
+          <!-- Models Used -->
+          <div v-if="diagStats.models_used && Object.keys(diagStats.models_used).length > 0" class="models-used">
+            <div class="models-title">AI Models</div>
+            <div class="models-list">
+              <el-tag v-for="(count, model) in diagStats.models_used" :key="model" size="small" type="" effect="plain">
+                {{ model }} ({{ count }})
+              </el-tag>
+            </div>
           </div>
         </div>
       </div>
 
     </div>
 
-    <!-- ── Bölüm 3: Son Teşhisler Tablosu ── -->
-    <div style="margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--el-text-color-secondary); letter-spacing: 0.5px; text-transform: uppercase;">
-      {{ $t('dashboardRecentDiagnoses') }}
-    </div>
-    <div class="recent-card">
-      <el-empty v-if="!loadingDiag && recentList.length === 0" :description="$t('dashboardNoData')" style="padding: 20px 0;" />
-      <table v-else class="recent-table">
-        <thead>
-          <tr>
-            <th>{{ $t('dashboardTime') }}</th>
-            <th>{{ $t('dashboardModel') }}</th>
-            <th>{{ $t('dashboardAlerts') }}</th>
-            <th>{{ $t('dashboardResult') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in recentList" :key="row.file">
-            <td style="white-space: nowrap;">{{ row.time }}</td>
-            <td><el-tag size="small" type="info">{{ row.model }}</el-tag></td>
-            <td style="max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              {{ row.alert_names.join(', ') || '—' }}
-            </td>
-            <td>
-              <el-tag size="small" :type="row.has_result ? 'success' : 'danger'">
-                {{ row.has_result ? $t('dashboardDone') : $t('dashboardFailed') }}
+    <!-- ── Recent Activity Timeline ── -->
+    <div class="panel" style="margin-top: 16px;">
+      <div class="panel-header">
+        <el-icon :size="16"><Clock /></el-icon>
+        <span>{{ $t('dashboardActivity') }}</span>
+      </div>
+      <div class="activity-timeline">
+        <el-empty v-if="!loading && recentActivity.length === 0" :description="$t('dashboardNoData')" :image-size="60" />
+        <div v-for="item in recentActivity" :key="item.file" class="activity-item">
+          <div class="activity-time">
+            <div class="activity-date">{{ formatDate(item.time) }}</div>
+            <div class="activity-hour">{{ formatHour(item.time) }}</div>
+          </div>
+          <div class="activity-line">
+            <div class="activity-dot" :class="item.has_result ? 'success' : 'failed'" />
+            <div class="activity-connector" v-if="recentActivity.indexOf(item) < recentActivity.length - 1" />
+          </div>
+          <div class="activity-content">
+            <div class="activity-title">
+              <el-tag size="small" :type="item.has_result ? 'success' : 'danger'" effect="light">
+                {{ item.has_result ? $t('dashboardDone') : $t('dashboardFailed') }}
               </el-tag>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <el-tag size="small" type="info" effect="plain">{{ item.model }}</el-tag>
+              <span v-if="item.alert_count" class="activity-alert-count">{{ item.alert_count }} {{ $t('dashboardAlerts').toLowerCase() }}</span>
+            </div>
+            <div v-if="item.alert_names && item.alert_names.length > 0" class="activity-alerts">
+              {{ item.alert_names.join(', ') }}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -163,46 +263,53 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Refresh, Loading, CircleCheck, WarningFilled, CircleClose, Connection, Monitor, DataBoard, Odometer, SetUp, ChatLineRound } from '@element-plus/icons-vue'
-import { getDashboardHealth, getDashboardDiagnosisSummary, getDashboardPipelineStatus } from '@/api/dashboard'
+import {
+  Refresh, Monitor, Connection, Coin, DataAnalysis,
+  TrendCharts, WarningFilled, Bell, Clock, CircleCheck
+} from '@element-plus/icons-vue'
+import { getDashboardOverview, getDashboardPipelineStatus } from '@/api/dashboard'
 
 // ── State ────────────────────────────────────────────────
 const loading = ref(false)
-const loadingHealth = ref(false)
-const loadingDiag = ref(false)
-const loadingPipeline = ref(false)
 const lastRefreshed = ref('—')
 const periodHours = ref(24)
 
-const services = ref([])
-const summary = ref({})
+const overviewData = ref({})
 const pipelineSteps = ref([])
 const pipelineOverall = ref('')
 
-// ── Hesaplamalı ──────────────────────────────────────────
-const recentList = computed(() => summary.value.last_diagnoses || [])
-const overallIcon = computed(() => {
-  if (pipelineOverall.value === 'healthy') return CircleCheck
-  if (pipelineOverall.value === 'warning') return WarningFilled
-  return CircleClose
+// ── Computed ─────────────────────────────────────────────
+const kpi = computed(() => overviewData.value.kpi || {})
+const services = computed(() => overviewData.value.services || [])
+const infra = computed(() => overviewData.value.infrastructure || {})
+const diagStats = computed(() => overviewData.value.diagnosis || {})
+const recentActivity = computed(() => overviewData.value.recent_activity || [])
+
+const ringOffset = computed(() => {
+  const score = overviewData.value.platform_score || 0
+  const circumference = 2 * Math.PI * 52 // r=52
+  return circumference - (score / 100) * circumference
 })
 
-// ── Servis ikon + etiket eşlemeleri ──────────────────────
-const svcIcon = (name) => {
-  const map = {
-    api: SetUp,
-    litellm: ChatLineRound,
-    prometheus: DataBoard,
-    alertmanager: WarningFilled,
-    notify_worker: Connection,
-    dba_agent: Odometer,
-  }
-  return map[name] || Monitor
-}
+const successBarWidth = computed(() => {
+  const total = (diagStats.value.success || 0) + (diagStats.value.failed || 0)
+  if (total === 0) return '0%'
+  return Math.round((diagStats.value.success / total) * 100) + '%'
+})
+
+const failedBarWidth = computed(() => {
+  const total = (diagStats.value.success || 0) + (diagStats.value.failed || 0)
+  if (total === 0) return '0%'
+  return Math.round((diagStats.value.failed / total) * 100) + '%'
+})
+
+// ── Helpers ──────────────────────────────────────────────
+const capitalize = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+
 const svcLabel = (name) => {
   const map = {
     api: 'API Server',
-    litellm: 'AI Gateway',
+    litellm: 'AI Gateway (LiteLLM)',
     prometheus: 'Prometheus',
     alertmanager: 'Alertmanager',
     notify_worker: 'Notify Worker',
@@ -211,52 +318,56 @@ const svcLabel = (name) => {
   return map[name] || name
 }
 
-// ── Veri yükleme ─────────────────────────────────────────
-const loadHealth = async () => {
-  loadingHealth.value = true
-  try {
-    const res = await getDashboardHealth()
-    if (res.data?.services) services.value = res.data.services
-  } catch (e) {
-    console.error('health error', e)
-  } finally {
-    loadingHealth.value = false
-  }
+const statusTagType = (status) => {
+  if (status === 'online') return 'success'
+  if (status === 'offline') return 'danger'
+  if (status === 'degraded') return 'warning'
+  return 'info'
 }
 
-const loadDiagnosis = async () => {
-  loadingDiag.value = true
+const dbIcon = (type) => {
+  const map = { postgresql: 'PG', mysql: 'MY', mariadb: 'MA', mssql: 'MS', oracle: 'OR' }
+  return map[type] || type?.substring(0, 2).toUpperCase() || '??'
+}
+
+const formatDate = (timeStr) => {
+  if (!timeStr) return ''
+  return timeStr.split(' ')[0]?.substring(5) || '' // MM-DD
+}
+
+const formatHour = (timeStr) => {
+  if (!timeStr) return ''
+  return timeStr.split(' ')[1]?.substring(0, 5) || '' // HH:MM
+}
+
+// ── Data Loading ─────────────────────────────────────────
+const loadOverview = async () => {
   try {
-    const res = await getDashboardDiagnosisSummary(periodHours.value)
-    if (res.data) summary.value = res.data
+    const res = await getDashboardOverview(periodHours.value)
+    if (res.data) overviewData.value = res.data
   } catch (e) {
-    console.error('diagnosis summary error', e)
-  } finally {
-    loadingDiag.value = false
+    console.error('overview error', e)
   }
 }
 
 const loadPipeline = async () => {
-  loadingPipeline.value = true
   try {
     const res = await getDashboardPipelineStatus()
     if (res.data?.steps) pipelineSteps.value = res.data.steps
     if (res.data?.overall) pipelineOverall.value = res.data.overall
   } catch (e) {
     console.error('pipeline error', e)
-  } finally {
-    loadingPipeline.value = false
   }
 }
 
 const loadAll = async () => {
   loading.value = true
-  await Promise.all([loadHealth(), loadDiagnosis(), loadPipeline()])
+  await Promise.all([loadOverview(), loadPipeline()])
   loading.value = false
   lastRefreshed.value = new Date().toLocaleTimeString()
 }
 
-// ── Otomatik yenileme (60 saniye) ────────────────────────
+// ── Auto-refresh (60s) ──────────────────────────────────
 let refreshTimer = null
 onMounted(() => {
   loadAll()
@@ -268,151 +379,358 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* ── Grid ── */
-.cards-grid {
+/* ── Layout ── */
+.dashboard-wrap {
+  height: calc(100vh - 30px);
+  overflow-y: auto;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  background: var(--el-bg-color-page);
+}
+
+/* ── Header ── */
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.dash-header-left { display: flex; align-items: center; gap: 12px; }
+.dash-header-right { display: flex; align-items: center; gap: 10px; }
+.dash-logo-area { display: flex; align-items: center; gap: 12px; }
+.dash-logo-icon {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+.dash-title { font-size: 20px; font-weight: 700; color: var(--el-text-color-primary); }
+.dash-subtitle { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 1px; }
+.dash-time { font-size: 11px; color: var(--el-text-color-placeholder); }
+
+/* ── Score + KPI Row ── */
+.score-kpi-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+/* Score Card */
+.score-card {
+  flex-shrink: 0;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  border-radius: 16px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  gap: 8px;
+}
+.score-card.healthy { border-color: #67c23a30; background: linear-gradient(135deg, var(--el-bg-color) 0%, #67c23a08 100%); }
+.score-card.warning { border-color: #e6a23c30; background: linear-gradient(135deg, var(--el-bg-color) 0%, #e6a23c08 100%); }
+.score-card.critical { border-color: #f56c6c30; background: linear-gradient(135deg, var(--el-bg-color) 0%, #f56c6c08 100%); }
+
+.score-ring-wrap { position: relative; width: 100px; height: 100px; }
+.score-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--el-border-color-lighter); stroke-width: 8; }
+.ring-fill {
+  fill: none; stroke-width: 8; stroke-linecap: round;
+  stroke-dasharray: 326.73; /* 2*PI*52 */
+  transition: stroke-dashoffset 1s ease;
+}
+.score-card.healthy .ring-fill { stroke: #67c23a; }
+.score-card.warning .ring-fill { stroke: #e6a23c; }
+.score-card.critical .ring-fill { stroke: #f56c6c; }
+
+.score-value {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px; font-weight: 800;
+  color: var(--el-text-color-primary);
+}
+.score-label { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 500; }
+.score-status { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.score-status.healthy { color: #67c23a; }
+.score-status.warning { color: #e6a23c; }
+.score-status.critical { color: #f56c6c; }
+
+/* KPI Grid */
+.kpi-grid {
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
-
-.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-@media (max-width: 900px) {
-  .two-col { grid-template-columns: 1fr; }
-}
-
-/* ── Servis Kartı ── */
-.svc-card {
+.kpi-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 16px;
   border-radius: 12px;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
-  transition: box-shadow 0.2s;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
-.svc-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.08); }
-.svc-card.online  { border-left: 4px solid #67c23a; }
-.svc-card.offline { border-left: 4px solid #f56c6c; }
-.svc-card.degraded{ border-left: 4px solid #e6a23c; }
-.svc-card.timeout { border-left: 4px solid #909399; }
-.svc-card.skeleton{ height: 66px; background: var(--el-fill-color); animation: pulse 1.4s ease-in-out infinite; }
+.kpi-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+.kpi-card.alert-pulse { animation: alertPulse 2s ease-in-out infinite; }
 
-.svc-icon { color: var(--el-text-color-secondary); flex-shrink: 0; }
-.svc-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.svc-status-text { font-size: 12px; margin-top: 2px; }
-.svc-status-text.online  { color: #67c23a; }
-.svc-status-text.offline { color: #f56c6c; }
-.svc-status-text.degraded{ color: #e6a23c; }
-.svc-status-text.timeout { color: #909399; }
+.kpi-icon {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; flex-shrink: 0;
+}
+.kpi-icon.services  { background: #ecf5ff; color: #409eff; }
+.kpi-icon.targets   { background: #f0f9eb; color: #67c23a; }
+.kpi-icon.diagnoses { background: #fdf6ec; color: #e6a23c; }
+.kpi-icon.rate      { background: #ecf5ff; color: #409eff; }
+.kpi-icon.critical  { background: #fef0f0; color: #f56c6c; }
+.kpi-icon.warning   { background: #fdf6ec; color: #e6a23c; }
 
-.svc-badge { display: flex; align-items: center; flex-shrink: 0; }
-.svc-dot { width: 10px; height: 10px; border-radius: 50%; }
-.svc-dot.online  { background: #67c23a; box-shadow: 0 0 6px #67c23a; }
+.kpi-body { min-width: 0; }
+.kpi-value { font-size: 22px; font-weight: 700; color: var(--el-text-color-primary); line-height: 1.2; }
+.kpi-sub { font-size: 13px; font-weight: 400; color: var(--el-text-color-secondary); }
+.kpi-label { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 2px; white-space: nowrap; }
+
+/* ── Main Grid (2x2) ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Panel */
+.panel {
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+/* ── Services List ── */
+.services-list { padding: 8px 12px; }
+.svc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.svc-row:hover { background: var(--el-fill-color); }
+.svc-row.skeleton { height: 38px; background: var(--el-fill-color); animation: pulse 1.4s ease-in-out infinite; border-radius: 8px; margin-bottom: 4px; }
+
+.svc-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.svc-dot.online  { background: #67c23a; box-shadow: 0 0 6px #67c23a88; }
 .svc-dot.offline { background: #f56c6c; }
 .svc-dot.degraded{ background: #e6a23c; }
 .svc-dot.timeout { background: #909399; }
 
-/* ── Stat Kartlar ── */
-.stat-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 10px;
-}
-.stat-card {
-  padding: 14px 10px;
-  border-radius: 10px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  text-align: center;
-}
-.stat-card.success { border-top: 3px solid #67c23a; }
-.stat-card.danger  { border-top: 3px solid #f56c6c; }
-.stat-card.info    { border-top: 3px solid #409eff; }
-.stat-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 4px; }
+.svc-info { flex: 1; min-width: 0; }
+.svc-name { font-size: 13px; font-weight: 500; }
 
-/* ── Severity ── */
-.severity-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.severity-badge {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 12px; border-radius: 20px;
-  font-size: 12px; font-weight: 500;
-}
-.severity-badge.critical { background: #fef0f0; color: #c0392b; }
-.severity-badge.warning  { background: #fdf6ec; color: #e67e22; }
-.severity-badge.info     { background: #ecf5ff; color: #2980b9; }
-
-/* ── Pipeline ── */
-.pipeline-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
-  padding: 16px;
+/* ── Pipeline Flow ── */
+.pipeline-flow { padding: 16px 18px; }
+.pipe-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   position: relative;
+  padding-bottom: 4px;
 }
-.pipeline-step {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 8px 0;
-  position: relative;
-}
-.pipe-dot {
-  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; margin-top: 3px;
-}
-.pipe-dot.ok      { background: #67c23a; box-shadow: 0 0 6px #67c23a; }
-.pipe-dot.offline { background: #f56c6c; }
-.pipe-dot.degraded{ background: #e6a23c; }
-.pipe-dot.warning { background: #e6a23c; }
-
-.pipe-step-name { font-weight: 600; font-size: 13px; }
-.pipe-detail    { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 2px; }
-.pipe-status-label { font-size: 11px; font-weight: 600; flex-shrink: 0; align-self: center; }
-.pipe-status-label.ok      { color: #67c23a; }
-.pipe-status-label.offline { color: #f56c6c; }
-.pipe-status-label.degraded{ color: #e6a23c; }
-.pipe-status-label.warning { color: #e6a23c; }
-
-.pipe-arrow {
-  position: absolute; left: 4px; bottom: -6px;
-  font-size: 14px; color: var(--el-text-color-placeholder);
+.pipe-node {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--el-border-color);
+  background: var(--el-bg-color);
   z-index: 1;
 }
-.pipeline-overall {
-  display: flex; align-items: center; gap: 6px;
-  margin-top: 12px; padding: 8px 14px;
-  border-radius: 8px; font-size: 13px; font-weight: 600;
-}
-.pipeline-overall.healthy { background: #f0f9eb; color: #67c23a; }
-.pipeline-overall.warning { background: #fdf6ec; color: #e6a23c; }
-.pipeline-overall.degraded{ background: #fef0f0; color: #f56c6c; }
+.pipe-node.ok { border-color: #67c23a; }
+.pipe-node.offline { border-color: #f56c6c; }
+.pipe-node.degraded { border-color: #e6a23c; }
+.pipe-node.warning { border-color: #e6a23c; }
 
-/* ── Son Teşhisler ── */
-.recent-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
-  padding: 0;
+.pipe-node-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--el-border-color);
+}
+.pipe-node.ok .pipe-node-dot { background: #67c23a; }
+.pipe-node.offline .pipe-node-dot { background: #f56c6c; }
+.pipe-node.degraded .pipe-node-dot { background: #e6a23c; }
+.pipe-node.warning .pipe-node-dot { background: #e6a23c; }
+
+.pipe-info { flex: 1; padding: 3px 0 12px; }
+.pipe-name { font-size: 13px; font-weight: 600; }
+.pipe-detail { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 1px; }
+
+.pipe-connector {
+  position: absolute;
+  left: 13px; top: 28px; bottom: -4px;
+  width: 2px;
+  background: var(--el-border-color-lighter);
+}
+.pipe-connector.ok { background: #67c23a44; }
+.pipe-connector.offline { background: #f56c6c44; }
+
+/* ── Infrastructure Targets ── */
+.targets-list { padding: 8px 12px; }
+.target-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.target-row:hover { background: var(--el-fill-color); }
+.target-icon {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; font-size: 11px; font-weight: 700;
+  background: var(--el-fill-color); color: var(--el-text-color-secondary);
+}
+.target-icon.postgresql { background: #336791; color: white; }
+.target-icon.mysql { background: #4479A1; color: white; }
+.target-icon.mariadb { background: #003545; color: white; }
+.target-icon.mssql { background: #CC2927; color: white; }
+.target-icon.oracle { background: #F80000; color: white; }
+
+.target-info { flex: 1; min-width: 0; }
+.target-name { font-size: 13px; font-weight: 500; }
+.target-host { font-size: 11px; color: var(--el-text-color-secondary); }
+
+.db-type-badges { display: flex; gap: 4px; }
+
+/* ── Diagnosis Stats ── */
+.diag-stats { padding: 16px 18px; }
+.diag-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.diag-bar-label { font-size: 12px; width: 70px; color: var(--el-text-color-secondary); }
+.diag-bar-track {
+  flex: 1; height: 8px;
+  border-radius: 4px;
+  background: var(--el-fill-color);
   overflow: hidden;
 }
-.recent-table {
-  width: 100%; border-collapse: collapse; font-size: 13px;
+.diag-bar-fill {
+  height: 100%; border-radius: 4px;
+  transition: width 0.6s ease;
 }
-.recent-table th, .recent-table td {
-  padding: 10px 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-.recent-table th { font-weight: 600; background: var(--el-fill-color-light); }
-.recent-table tr:last-child td { border-bottom: none; }
-.recent-table tr:hover td { background: var(--el-fill-color); }
+.diag-bar-fill.success { background: #67c23a; }
+.diag-bar-fill.danger { background: #f56c6c; }
+.diag-bar-val { font-size: 13px; font-weight: 600; width: 30px; text-align: right; }
 
-/* ── Genel ── */
+.severity-chips {
+  display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+}
+.sev-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 20px;
+  font-size: 11px; font-weight: 500;
+}
+.sev-chip .sev-dot { width: 6px; height: 6px; border-radius: 50%; }
+.sev-chip.critical { background: #fef0f0; color: #c0392b; }
+.sev-chip.critical .sev-dot { background: #f56c6c; }
+.sev-chip.warning { background: #fdf6ec; color: #e67e22; }
+.sev-chip.warning .sev-dot { background: #e6a23c; }
+.sev-chip.info { background: #ecf5ff; color: #2980b9; }
+.sev-chip.info .sev-dot { background: #409eff; }
+
+.models-used { margin-top: 14px; }
+.models-title { font-size: 11px; color: var(--el-text-color-secondary); margin-bottom: 6px; font-weight: 600; }
+.models-list { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Activity Timeline ── */
+.activity-timeline { padding: 16px 18px; }
+.activity-item {
+  display: flex;
+  gap: 12px;
+  min-height: 52px;
+}
+.activity-time {
+  width: 60px; flex-shrink: 0; text-align: right;
+  padding-top: 2px;
+}
+.activity-date { font-size: 11px; color: var(--el-text-color-secondary); }
+.activity-hour { font-size: 12px; font-weight: 600; color: var(--el-text-color-primary); }
+
+.activity-line {
+  width: 20px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center;
+  position: relative;
+}
+.activity-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  margin-top: 5px; flex-shrink: 0; z-index: 1;
+}
+.activity-dot.success { background: #67c23a; box-shadow: 0 0 6px #67c23a88; }
+.activity-dot.failed { background: #f56c6c; }
+.activity-connector {
+  flex: 1; width: 2px;
+  background: var(--el-border-color-lighter);
+  margin-top: 4px;
+}
+
+.activity-content {
+  flex: 1; padding-bottom: 16px; min-width: 0;
+}
+.activity-title {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.activity-alert-count {
+  font-size: 11px; color: var(--el-text-color-secondary);
+}
+.activity-alerts {
+  font-size: 11px; color: var(--el-text-color-secondary);
+  margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Animations ── */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+@keyframes alertPulse {
+  0%, 100% { border-color: var(--el-border-color-light); }
+  50% { border-color: #f56c6c88; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .score-kpi-row { flex-direction: column; }
+  .score-card { width: 100%; flex-direction: row; gap: 20px; padding: 16px 24px; }
+  .score-ring-wrap { width: 70px; height: 70px; }
+  .score-value { font-size: 20px; }
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .dash-header { flex-direction: column; align-items: flex-start; gap: 10px; }
 }
 </style>

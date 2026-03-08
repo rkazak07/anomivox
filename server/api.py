@@ -332,16 +332,16 @@ def mount_diagnose_routes(app: FastAPI):
 
 def mount_dashboard_routes(app: FastAPI):
     from server.dashboard.dashboard_api import (
-        dashboard_health, dashboard_diagnosis_summary, dashboard_pipeline_status
+        dashboard_overview, dashboard_health, dashboard_pipeline_status
     )
+    app.post("/dashboard/overview",
+             tags=["Dashboard"],
+             response_model=BaseResponse,
+             summary="Platform genel bakış — skor, KPI, altyapı, aktivite")(dashboard_overview)
     app.get("/dashboard/health",
             tags=["Dashboard"],
             response_model=BaseResponse,
             summary="Servis sağlık durumu")(dashboard_health)
-    app.post("/dashboard/diagnosis_summary",
-             tags=["Dashboard"],
-             response_model=BaseResponse,
-             summary="Teşhis istatistikleri özeti")(dashboard_diagnosis_summary)
     app.get("/dashboard/pipeline_status",
             tags=["Dashboard"],
             response_model=BaseResponse,

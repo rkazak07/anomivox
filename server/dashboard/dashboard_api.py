@@ -1,10 +1,11 @@
 """
-Dashboard API — Anomivox Operasyonel Durum Paneli
+Dashboard API — Anomivox Platform Dashboard
 
-3 ana bölüm:
-1. Servis Sağlık Durumu (health checks)
-2. Teşhis Pipeline Özeti (son 24 saat)
-3. Pipeline Zincir Durumu (Prometheus → Alertmanager → Notify → API → Diagnosis)
+4 ana bölüm:
+1. Platform Genel Bakış (overview) — Sağlık skoru, KPI'lar, altyapı özeti
+2. Servis Sağlık Durumu (health checks)
+3. Aktivite Akışı (activity) — Son teşhisler ve olaylar timeline
+4. Pipeline Zincir Durumu (Prometheus → Alertmanager → Notify → API → Diagnosis)
 """
 import os
 import json
@@ -13,6 +14,7 @@ import asyncio
 import glob
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
+from collections import Counter
 
 import aiohttp
 from fastapi import Body
@@ -32,9 +34,12 @@ SERVICES = {
     "dba_agent":     {"url": os.environ.get("DBA_AGENT_URL",     "http://dba-agent:8100"),    "check": "/health",              "method": "GET"},
 }
 
+DB_TARGETS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "configs", "db_targets.json")
+
 TIMEOUT = aiohttp.ClientTimeout(total=5)
 
 
+# ── Yardımcı fonksiyonlar ─────────────────────────────────
 async def _check_service(name: str, info: dict) -> dict:
     """Tek bir servisi HTTP ile kontrol et"""
     url = info["url"].rstrip("/") + info["check"]
@@ -56,7 +61,201 @@ async def _all_health_checks() -> List[dict]:
     return await asyncio.gather(*tasks)
 
 
-# ── Endpoint 1: Servis Sağlık Durumu ──────────────────────
+def _load_db_targets() -> list:
+    """db_targets.json'dan hedef listesini yükle"""
+    try:
+        if os.path.exists(DB_TARGETS_PATH):
+            with open(DB_TARGETS_PATH, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning(f"db_targets.json okunamadı: {e}")
+    return []
+
+
+def _scan_diagnoses(hours: int = 24) -> dict:
+    """Teşhis dosyalarını tara, istatistikleri döndür"""
+    cutoff = datetime.now() - timedelta(hours=hours)
+    cutoff_ts = int(cutoff.timestamp())
+
+    total = 0
+    success = 0
+    failed = 0
+    all_diagnoses = []
+    severity_counts = {"CRITICAL": 0, "WARNING": 0, "INFO": 0}
+    models_used = Counter()
+
+    if not os.path.exists(DIAGNOSTIC_RESULTS_PATH):
+        return {
+            "total": 0, "success": 0, "failed": 0,
+            "success_rate": 0, "severity_counts": severity_counts,
+            "all_diagnoses": [], "models_used": {},
+        }
+
+    for model_dir in os.listdir(DIAGNOSTIC_RESULTS_PATH):
+        if model_dir == "examples":
+            continue
+        folder = os.path.join(DIAGNOSTIC_RESULTS_PATH, model_dir)
+        if not os.path.isdir(folder):
+            continue
+        for fname in glob.glob(os.path.join(folder, "*.json")) + glob.glob(os.path.join(folder, "*.jsonl")):
+            try:
+                base = os.path.splitext(os.path.basename(fname))[0]
+                ts = int(base)
+            except (ValueError, TypeError):
+                continue
+
+            if ts < cutoff_ts:
+                continue
+
+            total += 1
+            models_used[model_dir] += 1
+            try:
+                with open(fname, "r") as f:
+                    data = json.load(f)
+
+                has_result = bool(data.get("diagnosis") or data.get("report") or data.get("messages"))
+                if has_result:
+                    success += 1
+                else:
+                    failed += 1
+
+                alerts = data.get("alerts", [])
+                for alert in alerts:
+                    level = alert.get("alert_level", "INFO").upper()
+                    if level in severity_counts:
+                        severity_counts[level] += 1
+                    else:
+                        severity_counts["INFO"] += 1
+
+                all_diagnoses.append({
+                    "time": datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": ts,
+                    "model": model_dir,
+                    "file": os.path.basename(fname),
+                    "has_result": has_result,
+                    "alert_count": len(alerts),
+                    "alert_names": [a.get("alert_name", "") for a in alerts[:3]],
+                    "severity": alerts[0].get("alert_level", "INFO").upper() if alerts else "INFO",
+                })
+            except Exception as e:
+                logger.warning(f"Failed to read {fname}: {e}")
+                failed += 1
+                total = max(total, 1)
+
+    all_diagnoses.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    return {
+        "total": total,
+        "success": success,
+        "failed": failed,
+        "success_rate": round(success / total * 100, 1) if total > 0 else 0,
+        "severity_counts": severity_counts,
+        "all_diagnoses": all_diagnoses,
+        "models_used": dict(models_used),
+    }
+
+
+# ── Endpoint 1: Platform Genel Bakış ──────────────────────
+async def dashboard_overview(hours: int = Body(24, description="Kaç saatlik veri", embed=True)):
+    """
+    Anomivox platform genel bakış — tek endpoint ile tüm dashboard verisi.
+    Platform sağlık skoru, KPI'lar, altyapı hedef özeti, servis durumları,
+    pipeline durumu ve son aktiviteler.
+    """
+    # Paralel: servis kontrolleri
+    health_results = await _all_health_checks()
+    total_svc = len(health_results)
+    online_svc = sum(1 for r in health_results if r["status"] == "online")
+
+    # Teşhis istatistikleri
+    diag = _scan_diagnoses(hours)
+
+    # DB hedefleri
+    targets = _load_db_targets()
+    db_type_counts = Counter(t.get("db_type", "unknown") for t in targets)
+    ssh_enabled = sum(1 for t in targets if t.get("ssh_enabled"))
+    targets_ok = sum(1 for t in targets if t.get("last_status") == "ok")
+
+    # Platform sağlık skoru (0-100)
+    scores = []
+    # Servis sağlığı (%40 ağırlık)
+    svc_score = (online_svc / total_svc * 100) if total_svc > 0 else 0
+    scores.append(svc_score * 0.4)
+    # Teşhis başarı oranı (%30 ağırlık)
+    scores.append(diag["success_rate"] * 0.3)
+    # Hedef bağlantı durumu (%20 ağırlık)
+    target_score = (targets_ok / len(targets) * 100) if targets else 100
+    scores.append(target_score * 0.2)
+    # Kritik alert yokluğu (%10 ağırlık)
+    crit_count = diag["severity_counts"]["CRITICAL"]
+    alert_score = max(0, 100 - crit_count * 25)
+    scores.append(alert_score * 0.1)
+
+    platform_score = round(sum(scores), 1)
+
+    # Son 10 aktivite
+    recent_activities = diag["all_diagnoses"][:10]
+
+    return BaseResponse(
+        code=200,
+        msg="OK",
+        data={
+            # Platform Sağlık Skoru
+            "platform_score": platform_score,
+            "platform_status": "healthy" if platform_score >= 80 else ("warning" if platform_score >= 50 else "critical"),
+
+            # KPI Kartları
+            "kpi": {
+                "services_online": online_svc,
+                "services_total": total_svc,
+                "targets_total": len(targets),
+                "targets_ok": targets_ok,
+                "diagnoses_total": diag["total"],
+                "diagnoses_success_rate": diag["success_rate"],
+                "critical_alerts": crit_count,
+                "warning_alerts": diag["severity_counts"]["WARNING"],
+            },
+
+            # Altyapı Hedef Özeti
+            "infrastructure": {
+                "db_types": dict(db_type_counts),
+                "ssh_enabled": ssh_enabled,
+                "total_targets": len(targets),
+                "targets": [
+                    {
+                        "name": t.get("name", ""),
+                        "db_type": t.get("db_type", ""),
+                        "host": t.get("host", ""),
+                        "status": t.get("last_status", "unknown"),
+                        "ssh": t.get("ssh_enabled", False),
+                    }
+                    for t in targets
+                ],
+            },
+
+            # Servis Durumları
+            "services": health_results,
+
+            # Teşhis İstatistikleri
+            "diagnosis": {
+                "period_hours": hours,
+                "total": diag["total"],
+                "success": diag["success"],
+                "failed": diag["failed"],
+                "success_rate": diag["success_rate"],
+                "severity_counts": diag["severity_counts"],
+                "models_used": diag["models_used"],
+            },
+
+            # Son Aktiviteler
+            "recent_activity": recent_activities,
+
+            "generated_at": datetime.now().isoformat(),
+        }
+    )
+
+
+# ── Endpoint 2: Servis Sağlık Durumu ──────────────────────
 async def dashboard_health():
     """Tüm servislerin anlık sağlık durumunu döndür"""
     results = await _all_health_checks()
@@ -74,89 +273,6 @@ async def dashboard_health():
                 "healthy": online == total,
             },
             "checked_at": datetime.now().isoformat(),
-        }
-    )
-
-
-# ── Endpoint 2: Teşhis Özeti ──────────────────────────────
-def dashboard_diagnosis_summary(hours: int = Body(24, description="Kaç saatlik veri", embed=True)):
-    """Son N saatteki teşhis istatistikleri"""
-    cutoff = datetime.now() - timedelta(hours=hours)
-    cutoff_ts = int(cutoff.timestamp())
-
-    total = 0
-    success = 0
-    failed = 0
-    last_diagnoses = []
-    severity_counts = {"CRITICAL": 0, "WARNING": 0, "INFO": 0}
-
-    # Tüm model klasörlerini tara
-    if os.path.exists(DIAGNOSTIC_RESULTS_PATH):
-        for model_dir in os.listdir(DIAGNOSTIC_RESULTS_PATH):
-            if model_dir == "examples":
-                continue
-            folder = os.path.join(DIAGNOSTIC_RESULTS_PATH, model_dir)
-            if not os.path.isdir(folder):
-                continue
-            for fname in glob.glob(os.path.join(folder, "*.json")) + glob.glob(os.path.join(folder, "*.jsonl")):
-                try:
-                    base = os.path.splitext(os.path.basename(fname))[0]
-                    ts = int(base)
-                except (ValueError, TypeError):
-                    continue
-
-                if ts < cutoff_ts:
-                    continue
-
-                total += 1
-                try:
-                    with open(fname, "r") as f:
-                        data = json.load(f)
-
-                    # Başarı/başarısız tespiti
-                    has_result = bool(data.get("diagnosis") or data.get("report") or data.get("messages"))
-                    if has_result:
-                        success += 1
-                    else:
-                        failed += 1
-
-                    # Severity sayımı
-                    alerts = data.get("alerts", [])
-                    for alert in alerts:
-                        level = alert.get("alert_level", "INFO").upper()
-                        if level in severity_counts:
-                            severity_counts[level] += 1
-                        else:
-                            severity_counts["INFO"] += 1
-
-                    # Son teşhisler listesi (max 5)
-                    if len(last_diagnoses) < 5:
-                        last_diagnoses.append({
-                            "time": datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"),
-                            "model": model_dir,
-                            "file": os.path.basename(fname),
-                            "has_result": has_result,
-                            "alert_names": [a.get("alert_name", "") for a in alerts[:3]],
-                        })
-                except Exception as e:
-                    logger.warning(f"Failed to read {fname}: {e}")
-                    failed += 1
-                    total = max(total, 1)
-
-    last_diagnoses.sort(key=lambda x: x["time"], reverse=True)
-
-    return BaseResponse(
-        code=200,
-        msg="OK",
-        data={
-            "period_hours": hours,
-            "total": total,
-            "success": success,
-            "failed": failed,
-            "success_rate": round(success / total * 100, 1) if total > 0 else 0,
-            "severity_counts": severity_counts,
-            "last_diagnoses": last_diagnoses,
-            "generated_at": datetime.now().isoformat(),
         }
     )
 

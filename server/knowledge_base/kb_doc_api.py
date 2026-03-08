@@ -139,7 +139,7 @@ def _save_files_in_thread(files: List[UploadFile],
             ):
                 file_status = f"File {filename} already exists."
                 logger.warn(file_status)
-                return dict(code=404, msg=file_status, data=data)
+                return dict(code=409, msg=file_status, data=data)
 
             if not os.path.isdir(os.path.dirname(file_path)):
                 os.makedirs(os.path.dirname(file_path))
@@ -280,11 +280,11 @@ def delete_docs(
                         ).first()
                         if existing:
                             session.delete(existing)
-                            kb = session.query(KnowledgeBaseModel).filter_by(
+                            kb_model = session.query(KnowledgeBaseModel).filter_by(
                                 kb_name=knowledge_base_name
                             ).first()
-                            if kb:
-                                kb.file_count = max((kb.file_count or 1) - 1, 0)
+                            if kb_model:
+                                kb_model.file_count = max((kb_model.file_count or 1) - 1, 0)
 
                     # 3) Optionally remove the physical file
                     if delete_content:
@@ -303,7 +303,7 @@ def delete_docs(
                              exc_info=e if log_verbose else None)
                 failed_files[file_name] = msg
 
-        if not not_refresh_vs_cache:
+        if not not_refresh_vs_cache and kb is not None:
             kb.save_vector_store()
 
     return BaseResponse(code=200, msg=f"File deletion completed", data={"failed_files": failed_files})
@@ -448,6 +448,7 @@ def download_doc(
     else:
         content_disposition_type = None
 
+    kb_file = None
     try:
         kb_file = KnowledgeFile(filename=file_name,
                                 knowledge_base_name=knowledge_base_name)
@@ -459,13 +460,13 @@ def download_doc(
                 media_type="multipart/form-data",
                 content_disposition_type=content_disposition_type,
             )
+        return BaseResponse(code=404, msg=f"File not found: {file_name}")
     except Exception as e:
-        msg = f"Failed to read file {kb_file.filename}, error: {e}"
+        fname = kb_file.filename if kb_file else file_name
+        msg = f"Failed to read file {fname}, error: {e}"
         logger.error(f'{e.__class__.__name__}: {msg}',
                      exc_info=e if log_verbose else None)
         return BaseResponse(code=500, msg=msg)
-
-    return BaseResponse(code=500, msg=f"Could not read file {kb_file.filename}")
 def recreate_vector_store(
         knowledge_base_name: str = Body(..., examples=["samples"]),
         allow_empty_kb: bool = Body(True),

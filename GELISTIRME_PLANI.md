@@ -246,12 +246,14 @@ Phase 5 **~%90 tamamlanmis** durumda. Yalnizca B7 ve B8 kaldi.
 
 **Dosyalar:** `prometheus_service_docker/app.py`, `prometheus_service_docker/prometheus_abnormal_metric.py`, `prometheus_service_docker/get_slow_queries.py`
 
-#### 3.9 API Tutarliligi — KB Endpoint'leri
-**Sorun:** Bazi endpoint'ler `code=404` donup `msg` ile hata bildiriyor, bazi endpoint'ler 200 donup icinde `failed_files` donuyor. Tutarsiz.
-**Yapilacak:**
-- HTTP status kodlarini standartlastir
-- `BaseResponse` sinifinı gozden gecir
-- Hata durumunda her zaman anlamli `msg` don
+#### ~~3.9 API Tutarliligi — KB Endpoint'leri~~ — TAMAMLANDI (2026-03-08)
+**Yapilan:**
+- `save_file()`: dosya zaten varsa `code=404` → `code=409 Conflict` (anlamli HTTP kodu)
+- `download_doc()`: dosya bulunamazsa `code=500` → `code=404`; `kb_file=None` ile başlat, except bloğunda `NameError` riski giderildi; fazla `return` kaldirildi
+- `delete_docs()`: `session_scope` icerisindeki `kb` degiskenini `kb_model` olarak yeniden adlandirdi (dis scope'daki `kb` servis nesnesiyle cakisiyordu); `kb.save_vector_store()` → `kb is not None` guard eklendi
+
+**Notlar:**
+- `upload_docs`, `delete_docs`, `update_docs` — kısmi basarisizliklari `code=200` + `failed_files` ile dondurmek intentional (partial success pattern), UI buna gore calisıyor, degistirilmedi
 
 #### 3.10 Test Altyapisi
 **Sorun:** `tests/` dizini var ama kapsamli testler yok.

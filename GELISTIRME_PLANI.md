@@ -267,7 +267,7 @@ Phase 5 **~%90 tamamlanmis** durumda. Yalnizca B7 ve B8 kaldi.
 
 ### ONCELIK 4 — Yeni Ozellikler
 
-#### 3.11 Grafik Dashboard (Metrik Gorselleştirme)
+#### 3.11 Grafik Dashboard (Metrik Gorselleştirme) (Tamamlandi)
 **Mevcut durum:** Dashboard sadece ozet veri donuyor, gorsellestirme yok.
 **Yapilacak:**
 - Prometheus sorgularini cekip Streamlit `st.line_chart` ile goster

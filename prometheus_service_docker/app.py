@@ -603,8 +603,11 @@ async def alert(request: Request):
     AlertManager webhook — hem firing hem resolved durumları işle
     """
     args = await request.json()
-    with open("alert_history.txt", "a") as f:
-        f.write(json.dumps(args) + "\n")
+    try:
+        with open("alert_history.txt", "a") as f:
+            f.write(json.dumps(args) + "\n")
+    except Exception as e:
+        logger.warning(f"alert_history.txt yazma hatası: {e}")
 
     try:
         status = args.get("status", "unknown")
@@ -641,18 +644,46 @@ def _send_alert_notification(args):
         logger.error(f"Alert notification error: {e}")
 
 
+def _parse_alert_time(raw_time: str) -> datetime:
+    """
+    AlertManager zaman damgasını datetime'a çevir.
+    Nanosecond (9 hane) ve microsecond (6 hane) formatlarını destekler.
+    """
+    if not raw_time or not raw_time.endswith("Z") or "." not in raw_time:
+        raise ValueError(f"Beklenmeyen zaman formatı: {raw_time!r}")
+    dot_pos = raw_time.index(".")
+    frac = raw_time[dot_pos + 1:-1][:6]  # maks 6 hane (microsecond)
+    normalized = raw_time[:dot_pos + 1] + frac + "Z"
+    return datetime.strptime(normalized, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+
 def gen_diagnostic_file(args):
     alerts = args.get("alerts", [])
 
-    alert_time = alerts[0].get("startsAt")
-    alert_time = alert_time[:-4] + 'Z'
-    alert_time = datetime.strptime(alert_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+    if not alerts:
+        logger.warning("gen_diagnostic_file: boş alert listesi, atlandı.")
+        return
+
+    try:
+        alert_time = _parse_alert_time(alerts[0].get("startsAt", ""))
+    except (ValueError, TypeError) as e:
+        logger.error(f"gen_diagnostic_file: alert_time parse hatası: {e}")
+        return
 
     start_seconds = alert_time.timestamp() - 60 * 5
     end_seconds = alert_time.timestamp() + 60
 
-    exceptions = obtain_exceptions_in_times(start_seconds, end_seconds)
-    slow_queries = obtain_slow_queries(start_seconds, end_seconds)
+    try:
+        exceptions = obtain_exceptions_in_times(start_seconds, end_seconds)
+    except Exception as e:
+        logger.error(f"gen_diagnostic_file: obtain_exceptions_in_times hatası: {e}")
+        exceptions = {}
+
+    try:
+        slow_queries = obtain_slow_queries(start_seconds, end_seconds)
+    except Exception as e:
+        logger.error(f"gen_diagnostic_file: obtain_slow_queries hatası: {e}")
+        slow_queries = []
 
     diagnostic_file_data = {
         "start_time": start_seconds,
@@ -666,12 +697,14 @@ def gen_diagnostic_file(args):
     }
 
     path = './gen_diagnostic_files'
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-    filename = 'alert_time_' + datetime.fromtimestamp(start_seconds).strftime("%Y-%m-%d-%H-%M-%S") + '.json'
-    with open(os.path.join(path, filename), 'w') as f:
-        json.dump(diagnostic_file_data, f)
+    try:
+        os.makedirs(path, exist_ok=True)
+        filename = 'alert_time_' + datetime.fromtimestamp(start_seconds).strftime("%Y-%m-%d-%H-%M-%S") + '.json'
+        with open(os.path.join(path, filename), 'w') as f:
+            json.dump(diagnostic_file_data, f)
+        logger.info(f"Tanı dosyası oluşturuldu: {filename}")
+    except Exception as e:
+        logger.error(f"gen_diagnostic_file: dosya yazma hatası: {e}")
 
 
 if __name__ == "__main__":

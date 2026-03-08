@@ -50,40 +50,58 @@ def extract_execution_details(words):
     return None, None
 
 
+_SSH_CONNECT_TIMEOUT = 30  # saniye
+
+
 def obtain_slow_queries(diag_start_time, diag_end_time):
     slow_sqls = []
 
     if not validate_server_config(SERVER_CONFIG):
         return []
 
-    with paramiko.SSHClient() as ssh:
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(SERVER_CONFIG['server_address'], username=SERVER_CONFIG['username'],
-                    password=SERVER_CONFIG['password'])
+    try:
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                SERVER_CONFIG['server_address'],
+                username=SERVER_CONFIG['username'],
+                password=SERVER_CONFIG['password'],
+                timeout=_SSH_CONNECT_TIMEOUT,
+            )
 
-        with ssh.open_sftp() as sftp:
-            sftp.chdir(SERVER_CONFIG['remote_directory'])
-            files = sftp.listdir()
+            with ssh.open_sftp() as sftp:
+                sftp.chdir(SERVER_CONFIG['remote_directory'])
+                files = sftp.listdir()
 
-            for filename in files:
-                with sftp.open(f"{SERVER_CONFIG['remote_directory']}/{filename}", 'r') as remote_file:
-                    for line in remote_file:
-                        try:
-                            parsed_data = parse_log_line(line)
-                            if parsed_data:
-                                timestamp, sql = parsed_data
-                                sql_start_time = (timestamp - datetime(1970, 1, 1)).total_seconds()
+                for filename in files:
+                    try:
+                        with sftp.open(f"{SERVER_CONFIG['remote_directory']}/{filename}", 'r') as remote_file:
+                            for line in remote_file:
+                                try:
+                                    parsed_data = parse_log_line(line)
+                                    if parsed_data:
+                                        timestamp, sql = parsed_data
+                                        sql_start_time = (timestamp - datetime(1970, 1, 1)).total_seconds()
 
-                                if diag_start_time <= sql_start_time <= diag_end_time:
-                                    execution_seconds, dbname = extract_execution_details(line.split(' '))
-                                    if execution_seconds and "select" in sql:
-                                        sql = sql.replace("\n", "").replace("\t", "")
-                                        slow_sqls.append({
-                                            "sql": sql,
-                                            "dbname": dbname,
-                                            "execution_time": f"{execution_seconds}s"
-                                        })
-                        except UnicodeDecodeError:
-                            pass
+                                        if diag_start_time <= sql_start_time <= diag_end_time:
+                                            execution_seconds, dbname = extract_execution_details(line.split(' '))
+                                            if execution_seconds and "select" in sql:
+                                                sql = sql.replace("\n", "").replace("\t", "")
+                                                slow_sqls.append({
+                                                    "sql": sql,
+                                                    "dbname": dbname,
+                                                    "execution_time": f"{execution_seconds}s"
+                                                })
+                                except (UnicodeDecodeError, Exception):
+                                    pass
+                    except Exception as e:
+                        print(f"obtain_slow_queries: {filename} okunamadı: {e}")
+
+    except paramiko.AuthenticationException as e:
+        print(f"obtain_slow_queries: SSH kimlik doğrulama hatası: {e}")
+    except paramiko.SSHException as e:
+        print(f"obtain_slow_queries: SSH bağlantı hatası: {e}")
+    except Exception as e:
+        print(f"obtain_slow_queries: beklenmedik hata: {e}")
 
     return slow_sqls

@@ -237,14 +237,14 @@ Phase 5 **~%90 tamamlanmis** durumda. Yalnizca B7 ve B8 kaldi.
 
 **Dosyalar:** `requirements.txt`, `server/knowledge_base/kb_service/chroma_kb_service.py`, diger KB dosyalari
 
-#### 3.8 Notify Worker — Hata Yonetimi
-**Sorun:** `prometheus_service_docker/app.py` Telegram ve DBA Agent cagrilarini try/except olmadan yapiyor; bir servis dustu mu hep birlikte cokuyor.
-**Yapilacak:**
-- Her dis cagriyi ayri try/except ile sar
-- Timeout degerleri ekle (requests timeout=10)
-- Retry mekanizmasi ekle (en az 3 deneme)
+#### ~~3.8 Notify Worker — Hata Yonetimi~~ — TAMAMLANDI (2026-03-08)
+**Yapilan:**
+- `gen_diagnostic_file`: bos alert listesi erken cikis, `_parse_alert_time()` yardimci fonksiyonu (nanosecond/microsecond normalize), `obtain_exceptions_in_times` ve `obtain_slow_queries` ayri try/except blokları, dosya yazma try/except
+- `alert()` endpoint: `alert_history.txt` yazimi try/except icine alindi
+- `prometheus()` (prometheus_abnormal_metric.py): `timeout=DBA_PROM_TIMEOUT`, 3 deneme retry (Timeout, ConnectionError), beklenmedik hatalarda retry yapilmaz
+- `obtain_slow_queries()` (get_slow_queries.py): SSH `timeout=30`, dosya bazinda try/except, `AuthenticationException` / `SSHException` ayri yakalanir
 
-**Dosyalar:** `prometheus_service_docker/app.py`
+**Dosyalar:** `prometheus_service_docker/app.py`, `prometheus_service_docker/prometheus_abnormal_metric.py`, `prometheus_service_docker/get_slow_queries.py`
 
 #### 3.9 API Tutarliligi — KB Endpoint'leri
 **Sorun:** Bazi endpoint'ler `code=404` donup `msg` ile hata bildiriyor, bazi endpoint'ler 200 donup icinde `failed_files` donuyor. Tutarsiz.

@@ -84,10 +84,31 @@ def processed_values(data):
     return f"the max value is {max_value}, the min value is {min_value}, the mean value is {mean_value}, the deviation value is {deviation_value}, and the evenly_sampled_values are {evenly_sampled_values}."
 
 
-def prometheus(url, params):
-    res = requests.get(url=PROMETHEUS_CONFIG.get('api_url') + url, params=params)
+_PROMETHEUS_REQUEST_TIMEOUT = int(os.environ.get("DBA_PROM_TIMEOUT", "10"))
+_PROMETHEUS_MAX_RETRIES = 3
 
-    return res.json()
+
+def prometheus(url, params):
+    """Prometheus API'yi sorgula — timeout ve retry ile."""
+    full_url = PROMETHEUS_CONFIG.get('api_url') + url
+    last_exc = None
+    for attempt in range(1, _PROMETHEUS_MAX_RETRIES + 1):
+        try:
+            res = requests.get(url=full_url, params=params, timeout=_PROMETHEUS_REQUEST_TIMEOUT)
+            res.raise_for_status()
+            return res.json()
+        except requests.exceptions.Timeout:
+            last_exc = f"timeout ({_PROMETHEUS_REQUEST_TIMEOUT}s)"
+            print(f"Prometheus sorgu timeout (deneme {attempt}/{_PROMETHEUS_MAX_RETRIES}): {full_url}")
+        except requests.exceptions.ConnectionError as e:
+            last_exc = str(e)
+            print(f"Prometheus bağlantı hatası (deneme {attempt}/{_PROMETHEUS_MAX_RETRIES}): {e}")
+        except Exception as e:
+            last_exc = str(e)
+            print(f"Prometheus sorgu hatası (deneme {attempt}/{_PROMETHEUS_MAX_RETRIES}): {e}")
+            break  # Beklenmedik hatalarda retry yapma
+    print(f"Prometheus sorgusu başarısız: {full_url} — {last_exc}")
+    return {}
 
 
 def detect_anomalies(data, significance_level=0.2):

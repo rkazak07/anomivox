@@ -205,12 +205,13 @@ Phase 5 **~%90 tamamlanmis** durumda. Yalnizca B7 ve B8 kaldi.
 
 **3.4 Phase 5 — %100 TAMAMLANDI** (2026-03-08)
 
-#### 3.5 JSONL Format Destegi Duzelt
-**Sorun:** `diagnose_run_data_copy.jsonl` yuklediginde `JSONLoader` her satirin `dict` olmasi bekliyor ama satirlar `str` olabilir.
-**Yapilacak:**
-- `server/knowledge_base/utils.py` icerisinde `JSONLoader` konfigurasyonunu gozden gecir
-- `jq_schema` parametresini guncelle veya her satir icin farkli bir loader kullan
-- `.jsonl` dosyalarinin satir satir yuklenmesini sagla
+#### ~~3.5 JSONL Format Destegi Duzelt~~ — TAMAMLANDI (2026-03-08)
+**Yapilan:**
+- `LOADER_DICT` ve `DIAGNOSE_FILE_DICT`: `.jsonl` artik `JSONLinesLoader`'a, `.json` ise `JSONLoader`'a ayrı ayrı yonlendiriliyor
+- `JSONLinesLoader.__init__`: `json_lines=True` + `jq_schema="."` + `text_content=False` + `_jsonl_metadata_func` ile satır satır yukle; her satır dict veya str olabilir
+- `_jsonl_metadata_func`: dict satırlarının tüm alanlarını metadata'ya ekler
+- `get_loader`: `JSONLoader` artik `jq_schema="."` (tek obje veya array); `JSONLinesLoader` kendi varsayilanlarını kullanir
+- `file2docs`: metrics standardizasyonu `JSONLinesLoader`'i da kapsiyor
 
 **Dosyalar:** `server/knowledge_base/utils.py`
 
@@ -323,7 +324,7 @@ Hafta 1-2:
   [x] .gitignore ekle
   [x] ChromaDB volume mount duzelt
   [ ] Auth token'lari PostgreSQL'e tasi
-  [ ] JSONL format hatasi duzelt
+  [x] JSONL format hatasi duzelt
 
 Hafta 3-4:
   [ ] LangChain surumu guncelle

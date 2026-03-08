@@ -85,12 +85,13 @@ def list_files_from_folder(kb_name: str):
     return result
 
 
-DIAGNOSE_FILE_DICT = {"JSONLoader": [".json", ".jsonl"]}
+DIAGNOSE_FILE_DICT = {"JSONLoader": [".json"], "JSONLinesLoader": [".jsonl"]}
 KNOWLEDGE_EXTRACTION_FILE_DICT = {"UnstructuredWordDocumentLoader": [".docx", ".doc"]}
 
 LOADER_DICT = {"UnstructuredHTMLLoader": ['.html'],
                "UnstructuredMarkdownLoader": ['.md'],
-               "JSONLoader": ['.json', '.jsonl'],
+               "JSONLoader": ['.json'],
+               "JSONLinesLoader": ['.jsonl'],
                "CSVLoader": [".csv"],
                "RapidOCRLoader": ['.png', '.jpg', '.jpeg', '.bmp'],
                "UnstructuredEmailLoader": ['.eml', '.msg'],
@@ -123,11 +124,31 @@ if json.dumps is not _new_json_dumps:
 
 
 class JSONLinesLoader(langchain.document_loaders.JSONLoader):
-    '''
-    '''
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._json_lines = True
+    """
+    JSONL (JSON Lines) loader — her satır ayrı bir JSON objesi.
+
+    JSONLoader'ın `json_lines=True` modunu kullanır.
+    Satırlar düz string ise page_content olarak döndürür,
+    dict ise tüm alanları birleştirerek metin üretir.
+    """
+    def __init__(self, file_path: str, **kwargs):
+        # jq_schema="." → her satırı olduğu gibi al
+        # text_content=False → dict/str ayrımını jq ile çözmek yerine
+        #   metadata_func üzerinden handle edelim
+        kwargs.setdefault("jq_schema", ".")
+        kwargs.setdefault("text_content", False)
+        kwargs.setdefault("metadata_func", _jsonl_metadata_func)
+        super().__init__(file_path, json_lines=True, **kwargs)
+
+
+def _jsonl_metadata_func(record, metadata: dict) -> dict:
+    """
+    JSONL satırı dict ise tüm alanları metadata'ya ekle.
+    page_content için en uygun alanı döndür.
+    """
+    if isinstance(record, dict):
+        metadata.update({k: str(v) for k, v in record.items() if k != "page_content"})
+    return metadata
 
 
 langchain.document_loaders.JSONLinesLoader = JSONLinesLoader
@@ -170,13 +191,16 @@ def get_loader(loader_name: str, file_path: str, loader_kwargs: Dict = None):
             loader_kwargs["encoding"] = encode_detect["encoding"]
   
     elif loader_name == "JSONLoader":
-        loader_kwargs.setdefault("jq_schema", ".[]")
-        loader_kwargs.setdefault("content_key", "metrics")
-        loader_kwargs.setdefault("text_content", True)
+        # .json dosyaları: her objeyi ayrı belge olarak yükle
+        # jq_schema=".[]" → top-level array; "." → tek obje
+        # Dosyaya göre otomatik algılama: önce array dene, hata olursa "." kullan
+        loader_kwargs.setdefault("jq_schema", ".")
+        loader_kwargs.setdefault("text_content", False)
         loader_kwargs.setdefault("metadata_func", metadata_func)
     elif loader_name == "JSONLinesLoader":
-        loader_kwargs.setdefault("jq_schema", ".")
-        loader_kwargs.setdefault("text_content", True)
+        # .jsonl dosyaları: JSONLinesLoader kendi __init__'inde varsayılanları set eder
+        # Burada sadece dışarıdan gelen override'lara izin ver
+        pass
     
 
     loader = DocumentLoader(file_path, **loader_kwargs)
@@ -302,14 +326,14 @@ class KnowledgeFile:
             self.docs = loader.load()
 
             # Standardize the metrics format for improved accuracy in the vector database.
-            if self.document_loader_name == 'JSONLoader':
+            if self.document_loader_name in ('JSONLoader', 'JSONLinesLoader'):
                 for doc in self.docs:
                     if hasattr(doc, 'metadata'):
-                        metadata = getattr(doc, 'metadata')
+                        metadata = doc.metadata
                         if 'metrics' in metadata:
                             metadata['metrics'] = self.convert_yaml_to_json(metadata['metrics'])
-                    if 'page_content' in doc:
-                        doc['page_content'] = self.convert_yaml_to_json(doc['page_content'])
+                    if hasattr(doc, 'page_content') and doc.page_content:
+                        doc.page_content = self.convert_yaml_to_json(doc.page_content)
         return self.docs
 
     def docs2texts(

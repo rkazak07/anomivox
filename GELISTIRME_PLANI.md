@@ -377,3 +377,12 @@ Tum LLM cagrilari `LiteLLM Gateway` (port 4000) uzerinden gidiyor. Bu sayede:
 
 ### Konfigürasyon Yonetimi
 Tum konfigurasyonlar `configs/*.py` dosyalarinda. `entrypoint.sh` `.example` dosyalarindan otomatik olusturuyor. Docker env degiskenleri `entrypoint.sh` uzerinden `configs/` dosyalarina yaziliyor — bu yuzden `configs/` dizini container volume'unda tutulmali.
+
+
+7. Tanı ve KB  Mimarisi
+
+KB ekranıdna Create Knowledge Base diyince ingilizce oluşuyor Türkçe diline ihtiyaç var. ayrıca oluşturulan KB'de ayarlar sekmesi güncellenecek.
+Tanı ekranı dosyaları Türkçe olarak ve İNgilizce Olarak Eklenecek..
+Tanı ve KB yapısın hem türkçe, hem ingilizce dosyalar oluşturmalı ve çalışmalı
+
+8. Configs klasör yapısı Ayarlar sekmesine taşınacak

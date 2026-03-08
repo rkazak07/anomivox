@@ -15,7 +15,8 @@ from typing import Any, Dict, List, Optional
 from dba_agent.agent.planner import DiagnosisPlan, Planner, TriageResult
 from dba_agent.agent.executor import ExecutionResult, Executor
 from dba_agent.agent.verifier import Verifier, VerificationResult
-from dba_agent.agent.prompts import REPORT_SYSTEM, REPORT_USER, RISK_EMOJIS
+from dba_agent.agent.prompts import get_prompts, RISK_EMOJIS
+from dba_agent.config import get_config
 from dba_agent.inference import TaskType, get_llm_client, ModelRouter
 from dba_agent.security.audit import AuditLogger
 
@@ -173,12 +174,21 @@ class Orchestrator:
                 # Info ve action gerektirmeyen alert'ler için erken çıkış
                 if report.severity == "info" and not report.triage.requires_action:
                     report.root_cause = report.triage.summary
-                    report.report_text = (
-                        f"ℹ️ *Info Alert*\n\n"
-                        f"📊 Alert: {alert_text[:100]}\n"
-                        f"📝 Özet: {report.triage.summary}\n"
-                        f"✅ Aksiyon gerektirmiyor."
-                    )
+                    lang = get_config().agent_language
+                    if lang == "en":
+                        report.report_text = (
+                            f"ℹ️ *Info Alert*\n\n"
+                            f"📊 Alert: {alert_text[:100]}\n"
+                            f"📝 Summary: {report.triage.summary}\n"
+                            f"✅ No action required."
+                        )
+                    else:
+                        report.report_text = (
+                            f"ℹ️ *Info Alert*\n\n"
+                            f"📊 Alert: {alert_text[:100]}\n"
+                            f"📝 Özet: {report.triage.summary}\n"
+                            f"✅ Aksiyon gerektirmiyor."
+                        )
                     report.total_duration_sec = round(time.time() - start_time, 1)
                     return report
             else:
@@ -287,48 +297,64 @@ class Orchestrator:
     async def _generate_report(self, report: DiagnosisReport) -> str:
         """LLM ile Telegram formatında rapor oluştur."""
         params = self.router.get_params(TaskType.REPORT)
+        lang = get_config().agent_language
+        prompts = get_prompts(lang)
 
-        evidence_text = "\n".join(f"- {e}" for e in report.evidence) if report.evidence else "Yok"
+        if lang == "en":
+            none_label = "None"
+            no_history = "No historical records yet (Phase 4)"
+            fallback_title = "DBA Agent Diagnosis Report"
+            duration_label = "Duration"
+            evidence_label = "Evidence"
+            actions_label = "Recommendations"
+        else:
+            none_label = "Yok"
+            no_history = "Henüz geçmiş kayıt yok (Faz 4'te eklenecek)"
+            fallback_title = "DBA Agent Tanı Raporu"
+            duration_label = "Süre"
+            evidence_label = "Kanıtlar"
+            actions_label = "Öneriler"
+
+        evidence_text = "\n".join(f"- {e}" for e in report.evidence) if report.evidence else none_label
         actions_text = "\n".join(
             f"- [{a.get('risk', 'safe')}] {a.get('action', '')}: {a.get('sql', '-')}"
             for a in report.recommended_actions
-        ) if report.recommended_actions else "Yok"
+        ) if report.recommended_actions else none_label
 
-        prompt = REPORT_USER.format(
+        prompt = prompts["REPORT_USER"].format(
             alert_type=report.category,
             db_name=report.db_name,
             diagnosis_duration=f"{report.total_duration_sec}s",
             root_cause=report.root_cause,
             evidence=evidence_text,
             recommended_actions=actions_text,
-            similar_incidents="Henüz geçmiş kayıt yok (Faz 4'te eklenecek)",
+            similar_incidents=no_history,
         )
 
         try:
             response = await self.client.achat(
                 prompt=prompt,
                 model=params["model"],
-                system_prompt=REPORT_SYSTEM,
+                system_prompt=prompts["REPORT_SYSTEM"],
                 temperature=params["temperature"],
                 max_tokens=params["max_tokens"],
             )
             return response.strip()
         except Exception as e:
             logger.error(f"Report generation failed: {e}")
-            # Fallback: basit rapor
             risk_line = ""
             if report.recommended_actions:
                 risk = report.recommended_actions[0].get("risk", "safe")
                 risk_line = f"\n⚡ Risk: {RISK_EMOJIS.get(risk, risk)}"
 
             return (
-                f"🔍 *DBA Agent Tanı Raporu*\n\n"
+                f"🔍 *{fallback_title}*\n\n"
                 f"📊 Alert: {report.category}\n"
                 f"🖥️ DB: {report.db_name}\n"
-                f"⏱️ Süre: {report.total_duration_sec}s\n\n"
+                f"⏱️ {duration_label}: {report.total_duration_sec}s\n\n"
                 f"🎯 *Root Cause:*\n{report.root_cause}\n\n"
-                f"📋 *Kanıtlar:*\n{evidence_text}\n\n"
-                f"💡 *Öneriler:*\n{actions_text}"
+                f"📋 *{evidence_label}:*\n{evidence_text}\n\n"
+                f"💡 *{actions_label}:*\n{actions_text}"
                 f"{risk_line}"
             )
 

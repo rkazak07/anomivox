@@ -10,12 +10,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from dba_agent.agent.prompts import (
-    PLANNER_SYSTEM,
-    PLANNER_USER,
-    TRIAGE_SYSTEM,
-    TRIAGE_USER,
-)
+from dba_agent.agent.prompts import get_prompts
+from dba_agent.config import get_config
 from dba_agent.inference import TaskType, get_llm_client, ModelRouter
 from dba_agent.tools.registry import get_tool_registry
 
@@ -53,6 +49,7 @@ class Planner:
         self.client = get_llm_client()
         self.router = ModelRouter()
         self.registry = get_tool_registry()
+        self._prompts = get_prompts(get_config().agent_language)
 
     async def triage(
         self,
@@ -71,9 +68,13 @@ class Planner:
         """
         params = self.router.get_params(TaskType.TRIAGE)
 
-        prompt = TRIAGE_USER.format(
+        lang = get_config().agent_language
+        prompts = get_prompts(lang)
+        no_metrics = "No metrics available" if lang == "en" else "Metrik bilgisi yok"
+
+        prompt = prompts["TRIAGE_USER"].format(
             alert_text=alert_text,
-            metrics_summary=metrics_summary or "Metrik bilgisi yok",
+            metrics_summary=metrics_summary or no_metrics,
         )
 
         logger.info(f"Triage starting: {alert_text[:80]}...")
@@ -82,7 +83,7 @@ class Planner:
             response = await self.client.achat(
                 prompt=prompt,
                 model=params["model"],
-                system_prompt=TRIAGE_SYSTEM,
+                system_prompt=prompts["TRIAGE_SYSTEM"],
                 temperature=params["temperature"],
                 max_tokens=params["max_tokens"],
             )
@@ -147,11 +148,16 @@ class Planner:
         """
         params = self.router.get_params(TaskType.PLANNING)
 
+        lang = get_config().agent_language
+        prompts = get_prompts(lang)
+        unknown_duration = "unknown" if lang == "en" else "bilinmiyor"
+        no_context = "No additional context" if lang == "en" else "Ek bağlam yok"
+
         # Kullanılabilir araçları al
         tool_descriptions = self.registry.get_tool_descriptions(max_risk="safe")
 
-        system_prompt = PLANNER_SYSTEM.format(available_tools=tool_descriptions)
-        user_prompt = PLANNER_USER.format(
+        system_prompt = prompts["PLANNER_SYSTEM"].format(available_tools=tool_descriptions)
+        user_prompt = prompts["PLANNER_USER"].format(
             alert_type=alert_type,
             severity=severity,
             description=description,
@@ -159,8 +165,8 @@ class Planner:
             db_type=db_type,
             db_host=db_host,
             health_score=health_score,
-            duration=duration or "bilinmiyor",
-            context=context or "Ek bağlam yok",
+            duration=duration or unknown_duration,
+            context=context or no_context,
         )
 
         logger.info(f"Planning diagnosis for: {alert_type} ({severity})")
@@ -184,19 +190,35 @@ class Planner:
                 plan.expected_root_causes = data.get("expected_root_causes", [])
             except json.JSONDecodeError:
                 logger.warning("Plan JSON parse failed, creating basic plan")
-                plan.steps = [
-                    {"step": 1, "tool": "get_health", "args": {}, "reason": "Genel durum kontrolü"},
-                    {"step": 2, "tool": "get_slow_queries", "args": {"limit": 10}, "reason": "Yavaş sorgu tespiti"},
-                    {"step": 3, "tool": "get_active_connections", "args": {}, "reason": "Bağlantı durumu"},
-                ]
-                plan.initial_hypothesis = "Plan oluşturulamadı, varsayılan adımlar kullanılıyor"
+                if lang == "en":
+                    plan.steps = [
+                        {"step": 1, "tool": "get_health", "args": {}, "reason": "General health check"},
+                        {"step": 2, "tool": "get_slow_queries", "args": {"limit": 10}, "reason": "Slow query detection"},
+                        {"step": 3, "tool": "get_active_connections", "args": {}, "reason": "Connection status"},
+                    ]
+                    plan.initial_hypothesis = "Plan could not be created, using default steps"
+                else:
+                    plan.steps = [
+                        {"step": 1, "tool": "get_health", "args": {}, "reason": "Genel durum kontrolü"},
+                        {"step": 2, "tool": "get_slow_queries", "args": {"limit": 10}, "reason": "Yavaş sorgu tespiti"},
+                        {"step": 3, "tool": "get_active_connections", "args": {}, "reason": "Bağlantı durumu"},
+                    ]
+                    plan.initial_hypothesis = "Plan oluşturulamadı, varsayılan adımlar kullanılıyor"
 
             logger.info(f"Plan created: {len(plan.steps)} steps, hypothesis: {plan.initial_hypothesis[:80]}")
             return plan
 
         except Exception as e:
             logger.error(f"Planning failed: {e}")
-            # Fallback plan
+            lang = get_config().agent_language
+            if lang == "en":
+                return DiagnosisPlan(
+                    steps=[
+                        {"step": 1, "tool": "get_health", "args": {}, "reason": "General health check"},
+                        {"step": 2, "tool": "get_active_connections", "args": {}, "reason": "Connection check"},
+                    ],
+                    initial_hypothesis=f"Planning error: {e}",
+                )
             return DiagnosisPlan(
                 steps=[
                     {"step": 1, "tool": "get_health", "args": {}, "reason": "Genel durum kontrolü"},

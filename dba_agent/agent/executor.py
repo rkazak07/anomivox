@@ -11,7 +11,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from dba_agent.agent.prompts import EXECUTOR_SYSTEM, EXECUTOR_USER
+from dba_agent.agent.prompts import get_prompts
+from dba_agent.config import get_config
 from dba_agent.inference import TaskType, get_llm_client, ModelRouter
 from dba_agent.tools.registry import get_tool_registry
 
@@ -140,8 +141,12 @@ class Executor:
         start_time = time.time()
         params = self.router.get_params(TaskType.DIAGNOSIS)
 
+        lang = get_config().agent_language
+        prompts = get_prompts(lang)
+        no_steps_yet = "No steps yet." if lang == "en" else "Henüz adım yok."
+
         tool_descriptions = self.registry.get_tool_descriptions(max_risk="safe")
-        system_prompt = EXECUTOR_SYSTEM.format(
+        system_prompt = prompts["EXECUTOR_SYSTEM"].format(
             available_tools=tool_descriptions,
             max_steps=self.max_steps,
         )
@@ -149,11 +154,11 @@ class Executor:
         previous_steps_text = ""
 
         for step_num in range(1, self.max_steps + 1):
-            user_prompt = EXECUTOR_USER.format(
+            user_prompt = prompts["EXECUTOR_USER"].format(
                 plan=alert_description,
                 db_name=db_name,
                 db_type=db_type,
-                previous_steps=previous_steps_text or "Henüz adım yok.",
+                previous_steps=previous_steps_text or no_steps_yet,
             )
 
             try:
@@ -204,12 +209,20 @@ class Executor:
                 result.steps.append(step)
 
                 # Geçmişe ekle
-                previous_steps_text += (
-                    f"\nAdım {step_num}:\n"
-                    f"  Düşünce: {thought}\n"
-                    f"  Araç: {action}({json.dumps(args, ensure_ascii=False)})\n"
-                    f"  Sonuç: {observation[:500]}\n"
-                )
+                if lang == "en":
+                    previous_steps_text += (
+                        f"\nStep {step_num}:\n"
+                        f"  Thought: {thought}\n"
+                        f"  Tool: {action}({json.dumps(args, ensure_ascii=False)})\n"
+                        f"  Result: {observation[:500]}\n"
+                    )
+                else:
+                    previous_steps_text += (
+                        f"\nAdım {step_num}:\n"
+                        f"  Düşünce: {thought}\n"
+                        f"  Araç: {action}({json.dumps(args, ensure_ascii=False)})\n"
+                        f"  Sonuç: {observation[:500]}\n"
+                    )
 
             except json.JSONDecodeError:
                 logger.warning(f"Step {step_num}: JSON parse failed")
@@ -238,18 +251,37 @@ class Executor:
         db_type: str,
     ) -> None:
         """Toplanan tool sonuçlarını LLM ile analiz et — root cause bul."""
+        lang = get_config().agent_language
+
         if not result.steps:
-            result.root_cause = "Yeterli veri toplanamadı"
+            result.root_cause = "Insufficient data collected" if lang == "en" else "Yeterli veri toplanamadı"
             return
 
         params = self.router.get_params(TaskType.DIAGNOSIS)
 
-        observations = "\n".join(
-            f"Tool: {s.tool_name}\nSonuç: {s.observation[:500]}\n"
-            for s in result.steps if s.success
-        )
+        if lang == "en":
+            observations = "\n".join(
+                f"Tool: {s.tool_name}\nResult: {s.observation[:500]}\n"
+                for s in result.steps if s.success
+            )
+            prompt = f"""Analyze the following database diagnostic results.
 
-        prompt = f"""Aşağıdaki veritabanı diagnostik sonuçlarını analiz et.
+Database: {db_name} ({db_type})
+
+Collected Data:
+{observations}
+
+Respond ONLY in the following JSON format:
+{{"root_cause": "root cause", "evidence": ["evidence 1", "evidence 2"], "recommended_actions": [{{"action": "description", "sql": "SQL if any", "risk": "safe|low|medium|high", "reason": "why"}}]}}"""
+            system_prompt = "You are an experienced DBA. Analyze database diagnostic data and determine the root cause."
+            not_determined = "Could not be determined"
+            analysis_failed = "Analysis could not be completed"
+        else:
+            observations = "\n".join(
+                f"Tool: {s.tool_name}\nSonuç: {s.observation[:500]}\n"
+                for s in result.steps if s.success
+            )
+            prompt = f"""Aşağıdaki veritabanı diagnostik sonuçlarını analiz et.
 
 Veritabanı: {db_name} ({db_type})
 
@@ -258,22 +290,25 @@ Toplanan Veriler:
 
 SADECE aşağıdaki JSON formatında yanıt ver:
 {{"root_cause": "temel sebep", "evidence": ["kanıt 1", "kanıt 2"], "recommended_actions": [{{"action": "açıklama", "sql": "varsa SQL", "risk": "safe|low|medium|high", "reason": "neden"}}]}}"""
+            system_prompt = "Sen deneyimli bir DBA'sın. Veritabanı diagnostik verilerini analiz et ve root cause belirle."
+            not_determined = "Belirlenemedi"
+            analysis_failed = "Analiz tamamlanamadı"
 
         try:
             response = await self.client.achat(
                 prompt=prompt,
                 model=params["model"],
-                system_prompt="Sen deneyimli bir DBA'sın. Veritabanı diagnostik verilerini analiz et ve root cause belirle.",
+                system_prompt=system_prompt,
                 temperature=params["temperature"],
                 max_tokens=params["max_tokens"],
             )
 
             data = json.loads(response.strip().strip("```json").strip("```"))
-            result.root_cause = data.get("root_cause", "Belirlenemedi")
+            result.root_cause = data.get("root_cause", not_determined)
             result.evidence = data.get("evidence", [])
             result.recommended_actions = data.get("recommended_actions", [])
 
         except Exception as e:
             logger.error(f"Analysis failed: {e}")
-            result.root_cause = "Analiz tamamlanamadı"
+            result.root_cause = analysis_failed
             result.error = str(e)

@@ -2,18 +2,20 @@
 DB Action Tools — Veritabanı Yazma/Yönetim Araçları
 ═══════════════════════════════════════════════════
 Veritabanı üzerinde aktif müdahale araçları:
-  - Session/Query öldürme (pg_terminate_backend, KILL)
-  - VACUUM / VACUUM FULL
-  - REINDEX
-  - ANALYZE
-  - Config parametre değiştirme (ALTER SYSTEM SET)
-  - Config yeniden yükleme (pg_reload_conf)
+  - Session/Query öldürme (pg_terminate_backend, KILL, ALTER SYSTEM KILL SESSION)
+  - VACUUM / VACUUM FULL / OPTIMIZE TABLE / SHRINK SPACE / ALTER INDEX REBUILD
+  - REINDEX / ALTER INDEX REBUILD / DBMS_STATS
+  - ANALYZE / UPDATE STATISTICS / DBMS_STATS.GATHER_TABLE_STATS
+  - Config parametre değiştirme (ALTER SYSTEM SET / SET GLOBAL / sp_configure)
+  - Config yeniden yükleme (pg_reload_conf / FLUSH / RECONFIGURE)
+
+Desteklenen DB'ler: PostgreSQL, MySQL/MariaDB, Oracle, MSSQL
 
 Risk Seviyeleri:
-  SAFE     — ANALYZE
-  LOW      — pg_cancel_backend, VACUUM (normal)
-  MEDIUM   — pg_terminate_backend, REINDEX, KILL (MySQL)
-  HIGH     — VACUUM FULL, ALTER SYSTEM SET, config reload
+  SAFE     — ANALYZE / UPDATE STATISTICS / DBMS_STATS
+  LOW      — pg_cancel_backend, VACUUM (normal), OPTIMIZE TABLE
+  MEDIUM   — pg_terminate_backend, REINDEX, KILL, ALTER INDEX REBUILD
+  HIGH     — VACUUM FULL, ALTER SYSTEM SET, SHRINK SPACE CASCADE
 
 Tüm riskli operasyonlar Telegram onay sistemi ile korunur.
 """
@@ -121,6 +123,31 @@ def cancel_query(pid: int, db_name: str = None) -> Dict[str, Any]:
             }
             sql = f"KILL QUERY {pid}"
 
+        elif db_type == "oracle":
+            check = adapter.execute_query(
+                f"SELECT sid, username, status, sql_id FROM v$session WHERE sid = {pid}"
+            )
+            if not check.rows:
+                return {"pid": pid, "cancelled": False, "message": f"SID {pid} bulunamadı."}
+            query_info = {
+                "user": str(check.rows[0][1] or ""),
+                "state": str(check.rows[0][2] or ""),
+                "query": str(check.rows[0][3] or ""),
+            }
+            sql = f"ALTER SYSTEM CANCEL SQL '{check.rows[0][3]}'"
+
+        elif db_type in ("mssql", "sqlserver"):
+            check = adapter.execute_query(
+                f"SELECT session_id, login_name, status FROM sys.dm_exec_sessions WHERE session_id = {pid}"
+            )
+            if not check.rows:
+                return {"pid": pid, "cancelled": False, "message": f"Session {pid} bulunamadı."}
+            query_info = {
+                "user": str(check.rows[0][1] or ""),
+                "state": str(check.rows[0][2] or ""),
+            }
+            sql = f"KILL {pid}"
+
         else:
             return {
                 "pid": pid,
@@ -198,6 +225,38 @@ def kill_session(pid: int, db_name: str = None) -> Dict[str, Any]:
             sql = f"KILL {pid}"
             result = adapter.execute_action(sql, RiskLevel.MEDIUM)
 
+        elif db_type == "oracle":
+            check = adapter.execute_query(
+                f"SELECT sid, serial#, username, status FROM v$session WHERE sid = {pid}"
+            )
+            query_info = {}
+            if check.rows:
+                query_info = {
+                    "user": str(check.rows[0][2] or ""),
+                    "state": str(check.rows[0][3] or ""),
+                }
+                serial = int(check.rows[0][1])
+                sql = f"ALTER SYSTEM KILL SESSION '{pid},{serial}' IMMEDIATE"
+            else:
+                return {"pid": pid, "killed": False, "message": f"SID {pid} bulunamadı."}
+
+            result = adapter.execute_action(sql, RiskLevel.MEDIUM)
+
+        elif db_type in ("mssql", "sqlserver"):
+            check = adapter.execute_query(
+                f"SELECT session_id, login_name, status, host_name FROM sys.dm_exec_sessions WHERE session_id = {pid}"
+            )
+            query_info = {}
+            if check.rows:
+                query_info = {
+                    "user": str(check.rows[0][1] or ""),
+                    "state": str(check.rows[0][2] or ""),
+                    "host": str(check.rows[0][3] or ""),
+                }
+
+            sql = f"KILL {pid}"
+            result = adapter.execute_action(sql, RiskLevel.MEDIUM)
+
         else:
             return {
                 "pid": pid,
@@ -250,6 +309,18 @@ def vacuum_table(
         if db_type in ("mysql", "mariadb"):
             # MySQL/MariaDB: OPTIMIZE TABLE (dead rows temizle + istatistik güncelle)
             sql = f"OPTIMIZE TABLE {table_name}"
+        elif db_type == "oracle":
+            # Oracle: ALTER TABLE ... SHRINK SPACE veya istatistik güncelle
+            if analyze:
+                sql = f"BEGIN DBMS_STATS.GATHER_TABLE_STATS(ownname => USER, tabname => '{tbl.upper()}'); END;"
+            else:
+                sql = f"ALTER TABLE {table_name} ENABLE ROW MOVEMENT"
+        elif db_type in ("mssql", "sqlserver"):
+            # MSSQL: sp_clean_db_free_space + UPDATE STATISTICS
+            if analyze:
+                sql = f"UPDATE STATISTICS {table_name}"
+            else:
+                sql = f"ALTER INDEX ALL ON {table_name} REORGANIZE"
         else:
             analyze_str = " ANALYZE" if analyze else ""
             sql = f"VACUUM{analyze_str} {table_name}"
@@ -305,6 +376,12 @@ def vacuum_full_table(
         if db_type in ("mysql", "mariadb"):
             # MySQL'de VACUUM FULL yok — OPTIMIZE TABLE en yakın eşdeğer
             sql = f"OPTIMIZE TABLE {table_name}"
+        elif db_type == "oracle":
+            # Oracle: ALTER TABLE ... SHRINK SPACE COMPACT + CASCADE (index dahil)
+            sql = f"ALTER TABLE {table_name} SHRINK SPACE CASCADE"
+        elif db_type in ("mssql", "sqlserver"):
+            # MSSQL: DBCC CLEANTABLE + index rebuild
+            sql = f"ALTER INDEX ALL ON {table_name} REBUILD"
         else:
             sql = f"VACUUM FULL ANALYZE {table_name}"
         result = adapter.execute_action(sql, RiskLevel.HIGH)
@@ -349,12 +426,19 @@ def reindex_table(
     """
     with get_adapter(db_name) as adapter:
         db_type = adapter.target.db_type.lower()
+        schema, tbl = _parse_table_name(table_name)
 
         if db_type in ("postgresql", "postgres"):
             sql = f"REINDEX TABLE {table_name}"
         elif db_type in ("mysql", "mariadb"):
             # MySQL: ALTER TABLE ... FORCE veya OPTIMIZE TABLE
             sql = f"OPTIMIZE TABLE {table_name}"
+        elif db_type == "oracle":
+            # Oracle: ALTER INDEX ... REBUILD (tüm indexler için)
+            sql = f"BEGIN FOR idx IN (SELECT index_name FROM user_indexes WHERE table_name = '{tbl.upper()}') LOOP EXECUTE IMMEDIATE 'ALTER INDEX ' || idx.index_name || ' REBUILD'; END LOOP; END;"
+        elif db_type in ("mssql", "sqlserver"):
+            # MSSQL: ALTER INDEX ALL ... REBUILD
+            sql = f"ALTER INDEX ALL ON {table_name} REBUILD"
         else:
             return {
                 "table": table_name,
@@ -401,10 +485,18 @@ def analyze_table(
     with get_adapter(db_name) as adapter:
         db_type = adapter.target.db_type.lower()
 
+        schema, tbl = _parse_table_name(table_name)
+
         if db_type in ("postgresql", "postgres"):
             sql = f"ANALYZE {table_name}"
         elif db_type in ("mysql", "mariadb"):
             sql = f"ANALYZE TABLE {table_name}"
+        elif db_type == "oracle":
+            # Oracle: DBMS_STATS.GATHER_TABLE_STATS
+            sql = f"BEGIN DBMS_STATS.GATHER_TABLE_STATS(ownname => USER, tabname => '{tbl.upper()}'); END;"
+        elif db_type in ("mssql", "sqlserver"):
+            # MSSQL: UPDATE STATISTICS
+            sql = f"UPDATE STATISTICS {table_name}"
         else:
             return {
                 "table": table_name,
@@ -486,6 +578,24 @@ def set_db_config(
 
             sql = f"SET GLOBAL {param_name} = '{param_value}'"
 
+        elif db_type == "oracle":
+            old_r = adapter.execute_query(
+                f"SELECT value FROM v$parameter WHERE name = '{param_name.lower()}'"
+            )
+            old_value = str(old_r.rows[0][0]) if old_r.rows else "?"
+            old_unit = ""
+
+            sql = f"ALTER SYSTEM SET {param_name} = '{param_value}' SCOPE=BOTH"
+
+        elif db_type in ("mssql", "sqlserver"):
+            old_r = adapter.execute_query(
+                f"SELECT CAST(value_in_use AS NVARCHAR(200)) FROM sys.configurations WHERE name = '{param_name}'"
+            )
+            old_value = str(old_r.rows[0][0]) if old_r.rows else "?"
+            old_unit = ""
+
+            sql = f"EXEC sp_configure '{param_name}', {param_value}; RECONFIGURE"
+
         else:
             return {
                 "param": param_name,
@@ -519,9 +629,15 @@ def set_db_config(
             "new_value": param_value,
             "applied": result.success,
             "message": result.message,
-            "note": "PostgreSQL: pg_reload_conf() veya restart gerekebilir."
-                    if db_type in ("postgresql", "postgres")
-                    else "MySQL: Hemen aktif (SET GLOBAL).",
+            "note": (
+                "PostgreSQL: pg_reload_conf() veya restart gerekebilir."
+                if db_type in ("postgresql", "postgres")
+                else "Oracle: SCOPE=BOTH — hemen aktif + spfile."
+                if db_type == "oracle"
+                else "MSSQL: RECONFIGURE ile hemen aktif."
+                if db_type in ("mssql", "sqlserver")
+                else "MySQL: Hemen aktif (SET GLOBAL)."
+            ),
             "execution_time_ms": result.execution_time_ms,
         }
 
@@ -547,6 +663,12 @@ def reload_db_config(db_name: str = None) -> Dict[str, Any]:
             sql = "SELECT pg_reload_conf()"
         elif db_type in ("mysql", "mariadb"):
             sql = "FLUSH PRIVILEGES"
+        elif db_type == "oracle":
+            # Oracle: ALTER SYSTEM — spfile parametreleri restart gerektirir
+            sql = "ALTER SYSTEM FLUSH SHARED_POOL"
+        elif db_type in ("mssql", "sqlserver"):
+            # MSSQL: RECONFIGURE
+            sql = "RECONFIGURE"
         else:
             return {
                 "reloaded": False,
@@ -645,6 +767,64 @@ def kill_long_running_queries(
                 else:
                     failed.append(pid)
 
+        elif db_type == "oracle":
+            r = adapter.execute_query(f"""
+                SELECT s.sid, s.serial#, s.username, s.last_call_et,
+                       q.sql_text
+                FROM v$session s
+                LEFT JOIN v$sqlarea q ON s.sql_id = q.sql_id
+                WHERE s.type = 'USER' AND s.status = 'ACTIVE'
+                  AND s.last_call_et > {int(threshold_sec)}
+                ORDER BY s.last_call_et DESC
+            """)
+
+            killed = []
+            failed = []
+            for row in r.rows:
+                sid = int(row[0])
+                serial = int(row[1])
+                result = adapter.execute_action(
+                    f"ALTER SYSTEM KILL SESSION '{sid},{serial}' IMMEDIATE",
+                    RiskLevel.MEDIUM,
+                )
+                if result.success:
+                    killed.append({
+                        "pid": sid,
+                        "user": str(row[2] or ""),
+                        "duration_sec": int(row[3]),
+                        "query": str(row[4] or "")[:100],
+                    })
+                else:
+                    failed.append(sid)
+
+        elif db_type in ("mssql", "sqlserver"):
+            r = adapter.execute_query(f"""
+                SELECT r.session_id, s.login_name,
+                       r.total_elapsed_time / 1000 AS duration_sec,
+                       ISNULL(t.text, '')
+                FROM sys.dm_exec_requests r
+                JOIN sys.dm_exec_sessions s ON r.session_id = s.session_id
+                OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) t
+                WHERE r.total_elapsed_time > {int(threshold_sec * 1000)}
+                  AND r.session_id > 50
+                ORDER BY r.total_elapsed_time DESC
+            """)
+
+            killed = []
+            failed = []
+            for row in r.rows:
+                pid = int(row[0])
+                result = adapter.execute_action(f"KILL {pid}", RiskLevel.MEDIUM)
+                if result.success:
+                    killed.append({
+                        "pid": pid,
+                        "user": str(row[1] or ""),
+                        "duration_sec": int(row[2] or 0),
+                        "query": str(row[3] or "")[:100],
+                    })
+                else:
+                    failed.append(pid)
+
         else:
             return {
                 "killed_count": 0,
@@ -710,6 +890,40 @@ def _get_table_snapshot(adapter, schema: str, table_name: str) -> Dict[str, Any]
                 FROM information_schema.TABLES
                 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
             """, (schema, table_name))
+            if r.rows:
+                return {
+                    "live_rows": int(r.rows[0][0] or 0),
+                    "dead_rows": 0,
+                    "total_size_bytes": int(r.rows[0][1] or 0),
+                    "total_size_mb": round(int(r.rows[0][1] or 0) / (1024 * 1024), 2),
+                }
+        elif db_type == "oracle":
+            owner = schema.upper() if schema != "public" else adapter.target.user.upper()
+            r = adapter.execute_query(f"""
+                SELECT t.num_rows, NVL(s.bytes, 0)
+                FROM dba_tables t
+                LEFT JOIN dba_segments s ON s.segment_name = t.table_name
+                    AND s.owner = t.owner AND s.segment_type = 'TABLE'
+                WHERE t.owner = '{owner}' AND t.table_name = '{table_name.upper()}'
+            """)
+            if r.rows:
+                return {
+                    "live_rows": int(r.rows[0][0] or 0),
+                    "dead_rows": 0,
+                    "total_size_bytes": int(r.rows[0][1] or 0),
+                    "total_size_mb": round(int(r.rows[0][1] or 0) / (1024 * 1024), 2),
+                }
+        elif db_type in ("mssql", "sqlserver"):
+            schema_name = schema if schema != "public" else "dbo"
+            r = adapter.execute_query(f"""
+                SELECT p.rows, SUM(a.total_pages) * 8 * 1024 AS total_bytes
+                FROM sys.tables t
+                JOIN sys.schemas s ON t.schema_id = s.schema_id
+                JOIN sys.partitions p ON t.object_id = p.object_id AND p.index_id IN (0, 1)
+                JOIN sys.allocation_units a ON p.partition_id = a.container_id
+                WHERE s.name = '{schema_name}' AND t.name = '{table_name}'
+                GROUP BY p.rows
+            """)
             if r.rows:
                 return {
                     "live_rows": int(r.rows[0][0] or 0),

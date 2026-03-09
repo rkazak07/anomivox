@@ -18,6 +18,9 @@ _ADAPTER_MAP = {
     "postgres": "dba_agent.db.postgresql.PostgreSQLAdapter",
     "mysql": "dba_agent.db.mysql.MySQLAdapter",
     "mariadb": "dba_agent.db.mysql.MySQLAdapter",
+    "oracle": "dba_agent.db.oracle.OracleAdapter",
+    "mssql": "dba_agent.db.mssql.MSSQLAdapter",
+    "sqlserver": "dba_agent.db.mssql.MSSQLAdapter",
 }
 
 

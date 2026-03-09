@@ -401,9 +401,11 @@
                     </el-col>
                     <el-col :span="4">
                       <el-form-item :label="$t('dbTargetType')">
-                        <el-select v-model="newDbTarget.db_type" style="width: 100%">
+                        <el-select v-model="newDbTarget.db_type" style="width: 100%" @change="onNewDbTypeChange">
                           <el-option label="🐘 PostgreSQL" value="postgresql" />
                           <el-option label="🐬 MySQL" value="mysql" />
+                          <el-option label="🔴 Oracle" value="oracle" />
+                          <el-option label="🔷 MSSQL" value="mssql" />
                         </el-select>
                       </el-form-item>
                     </el-col>
@@ -1499,9 +1501,11 @@
           </el-col>
           <el-col :span="12">
             <el-form-item :label="$t('dbTargetType')">
-              <el-select v-model="editDbTarget.db_type" style="width: 100%">
+              <el-select v-model="editDbTarget.db_type" style="width: 100%" @change="onEditDbTypeChange">
                 <el-option label="🐘 PostgreSQL" value="postgresql" />
                 <el-option label="🐬 MySQL" value="mysql" />
+                <el-option label="🔴 Oracle" value="oracle" />
+                <el-option label="🔷 MSSQL" value="mssql" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -2267,6 +2271,19 @@ const editDbTarget = reactive({
   ssh_key_passphrase: '',
 })
 
+const getDefaultPort = (dbType) => {
+  const portMap = { postgresql: 5432, mysql: 3306, oracle: 1521, mssql: 1433 }
+  return portMap[dbType] || 5432
+}
+
+const onNewDbTypeChange = (val) => {
+  newDbTarget.port = getDefaultPort(val)
+}
+
+const onEditDbTypeChange = (val) => {
+  editDbTarget.port = getDefaultPort(val)
+}
+
 const fetchDbTargets = async () => {
   dbTargetsLoading.value = true
   try {
@@ -2322,7 +2339,7 @@ const onAddDbTarget = async () => {
       ElMessage.success(res.msg)
       newDbTarget.name = ''
       newDbTarget.host = ''
-      newDbTarget.port = newDbTarget.db_type === 'postgresql' ? 5432 : 3306
+      newDbTarget.port = getDefaultPort(newDbTarget.db_type)
       newDbTarget.user = ''
       newDbTarget.password = ''
       newDbTarget.dbname = ''

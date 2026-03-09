@@ -283,13 +283,18 @@ Phase 5 **~%90 tamamlanmis** durumda. Yalnizca B7 ve B8 kaldi.
 - Bakimlarin bakim penceresi disinda calismasini zorunlu kil
 - Sonuclari audit log'a yaz
 
-#### 3.13 Oracle / MSSQL Destegi
-**Mevcut durum:** Sadece PostgreSQL ve MySQL destekleniyor.
-**Yapilacak:**
-- `dba_agent/tools/db_diagnostic.py` soyutlama katmani olustur
-- Oracle icin `cx_Oracle` / `oracledb` adapter
-- MSSQL icin `pyodbc` adapter
-- Her adapter icin `get_health`, `get_slow_queries` vs. implement et
+#### 3.13 Oracle / MSSQL Destegi ✅
+**Durum:** Tamamlandi.
+**Yapilanlar:**
+- `dba_agent/db/oracle.py` — OracleAdapter (oracledb thin mode, Oracle Client gerektirmez)
+- `dba_agent/db/mssql.py` — MSSQLAdapter (pymssql/FreeTDS, ODBC gerektirmez)
+- Her iki adapter icin 13 metot: connect, disconnect, is_connected, execute_query, get_health, get_active_connections, get_long_running_queries, get_blocked_locks, get_slow_queries, get_table_stats, get_index_stats, explain_query, execute_action
+- `dba_agent/db/factory.py` — _ADAPTER_MAP'e oracle, mssql, sqlserver eklendi
+- `dba_agent/tools/db_action_tools.py` — Tum aksiyon fonksiyonlarina Oracle/MSSQL dallanmalari eklendi (cancel_query, kill_session, vacuum_table, vacuum_full_table, reindex_table, analyze_table, set_db_config, reload_db_config, kill_long_running_queries, _get_table_snapshot)
+- `requirements_dba_agent.txt` — oracledb>=2.1.0, pymssql>=2.2.11
+- Vue.js Settings — DB type dropdown'a Oracle/MSSQL eklendi, port otomatik degisimi (1521/1433)
+- Dil dosyalari (en.js, tr.js) — Oracle/MSSQL destegi belgeleri guncellendi
+- Dashboard zaten Oracle/MSSQL ikonlari ve renkleri destekliyordu
 
 #### 3.14 Multi-Tenant Kullanici Yonetimi
 **Mevcut durum:** Tek admin + kullanici modeli var, KB ve tani sonuclari herkese acik.
@@ -354,7 +359,7 @@ Ay 2:
   [ ] Dashboard grafikleri
 
 Ay 3+:
-  [ ] Oracle/MSSQL adapter
+  [x] Oracle/MSSQL adapter
   [ ] Multi-tenant
   [ ] Prediktif anomali
   [ ] Zamanlanmis bakim

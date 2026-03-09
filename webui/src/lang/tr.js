@@ -391,7 +391,7 @@ export default {
   dbTargetStep1: '1. Her hedef veritabanı için sunucu, port ve kimlik bilgilerini ekleyin.',
   dbTargetStep2: '2. Bağlantıyı test ederek erişilebilirliği ve kimlik bilgilerini doğrulayın.',
   dbTargetStep3: '3. Bir bağlantıyı "Birincil" olarak işaretleyin — DBA Agent varsayılan olarak bu bağlantıyı kullanacaktır.',
-  dbTargetStep4: '4. PostgreSQL ve MySQL desteklenir. Kullanıcının pg_stat görünümlerine okuma erişimi olduğundan emin olun.',
+  dbTargetStep4: '4. PostgreSQL, MySQL, Oracle ve MSSQL desteklenir. Kullanıcının sistem görünümlerine (pg_stat, v$session, DMV) okuma erişimi olduğundan emin olun.',
   dbTargetStep5: '5. DBA Agent bu bağlantıları otomatik tanı ve performans izleme için kullanacaktır.',
   // SSH / OS Erişimi
   sshAccessOptional: 'SSH / OS Erişimi (Opsiyonel)',

@@ -396,7 +396,7 @@ export default {
   dbTargetStep1: '1. Add the database host, port, and credentials for each target database.',
   dbTargetStep2: '2. Test the connection to verify connectivity and credentials.',
   dbTargetStep3: '3. Mark one connection as "Primary" — DBA Agent will use it by default for monitoring.',
-  dbTargetStep4: '4. PostgreSQL and MySQL are supported. Ensure the user has read access to pg_stat views.',
+  dbTargetStep4: '4. PostgreSQL, MySQL, Oracle and MSSQL are supported. Ensure the user has read access to system views (pg_stat, v$session, DMVs).',
   dbTargetStep5: '5. DBA Agent will use these connections for automated diagnosis and performance monitoring.',
   // SSH / OS Access
   sshAccessOptional: 'SSH / OS Access (Optional)',

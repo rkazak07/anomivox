@@ -23,7 +23,7 @@
           <div v-for="(vs_item, vs_index) in item.vs_types" :key="vs_index" style="margin-right: 16px">
             <el-tag size="small" style="margin-bottom: 5px">{{ vs_item.vs_type }}</el-tag>
             <span style="color: var(--el-text-color-regular); margin: 0 2px">/</span>
-            <el-tag size="small" style="margin-bottom: 5px">{{vs_item.file_count}} files</el-tag>
+            <el-tag size="small" style="margin-bottom: 5px">{{vs_item.file_count}} {{ $t('kbFiles') }}</el-tag>
           </div>
         </div>
       </div>

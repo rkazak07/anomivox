@@ -1,0 +1,59 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+*.egg-info
+.eggs
+dist
+build
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+venv
+env
+
+# Node
+webui/node_modules
+webui_pages/reports/reports_ui/node_modules
+**/node_modules
+
+# Runtime / veri dosyaları (build'e dahil edilmez)
+chroma_db
+alert_results
+logs
+nltk_data
+knowledge_base/
+
+# IDE / OS
+.DS_Store
+.idea
+.vscode
+*.swp
+*.swo
+
+# Docker / CI
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+prometheus_service_docker
+
+# Dökümanlar
+*.md
+doc
+docs
+materials
+test_cases
+tests
+
+# Geçici
+tmp
+temp
+*.tmp
+*.bak

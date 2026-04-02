@@ -12,7 +12,7 @@
               <el-icon>
                 <Document/>
               </el-icon>
-              <span>Dataset</span>
+              <span>{{ $t('kbDataset') }}</span>
             </div>
             <div :class="`rowSC menu-item ${activeIndex === 'chat' ? ' active' : ''}`" @click="onMenuClick('chat')">
               <el-icon>
@@ -24,13 +24,13 @@
               <el-icon>
                 <Search/>
               </el-icon>
-              <span>Search Test</span>
+              <span>{{ $t('kbSearchTest') }}</span>
             </div>
             <div :class="`rowSC menu-item ${activeIndex === 'setting' ? ' active' : ''}`" @click="onMenuClick('setting')">
               <el-icon>
                 <Setting/>
               </el-icon>
-              <span>Settings</span>
+              <span>{{ $t('kbDetailSettings') }}</span>
             </div>
           </div>
         </div>
@@ -48,39 +48,36 @@
                 :auto-upload="false"
             >
               <template #trigger>
-                <el-button size="default" type="primary">Select File</el-button>
+                <el-button size="default" type="primary">{{ $t('kbSelectFile') }}</el-button>
               </template>
               <template #tip>
-                <div class="el-upload__tip">
-                  Limit 1 file, new file will cover the old file, Only HTML, MD, JSON, JSONL, CSV, PDF, PNG, JPG, JPEG, BMP, EML, MSG, EPUB, XLSX, XLSD, IPYNB,
-                  ODT, PY, RST, RTF, SRT, TOML, TSV, DOCX, DOC, XML, PPT, PPTX, TXT, HTM
-                </div>
+                <div class="el-upload__tip">{{ $t('kbFileUploadTip') }}</div>
               </template>
             </el-upload>
             <el-button size="default" type="success" @click="onUploadDocsClick">
-              UPLOAD
+              {{ $t('kbUploadBtn') }}
             </el-button>
           </div>
           <el-table :data="fileList.value" style="width: 100%; border-radius: 10px;" height="calc(100vh - 220px)">
             <el-table-column prop="No" label="No" width="60" align="center"/>
-            <el-table-column prop="file_name" label="File Name" header-align="center"/>
-            <el-table-column prop="docs_count" label="Data Count" width="120" align="center"/>
-            <el-table-column fixed="right" label="Operations" width="170" align="center">
+            <el-table-column prop="file_name" :label="$t('kbFileName')" header-align="center"/>
+            <el-table-column prop="docs_count" :label="$t('kbDataCount')" width="120" align="center"/>
+            <el-table-column fixed="right" :label="$t('kbOperations')" width="170" align="center">
               <template #default="scope">
-                <el-button text type="primary" size="small" @click="onHandleFileReviewClick(scope.row)">Review</el-button>
-                <el-button text type="primary" size="small" @click="onHandleFileDeleteClick(scope.row)">Delete</el-button>
+                <el-button text type="primary" size="small" @click="onHandleFileReviewClick(scope.row)">{{ $t('kbReview') }}</el-button>
+                <el-button text type="primary" size="small" @click="onHandleFileDeleteClick(scope.row)">{{ $t('delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
         </div>
         <div v-if="activeIndex === 'search'">
           <div class="rowBC" style="margin-bottom: 20px">
-            <el-input v-model="searchValue" :rows="2" type="textarea" placeholder="Search" style="width: calc(100% - 100px)"/>
-            <el-button :disabled="searchValue.value" type="primary" @click="onSearchClick">Search</el-button>
+            <el-input v-model="searchValue" :rows="2" type="textarea" :placeholder="$t('kbSearchPlaceholder')" style="width: calc(100% - 100px)"/>
+            <el-button :disabled="searchValue.value" type="primary" @click="onSearchClick">{{ $t('kbSearchBtn') }}</el-button>
           </div>
           <el-table :data="searchResult.value" style="width: 100%; border-radius: 10px;" height="calc(100vh - 140px)">
-            <el-table-column prop="page_content" label="page content" header-align="center"/>
-            <el-table-column prop="metadata.source" label="source" header-align="center"/>
+            <el-table-column prop="page_content" :label="$t('kbPageContent')" header-align="center"/>
+            <el-table-column prop="metadata.source" :label="$t('kbSource')" header-align="center"/>
           </el-table>
         </div>
         <div v-if="activeIndex === 'setting'">
@@ -89,23 +86,23 @@
 class="columnSS"
                  style="padding: 20px; border-radius: 10px; margin-top: 20px; width: calc(100% - 10px)">
               <div class="rowSC" style="width: 100%;">
-                <span style="color: var(--el-text-color-primary); width: 180px; text-align: left; font-size: 16px; flex-shrink: 0">Name</span>
+                <span style="color: var(--el-text-color-primary); width: 180px; text-align: left; font-size: 16px; flex-shrink: 0">{{ $t('kbDetailName') }}</span>
                 <span style="color: var(--el-text-color-regular);">{{ editForm.kb_name }}</span>
               </div>
 
               <div class="rowSC" style="width: 100%; margin-top: 20px;">
-                <span style="color: var(--el-text-color-primary); width: 180px; text-align: left; font-size: 16px; flex-shrink: 0">Brief Introduction</span>
+                <span style="color: var(--el-text-color-primary); width: 180px; text-align: left; font-size: 16px; flex-shrink: 0">{{ $t('kbDetailBriefIntro') }}</span>
                 <el-input v-model="editForm.kb_info" :rows="2" type="textarea"/>
               </div>
 
               <div class="rowSC" style="width: 100%; margin-top: 20px;">
-                <span style="color: var(--el-text-color-primary); width: 180px; text-align: left; font-size: 16px; flex-shrink: 0">Embedding Model</span>
+                <span style="color: var(--el-text-color-primary); width: 180px; text-align: left; font-size: 16px; flex-shrink: 0">{{ $t('kbDetailEmbeddingModel') }}</span>
                 <span style="color: var(--el-text-color-regular);">{{ editForm.embed_model }}</span>
               </div>
             </div>
 
             <div class="rowSC" style="margin-left: 20px; margin-top: 20px">
-              <el-button size="default" type="primary" @click="onHandleSaveClick">Save</el-button>
+              <el-button size="default" type="primary" @click="onHandleSaveClick">{{ $t('save') }}</el-button>
               <el-button style="margin-left: 10px" :icon="Delete" size="small" circle @click="onHandleDeleteClick" />
             </div>
 
@@ -148,8 +145,11 @@ import {knowledgeDeleteDocsReq, knowledgeFileDetailsReq, knowledgeFileSplitConte
 import { ElMessage, ElMessageBox, genFileId } from 'element-plus'
 import { reactive, ref } from 'vue'
 import type { UploadInstance, UploadProps, UploadRawFile } from 'element-plus'
+import {useI18n} from 'vue-i18n'
 
 import {Delete, Document, Search, Setting} from "@element-plus/icons-vue";
+
+const { t } = useI18n()
 
 const router = useRouter()
 
@@ -240,7 +240,7 @@ const deleteDocs = (fileName) => {
   knowledgeDeleteDocsReq(route.query.kb_name, fileName).then(() => {
     ElMessage({
       type: 'success',
-      message: 'Delete completed',
+      message: t('kbDeleteCompleted'),
     })
     getFileDetail()
   }).finally(() => {
@@ -252,7 +252,7 @@ const onHandleSaveClick = () => {
   knowledgeBaseUpdateInfoReq(route.query.kb_name, editForm.kb_info).then(() => {
     ElMessage({
       type: 'success',
-      message: 'Update completed',
+      message: t('kbUpdateCompleted'),
     })
   })
 }
@@ -269,11 +269,11 @@ const onSearchClick = () => {
 
 const onHandleDeleteClick = () => {
   ElMessageBox.confirm(
-      'Will delete the Knowledge Base. Continue?',
-      'Warning',
+      t('kbDeleteKbConfirm'),
+      t('warning'),
       {
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel',
+        confirmButtonText: t('delete'),
+        cancelButtonText: t('cancel'),
         type: 'warning',
       }
   )
@@ -281,7 +281,7 @@ const onHandleDeleteClick = () => {
         knowledgeBaseDeleteReq(route.query.kb_name).then(() => {
           ElMessage({
             type: 'success',
-            message: 'Delete completed',
+            message: t('kbDeleteCompleted'),
           })
           routerBack()
         })
@@ -296,7 +296,7 @@ const uploadFile = (files) => {
   knowledgeUploadDocsReq(route.query.kb_name, files.file).then(() => {
     ElMessage({
       type: 'success',
-      message: 'Upload Docs Completed',
+      message: t('kbUploadCompleted'),
     })
     getFileDetail()
   }).finally(() => {
@@ -318,11 +318,11 @@ const onHandleFileReviewClick = (file) => {
 
 const onHandleFileDeleteClick = (file) => {
   ElMessageBox.confirm(
-      'Will permanently delete the file. Continue?',
-      'Warning',
+      t('kbDeleteFileConfirm'),
+      t('warning'),
       {
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel',
+        confirmButtonText: t('delete'),
+        cancelButtonText: t('cancel'),
         type: 'warning',
       }
   )

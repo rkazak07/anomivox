@@ -258,6 +258,71 @@
       </div>
     </div>
 
+    <!-- ── Predictions Tab ── -->
+    <div class="dash-section" style="margin-top:24px">
+      <div class="dash-section-title">{{ $t('predictionTitle') }}</div>
+      <div class="prediction-controls" style="display:flex;gap:12px;margin-bottom:16px;align-items:center;">
+        <el-select v-model="predMetric" size="small" style="width:200px">
+          <el-option v-for="m in supportedMetrics" :key="m.name" :label="m.name" :value="m.name" />
+        </el-select>
+        <el-select v-model="predHorizon" size="small" style="width:100px">
+          <el-option :value="1" label="1h" />
+          <el-option :value="2" label="2h" />
+          <el-option :value="4" label="4h" />
+        </el-select>
+        <el-button size="small" type="primary" @click="runForecast" :loading="predLoading">
+          {{ $t('predictionForecast') }}
+        </el-button>
+      </div>
+
+      <div v-if="predResult">
+        <el-alert v-if="predResult.will_breach" type="warning" :closable="false" style="margin-bottom:12px">
+          {{ $t('predictionWillBreach') }} — {{ $t('predictionBreachAt') }}:
+          ~{{ predResult.breach_at_minutes }} {{ $t('dashboardMinutes') || 'min' }}
+        </el-alert>
+        <div class="pred-stats" style="display:flex;gap:16px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">{{ $t('predictionCurrentValue') }}</div>
+            <div class="kpi-value">{{ predResult.current_value?.toFixed(1) }}</div>
+          </div>
+          <div v-if="predResult.threshold" class="kpi-card">
+            <div class="kpi-label">{{ $t('predictionThreshold') }}</div>
+            <div class="kpi-value">{{ predResult.threshold }}</div>
+          </div>
+          <div v-if="predResult.forecast?.length" class="kpi-card">
+            <div class="kpi-label">{{ $t('predictionForecastValue') }}</div>
+            <div class="kpi-value">{{ predResult.forecast[predResult.forecast.length - 1]?.value?.toFixed(1) }}</div>
+          </div>
+        </div>
+        <!-- Simple forecast chart using SVG sparkline -->
+        <div class="pred-chart" style="background:var(--el-fill-color-extra-light);border-radius:8px;padding:12px;">
+          <div style="font-size:12px;color:var(--el-text-color-secondary);margin-bottom:6px;">
+            {{ $t('dashboardHistory') || 'History' }} + {{ $t('predictionForecast') }}
+          </div>
+          <svg :viewBox="`0 0 ${chartW} ${chartH}`" :width="chartW" :height="chartH" style="max-width:100%">
+            <!-- History line (blue) -->
+            <polyline v-if="historyPoints" :points="historyPoints"
+              fill="none" stroke="#409EFF" stroke-width="1.5" />
+            <!-- Forecast line (orange dashed) -->
+            <polyline v-if="forecastPoints" :points="forecastPoints"
+              fill="none" stroke="#E6A23C" stroke-width="1.5" stroke-dasharray="4,3" />
+            <!-- Threshold line (red) -->
+            <line v-if="predResult.threshold && thresholdY >= 0"
+              x1="0" :y1="thresholdY" :x2="chartW" :y2="thresholdY"
+              stroke="#F56C6C" stroke-width="1" stroke-dasharray="6,3" />
+          </svg>
+          <div style="font-size:11px;color:var(--el-text-color-secondary);margin-top:4px;display:flex;gap:12px;">
+            <span style="color:#409EFF">— {{ $t('dashboardHistory') || 'History' }}</span>
+            <span style="color:#E6A23C">-- {{ $t('predictionForecast') }}</span>
+            <span v-if="predResult.threshold" style="color:#F56C6C">— {{ $t('predictionThreshold') }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="!predLoading" style="color:var(--el-text-color-secondary);font-size:13px;">
+        {{ $t('predictionNoData') }}
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -268,6 +333,7 @@ import {
   TrendCharts, WarningFilled, Bell, Clock, CircleCheck
 } from '@element-plus/icons-vue'
 import { getDashboardOverview, getDashboardPipelineStatus } from '@/api/dashboard'
+import { getSupportedMetricsReq, getForecastReq } from '@/api/prediction'
 
 // ── State ────────────────────────────────────────────────
 const loading = ref(false)
@@ -373,10 +439,99 @@ let refreshTimer = null
 onMounted(() => {
   loadAll()
   refreshTimer = setInterval(loadAll, 60_000)
+  loadSupportedMetrics()
 })
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
 })
+
+// ── Prediction ───────────────────────────────────────────
+const predMetric = ref('cpu_usage')
+const predHorizon = ref(2)
+const predLoading = ref(false)
+const predResult = ref(null)
+const supportedMetrics = ref([])
+const chartW = 600
+const chartH = 120
+
+async function loadSupportedMetrics() {
+  try {
+    const res = await getSupportedMetricsReq()
+    supportedMetrics.value = res.data?.data || []
+    if (supportedMetrics.value.length && !predMetric.value) {
+      predMetric.value = supportedMetrics.value[0].name
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function runForecast() {
+  predLoading.value = true
+  predResult.value = null
+  try {
+    const res = await getForecastReq({ metric_name: predMetric.value, horizon_hours: predHorizon.value })
+    predResult.value = res.data?.data || null
+  } catch (e) {
+    predResult.value = null
+  } finally {
+    predLoading.value = false
+  }
+}
+
+const historyPoints = computed(() => {
+  if (!predResult.value?.history?.length) return ''
+  return _toSvgPoints(predResult.value.history, 0, predResult.value.history.length - 1)
+})
+
+const forecastPoints = computed(() => {
+  if (!predResult.value?.forecast?.length || !predResult.value?.history?.length) return ''
+  const hLen = predResult.value.history.length
+  const fLen = predResult.value.forecast.length
+  const totalLen = hLen + fLen
+  // Forecast starts where history ends
+  const allValues = [
+    ...predResult.value.history.map(p => p.value),
+    ...predResult.value.forecast.map(p => p.value),
+  ]
+  const min = Math.min(...allValues)
+  const max = Math.max(...allValues) || 1
+  const pts = predResult.value.forecast.map((p, i) => {
+    const x = ((hLen + i) / (totalLen - 1)) * chartW
+    const y = chartH - ((p.value - min) / (max - min)) * (chartH - 10) - 5
+    return `${x},${y}`
+  })
+  return pts.join(' ')
+})
+
+const thresholdY = computed(() => {
+  if (!predResult.value?.threshold) return -1
+  const allValues = [
+    ...(predResult.value.history?.map(p => p.value) || []),
+    ...(predResult.value.forecast?.map(p => p.value) || []),
+  ]
+  if (!allValues.length) return -1
+  const min = Math.min(...allValues)
+  const max = Math.max(...allValues) || 1
+  const t = predResult.value.threshold
+  return chartH - ((t - min) / (max - min)) * (chartH - 10) - 5
+})
+
+function _toSvgPoints(series, startIdx, endIdx) {
+  const allValues = [
+    ...(predResult.value.history?.map(p => p.value) || []),
+    ...(predResult.value.forecast?.map(p => p.value) || []),
+  ]
+  const hLen = predResult.value.history.length
+  const fLen = predResult.value.forecast?.length || 0
+  const totalLen = hLen + fLen
+  const min = Math.min(...allValues)
+  const max = Math.max(...allValues) || 1
+  const pts = series.slice(startIdx, endIdx + 1).map((p, i) => {
+    const x = (i / (totalLen - 1)) * chartW
+    const y = chartH - ((p.value - min) / (max - min)) * (chartH - 10) - 5
+    return `${x},${y}`
+  })
+  return pts.join(' ')
+}
 </script>
 
 <style scoped>

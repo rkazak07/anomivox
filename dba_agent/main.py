@@ -135,6 +135,31 @@ async def health_monitor():
     return monitor.stats
 
 
+@app.post("/api/maintenance/run")
+async def run_maintenance(body: dict):
+    """Zamanlanmış bakım görevi çalıştır (server scheduler tarafından çağrılır)."""
+    task_type = body.get('task_type', '')
+    db_target_name = body.get('db_target_name', '')
+    if not task_type or not db_target_name:
+        return {'success': False, 'output': 'task_type ve db_target_name zorunlu.'}
+    from dba_agent.scheduler.maintenance_executor import run_maintenance as _run
+    result = await _run(task_type=task_type, db_target_name=db_target_name)
+    # Audit log
+    try:
+        from dba_agent.security.audit import AuditLogger
+        AuditLogger().log(
+            action_type='scheduled_maintenance',
+            target=db_target_name,
+            command=task_type,
+            risk_level='low',
+            result='success' if result.get('success') else 'failed',
+            metadata={'output': result.get('output', '')[:500]},
+        )
+    except Exception:
+        pass
+    return result
+
+
 @app.post("/api/agent/monitor/start")
 async def monitor_start():
     """Proaktif izlemeyi başlat."""

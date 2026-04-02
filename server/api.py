@@ -64,6 +64,67 @@ def _run_db_migrations():
             conn.commit()
         except Exception:
             conn.rollback()
+        # v3: scheduled_task table (4.6)
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS scheduled_task (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    task_type VARCHAR(50) NOT NULL,
+                    db_target_name VARCHAR(100) NOT NULL,
+                    cron_expression VARCHAR(50) NOT NULL,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    risk_level VARCHAR(20) DEFAULT 'LOW',
+                    maintenance_window_start VARCHAR(5),
+                    maintenance_window_end VARCHAR(5),
+                    last_run_at TIMESTAMP,
+                    last_run_status VARCHAR(20),
+                    last_run_output TEXT,
+                    created_by INTEGER,
+                    create_time TIMESTAMP DEFAULT NOW(),
+                    update_time TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        # v4: tenant table + tenant_id columns (4.7)
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS tenant (
+                    id VARCHAR(36) PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    display_name VARCHAR(200),
+                    is_active BOOLEAN DEFAULT TRUE,
+                    create_time TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("""
+                INSERT INTO tenant (id, name, display_name)
+                VALUES ('00000000-0000-0000-0000-000000000001', 'default', 'Default Tenant')
+                ON CONFLICT DO NOTHING
+            """))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        try:
+            conn.execute(text("ALTER TABLE app_user ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(36) REFERENCES tenant(id) ON DELETE SET NULL"))
+            conn.execute(text("UPDATE app_user SET tenant_id = '00000000-0000-0000-0000-000000000001' WHERE tenant_id IS NULL"))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        try:
+            conn.execute(text("ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(36)"))
+            conn.execute(text("UPDATE knowledge_base SET tenant_id = '00000000-0000-0000-0000-000000000001' WHERE tenant_id IS NULL"))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        try:
+            conn.execute(text("ALTER TABLE conversation ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(36)"))
+            conn.execute(text("UPDATE conversation SET tenant_id = '00000000-0000-0000-0000-000000000001' WHERE tenant_id IS NULL"))
+            conn.commit()
+        except Exception:
+            conn.rollback()
 
 
 def create_app(run_mode: str = None):
@@ -76,6 +137,8 @@ def create_app(run_mode: str = None):
     # Apply any saved KB settings overrides from JSON
     from configs.kb_settings_config import load_kb_settings_on_startup
     load_kb_settings_on_startup()
+    from configs.model_settings_config import load_model_settings_on_startup
+    load_model_settings_on_startup()
 
     app = FastAPI(
         title="Datachat API Server",
@@ -135,8 +198,12 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
     mount_mail_routes(app)
     mount_telegram_alert_routes(app)
     mount_litellm_routes(app)
+    mount_llm_config_routes(app)
     mount_db_target_routes(app)
     mount_dashboard_routes(app)
+    mount_scheduler_routes(app)
+    mount_prediction_routes(app)
+    mount_tenant_routes(app)
 
     from server.utils import all_embed_models
 
@@ -392,6 +459,18 @@ def mount_kb_auto_ingest_routes(app: FastAPI):
             summary="Get auto-ingest statistics")(api_ingest_stats)
 
 
+def mount_llm_config_routes(app: FastAPI):
+    from server.model_config_api import api_get_llm_config, api_save_llm_config
+    app.get("/config/llm",
+            tags=["LLM Config"],
+            response_model=BaseResponse,
+            summary="LLM sağlayıcı ayarlarını getir")(api_get_llm_config)
+    app.post("/config/llm",
+             tags=["LLM Config"],
+             response_model=BaseResponse,
+             summary="LLM sağlayıcı ayarlarını kaydet")(api_save_llm_config)
+
+
 def mount_kb_settings_routes(app: FastAPI):
     from server.knowledge_base.kb_settings_api import (
         api_get_kb_settings,
@@ -538,6 +617,69 @@ def mount_filename_summary_routes(app: FastAPI):
              tags=["Knowledge kb_summary_api Management"],
              summary="Tek bilgi tabanı dosya özetini yeniden oluştur"
              )(recreate_summary_vector_store)
+
+
+def mount_scheduler_routes(app: FastAPI):
+    from server.scheduler.scheduler_api import (
+        api_list_tasks, api_create_task, api_update_task,
+        api_delete_task, api_run_task_now,
+    )
+    app.get("/scheduler/tasks", tags=["Scheduler"], response_model=BaseResponse,
+            summary="Zamanlanmış görevleri listele")(api_list_tasks)
+    app.post("/scheduler/tasks", tags=["Scheduler"], response_model=BaseResponse,
+             summary="Zamanlanmış görev oluştur")(api_create_task)
+    app.put("/scheduler/tasks", tags=["Scheduler"], response_model=BaseResponse,
+            summary="Zamanlanmış görev güncelle")(api_update_task)
+    app.post("/scheduler/tasks/delete", tags=["Scheduler"], response_model=BaseResponse,
+             summary="Zamanlanmış görev sil")(api_delete_task)
+    app.post("/scheduler/tasks/run", tags=["Scheduler"], response_model=BaseResponse,
+             summary="Görevi hemen çalıştır")(api_run_task_now)
+
+    @app.on_event("startup")
+    async def _start_scheduler():
+        from server.scheduler.scheduler_service import start_scheduler
+        try:
+            start_scheduler()
+        except Exception as e:
+            import logging
+            logging.getLogger("server.scheduler").error(f"Scheduler başlatma hatası: {e}")
+
+    @app.on_event("shutdown")
+    async def _stop_scheduler():
+        from server.scheduler.scheduler_service import stop_scheduler
+        try:
+            stop_scheduler()
+        except Exception:
+            pass
+
+
+def mount_prediction_routes(app: FastAPI):
+    from server.prediction_api import (
+        api_get_forecast, api_get_supported_metrics, api_run_alert_check,
+    )
+    app.post("/prediction/forecast", tags=["Prediction"], response_model=BaseResponse,
+             summary="Metrik tahmini")(api_get_forecast)
+    app.get("/prediction/metrics", tags=["Prediction"], response_model=BaseResponse,
+            summary="Desteklenen metrikler")(api_get_supported_metrics)
+    app.post("/prediction/alerts/check", tags=["Prediction"], response_model=BaseResponse,
+             summary="Tahmine dayalı alert kontrolü")(api_run_alert_check)
+
+
+def mount_tenant_routes(app: FastAPI):
+    from server.auth.tenant_api import (
+        api_list_tenants, api_create_tenant, api_delete_tenant,
+        api_assign_user_to_tenant, api_list_tenant_users,
+    )
+    app.get("/auth/tenants", tags=["Auth"], response_model=BaseResponse,
+            summary="Tenant listesi (admin)")(api_list_tenants)
+    app.post("/auth/tenants", tags=["Auth"], response_model=BaseResponse,
+             summary="Tenant oluştur (admin)")(api_create_tenant)
+    app.post("/auth/tenants/delete", tags=["Auth"], response_model=BaseResponse,
+             summary="Tenant sil (admin)")(api_delete_tenant)
+    app.post("/auth/tenants/assign", tags=["Auth"], response_model=BaseResponse,
+             summary="Kullanıcıyı tenant'a ata (admin)")(api_assign_user_to_tenant)
+    app.get("/auth/tenants/{tenant_id}/users", tags=["Auth"], response_model=BaseResponse,
+            summary="Tenant kullanıcıları (admin)")(api_list_tenant_users)
 
 
 def run_api(host, port, **kwargs):

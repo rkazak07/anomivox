@@ -103,6 +103,18 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/scheduler',
+    component: Layout,
+    children: [
+      {
+        path: '/scheduler',
+        name: 'Scheduler',
+        component: () => import('@/views/scheduler/index.vue'),
+        meta: { title: 'Scheduler', elSvgIcon: 'Clock' }
+      }
+    ]
+  },
+  {
     path: '/settings',
     component: Layout,
     children: [

@@ -7,7 +7,8 @@ from multiagents.agents import agent_registry
 from multiagents.agents.base import BaseAgent
 from multiagents.prompt_templates.report_prompts import (
     ANOMALY_DESC_PROMPT, ANOMALY_TITLE_PROMPT,
-    ANOMALY_DESC_PROMPT_zh, ANOMALY_TITLE_PROMPT_zh
+    ANOMALY_DESC_PROMPT_zh, ANOMALY_TITLE_PROMPT_zh,
+    ANOMALY_DESC_PROMPT_tr, ANOMALY_TITLE_PROMPT_tr,
 )
 from multiagents.utils.interact import add_display_message
 
@@ -34,6 +35,9 @@ class ReporterAgent(BaseAgent):
         if self.language == 'zh':
             self.anomaly_desc_prompt = ANOMALY_DESC_PROMPT_zh
             self.anomaly_title_prompt = ANOMALY_TITLE_PROMPT_zh
+        elif self.language == 'tr':
+            self.anomaly_desc_prompt = ANOMALY_DESC_PROMPT_tr
+            self.anomaly_title_prompt = ANOMALY_TITLE_PROMPT_tr
 
         seconds = int(self.start_time)
         start_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(seconds))
@@ -85,6 +89,8 @@ class ReporterAgent(BaseAgent):
     def update_diagnosis(self):
         if self.language == 'zh':
             prompt = f'''You are writing a fault diagnosis report and need to provide the final root cause analysis. Please refer to the review suggestions above and the following root cause analysis:\n{self.report["root cause"]} \nNote:\n1. Output must be in markdown format, but do not say things like "this is markdown format".\n2. Only provide root cause analysis, do not mention anything related to solutions.\n'''
+        elif self.language == 'tr':
+            prompt = f'''Bir arıza tanı raporu yazıyorsun. Yukarıdaki değerlendirme tavsiyelerine ve aşağıdaki kök neden analizine dayanarak nihai kök neden analizini Türkçe olarak ver:\n{self.report["root cause"]} \nNot:\n1. Çıktı markdown formatında olmalı.\n2. Yalnızca kök neden analizi yaz, çözümlerden bahsetme.\n3. Yanıtını Türkçe yaz.\n'''
         else:
             prompt = "You are writing a report. Please give the refined root cause analysis based on the above review advice. The root cause analysis is as follows:\n" + self.report["root cause"] + "\n ===== \n Note 1. the output should be in markdown format.\n2. do not any additional content like 'Sure' and 'I will refine the anomaly diagnosis description based on the above advice. 3. Do not add anything about solutions!!!'\n"
 
@@ -121,6 +127,8 @@ class ReporterAgent(BaseAgent):
 
         if self.language == 'zh':
             prompt = f"""The following is a root cause analysis process:\n{self.report["root cause"]}\nThe following are labels for some root causes listed:\n{labels}\nBased on the description of the root cause analysis process, select the corresponding labels.\nNote:\n1. Output must be in list format, do not add any extra content.\n2. Output should strictly exclude labels not mentioned in the root cause analysis.\n3. If there are no relevant labels, return None.\n"""
+        elif self.language == 'tr':
+            prompt = f"""Aşağıdaki kök neden analizi sürecine dayanarak uygun etiketleri seç:\n{self.report["root cause"]}\n\nKullanılabilir etiketler:\n{labels}\nNot:\n1. Çıktı liste formatında olmalı.\n2. Kök neden analizinde geçmeyen etiketler dahil edilmemeli.\n3. İlgili etiket yoksa None döndür."""
         else:
             prompt = "Based on the description\n" + self.report["root cause"] + "\n\n Output all the labels mentioned in the description. The available labels are  \n" + str(labels) + "===== \n Note 1. the output should be in list format. And do not output any additional information (output \"None\" if no label mentioned in the description)\n2. the output should strictly exclude labels not mentioned in the description."
 
@@ -140,6 +148,8 @@ class ReporterAgent(BaseAgent):
     def update_solutions(self):
         if self.language == 'zh':
             prompt = f"""You are writing a fault diagnosis report and need to provide the final solution. Please refer to the review suggestions above and the following solutions:\n{self.report["solutions"]} \nNote:\n1. Output must be in markdown format, but do not say things like "this is markdown format".\n2. Only provide solutions, do not mention anything related to root cause analysis.\n"""
+        elif self.language == 'tr':
+            prompt = f"""Bir arıza tanı raporu yazıyorsun. Yukarıdaki değerlendirme tavsiyelerine ve aşağıdaki çözümlere dayanarak nihai çözümleri Türkçe olarak ver:\n{self.report["solutions"]} \nNot:\n1. Çıktı markdown formatında olmalı.\n2. Yalnızca çözümleri yaz, kök neden analizinden bahsetme.\n3. Yanıtını Türkçe yaz.\n"""
         else:
             prompt = "You are writing a report. Please optimize the following solutions based on the above review advice. The solutions are:\n" + self.report["solutions"] + "\n ===== \n Note 1. the output should be in markdown format.\n2. do not any additional content like 'Sure' and 'I will refine the solutions based on the above advice'. 3. Do not add anything about root causes!!!\n"
 

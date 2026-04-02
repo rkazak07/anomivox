@@ -18,7 +18,7 @@ import importlib
 if TYPE_CHECKING:
     from agents import BaseAgent
 
-LANGUAGE = "en"
+LANGUAGE = os.environ.get("DBA_AGENT_LANGUAGE", "en")
 
 def load_llm(llm_config: Dict):
     llm_type = llm_config.pop("llm_type", "xxxx")

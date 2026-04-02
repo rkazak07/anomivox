@@ -73,6 +73,7 @@ services:
       - ./configs:/app/configs
       - logs_data:/app/logs
       - ./webui/src:/app/webui/src
+      - ./webui/public:/app/webui/public
       - ./webui_pages:/app/webui_pages
       - ./webui.py:/app/webui.py
     networks:

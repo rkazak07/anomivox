@@ -44,7 +44,7 @@
             style="width: 100%"
             :empty-text="$t('noData')"
           >
-            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="id" :label="$t('id')" width="80" />
             <el-table-column prop="username" :label="$t('username')" min-width="150">
               <template #default="{ row }">
                 <div class="rowSC">
@@ -53,14 +53,14 @@
                     <User v-else />
                   </el-icon>
                   <span>{{ row.username }}</span>
-                  <el-tag v-if="row.role === 'admin'" size="small" type="warning" style="margin-left: 8px">Admin</el-tag>
+                  <el-tag v-if="row.role === 'admin'" size="small" type="warning" style="margin-left: 8px">{{ $t('admin') }}</el-tag>
                 </div>
               </template>
             </el-table-column>
             <el-table-column :label="$t('role')" width="100">
               <template #default="{ row }">
                 <el-tag :type="row.role === 'admin' ? 'warning' : 'info'" size="small">
-                  {{ row.role === 'admin' ? 'Admin' : 'User' }}
+                  {{ row.role === 'admin' ? $t('admin') : $t('userRole') }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -152,7 +152,7 @@
                 <div v-show="innerSections.models" class="inner-card-body">
 
                   <!-- Mevcut modeller tablosu -->
-                  <el-table :data="litellmModels" stripe size="small" style="margin-bottom: 16px;" empty-text="Henüz model eklenmemiş">
+                  <el-table :data="litellmModels" stripe size="small" style="margin-bottom: 16px;" :empty-text="$t('noData')">
                     <el-table-column prop="model_name" :label="$t('litellmModelName')" min-width="140" />
                     <el-table-column prop="litellm_model" :label="$t('litellmModelId')" min-width="180" />
                     <el-table-column prop="api_base" :label="$t('litellmApiBase')" min-width="200">
@@ -191,7 +191,7 @@
                     <div style="font-size: 13px; color: var(--el-text-color-secondary);">
                       <strong>{{ $t('litellmModelName') }}:</strong> {{ testResult.model }}<br>
                       <strong>{{ $t('litellmResponse') }}:</strong> {{ testResult.response?.substring(0, 200) }}<br>
-                      <strong>Tokens:</strong> {{ testResult.tokens }} (prompt: {{ testResult.prompt_tokens }}, completion: {{ testResult.completion_tokens }})
+                      <strong>{{ $t('litellmTokens') }}:</strong> {{ testResult.tokens }} (prompt: {{ testResult.prompt_tokens }}, completion: {{ testResult.completion_tokens }})
                     </div>
                   </div>
 
@@ -229,17 +229,17 @@
                   </el-row>
                   <el-row :gutter="16">
                     <el-col :span="4">
-                      <el-form-item label="Timeout (s)">
+                      <el-form-item :label="$t('litellmModelTimeout')">
                         <el-input-number v-model="newModel.timeout" :min="30" :max="600" :step="30" style="width: 100%" controls-position="right" />
                       </el-form-item>
                     </el-col>
                     <el-col :span="4">
-                      <el-form-item label="Context (num_ctx)">
+                      <el-form-item :label="$t('litellmModelContextWindow')">
                         <el-input-number v-model="newModel.num_ctx" :min="256" :max="32768" :step="512" style="width: 100%" controls-position="right" />
                       </el-form-item>
                     </el-col>
                     <el-col :span="4">
-                      <el-form-item label="Max Output">
+                      <el-form-item :label="$t('litellmModelMaxOutput')">
                         <el-input-number v-model="newModel.num_predict" :min="32" :max="4096" :step="64" style="width: 100%" controls-position="right" />
                       </el-form-item>
                     </el-col>
@@ -327,13 +327,13 @@
                       </template>
                     </el-table-column>
                     <el-table-column prop="user" :label="$t('username')" width="100" />
-                    <el-table-column :label="'SSL'" width="70" align="center">
+                    <el-table-column :label="$t('ssl')" width="70" align="center">
                       <template #default="{ row }">
                         <el-tag v-if="row.ssl_enabled" type="success" size="small" effect="plain">🔒</el-tag>
                         <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">—</span>
                       </template>
                     </el-table-column>
-                    <el-table-column :label="'SSH'" width="70" align="center">
+                    <el-table-column :label="$t('ssh')" width="70" align="center">
                       <template #default="{ row }">
                         <template v-if="row.ssh_enabled">
                           <el-tag v-if="row.ssh_last_status === 'ok'" type="success" size="small" effect="plain">🖥 ✓</el-tag>
@@ -356,7 +356,7 @@
                           {{ $t('testConnection') }}
                         </el-button>
                         <el-button v-if="row.ssh_enabled" size="small" type="info" link :loading="testingSshTarget === row.id" @click="onTestSshTarget(row.id)">
-                          SSH Test
+                          {{ $t('sshTest') }}
                         </el-button>
                         <el-button size="small" type="default" link @click="onEditDbTarget(row)">
                           {{ $t('edit') }}
@@ -375,10 +375,10 @@
                   <div v-if="dbTestResult" style="background: var(--el-fill-color-light); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
                     <div style="font-weight: 500; margin-bottom: 6px;">🧪 {{ $t('dbTargetTestResult') }}:</div>
                     <div style="font-size: 13px; color: var(--el-text-color-secondary);">
-                      <strong>Version:</strong> {{ dbTestResult.version }}<br>
-                      <strong>Database:</strong> {{ dbTestResult.database }}<br>
-                      <strong>User:</strong> {{ dbTestResult.user }}
-                      <template v-if="dbTestResult.size"><br><strong>Size:</strong> {{ dbTestResult.size }}</template>
+                      <strong>{{ $t('dbTestVersion') }}:</strong> {{ dbTestResult.version }}<br>
+                      <strong>{{ $t('dbTestDatabase') }}:</strong> {{ dbTestResult.database }}<br>
+                      <strong>{{ $t('dbTestUser') }}:</strong> {{ dbTestResult.user }}
+                      <template v-if="dbTestResult.size"><br><strong>{{ $t('dbTestSize') }}:</strong> {{ dbTestResult.size }}</template>
                     </div>
                   </div>
 
@@ -1136,7 +1136,7 @@
             {{ kbSettingsConfig.default_vs_type }}
           </el-tag>
           <el-tag :type="autoIngestConfig.enabled ? 'success' : 'info'" size="small" effect="plain" round style="margin-left: 4px;">
-            Auto-Ingest {{ autoIngestConfig.enabled ? 'ON' : 'OFF' }}
+            Auto-Ingest {{ autoIngestConfig.enabled ? $t('autoIngestOn') : $t('autoIngestOff') }}
           </el-tag>
           <div class="collapse-chevron" :class="{ rotated: sections.knowledgeBase }">
             <el-icon :size="18"><ArrowDown /></el-icon>
@@ -1454,38 +1454,255 @@
       </Transition>
     </div>
 
-    <!-- Change My Password (visible to all users) -->
-    <div class="collapse-card" :class="{ open: sections.myPassword }">
-      <div class="collapse-card-header" @click="toggleSection('myPassword')">
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- SECTION 5 — LLM Provider Settings                        -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.llmProvider }">
+      <div class="collapse-card-header" @click="toggleSection('llmProvider')">
         <div class="collapse-card-title">
-          <div class="collapse-card-icon" style="background: linear-gradient(135deg,#667eea,#764ba2);">
-            <el-icon :size="20"><Lock /></el-icon>
+          <div class="collapse-card-icon" style="background: linear-gradient(135deg,#f093fb,#f5576c);">
+            <span style="font-size: 20px;">🔑</span>
           </div>
           <div>
-            <h3>{{ $t('changeMyPassword') }}</h3>
-            <span class="collapse-card-subtitle">{{ $t('changeMyPasswordDesc') }}</span>
+            <h3>{{ $t('llmProviderSettings') }}</h3>
+            <span class="collapse-card-subtitle">{{ $t('llmActiveModel') }}: {{ llmConfig.llm_models?.join(', ') || '—' }}</span>
           </div>
         </div>
-        <div class="collapse-chevron" :class="{ rotated: sections.myPassword }">
-          <el-icon :size="18"><ArrowDown /></el-icon>
+        <div class="collapse-card-right">
+          <el-tag type="info" size="default" effect="plain" round>
+            T={{ llmConfig.temperature }}
+          </el-tag>
+          <div class="collapse-chevron" :class="{ rotated: sections.llmProvider }">
+            <el-icon :size="18"><ArrowDown /></el-icon>
+          </div>
         </div>
       </div>
       <Transition name="collapse-body">
-        <div v-show="sections.myPassword" class="collapse-card-body">
-          <el-form ref="refMyPasswordForm" :model="myPasswordForm" :rules="myPasswordRules" label-position="top" style="max-width: 500px;">
-            <el-form-item :label="$t('currentPassword')" prop="currentPassword">
-              <el-input v-model="myPasswordForm.currentPassword" type="password" show-password :placeholder="$t('pleaseInputCurrentPassword')" />
-            </el-form-item>
-            <el-form-item :label="$t('newPassword')" prop="newPassword">
-              <el-input v-model="myPasswordForm.newPassword" type="password" show-password :placeholder="$t('pleaseInputNewPassword')" />
-            </el-form-item>
-            <el-form-item :label="$t('confirmPassword')" prop="confirmPassword">
-              <el-input v-model="myPasswordForm.confirmPassword" type="password" show-password :placeholder="$t('pleaseConfirmPassword')" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="myPasswordLoading" @click="onSubmitMyPassword">{{ $t('save') }}</el-button>
-            </el-form-item>
+        <div v-show="sections.llmProvider" class="collapse-card-body">
+          <el-form label-position="top" v-loading="llmConfigLoading">
+
+            <!-- ═══ Active Model & Global Settings ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('llmGlobal')">
+                <span>⚙️ {{ $t('llmGlobalSettings') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.llmGlobal }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.llmGlobal" class="inner-card-body">
+                  <el-row :gutter="20">
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmActiveModel')">
+                        <el-select v-model="llmConfig.llm_models[0]" style="width: 100%">
+                          <el-option v-for="(_, key) in llmConfig.online_llm_model" :key="key" :label="key" :value="key" />
+                        </el-select>
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('llmTemperature')">
+                        <el-input-number v-model="llmConfig.temperature" :min="0" :max="2" :step="0.05" :precision="2" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="5">
+                      <el-form-item :label="$t('llmMaxTokens')">
+                        <el-input-number v-model="llmConfig.max_tokens" :min="0" :max="128000" :step="256" style="width: 100%" controls-position="right" :placeholder="$t('llmMaxTokens')" />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('llmHistoryLen')">
+                        <el-input-number v-model="llmConfig.history_len" :min="0" :max="20" :step="1" style="width: 100%" controls-position="right" />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- ═══ Provider Configuration ═══ -->
+            <div class="inner-card">
+              <div class="inner-card-header" @click="toggleInner('llmProviders')">
+                <span>🏢 {{ $t('llmProviderConfig') }}</span>
+                <div class="collapse-chevron small" :class="{ rotated: innerSections.llmProviders }">
+                  <el-icon :size="14"><ArrowDown /></el-icon>
+                </div>
+              </div>
+              <Transition name="collapse-body">
+                <div v-show="innerSections.llmProviders" class="inner-card-body">
+
+                  <!-- Groq -->
+                  <el-divider content-position="left"><strong>{{ $t('llmProviderGroq') }}</strong></el-divider>
+                  <el-row :gutter="16">
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmModelName')">
+                        <el-input v-model="llmConfig.online_llm_model['groq-api'].model_name" placeholder="llama-3.3-70b-versatile" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmApiBaseUrl')">
+                        <el-input v-model="llmConfig.online_llm_model['groq-api'].api_base_url" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmApiKey')">
+                        <el-input v-model="llmConfig.online_llm_model['groq-api'].api_key" type="password" show-password placeholder="gsk_..." clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- OpenAI -->
+                  <el-divider content-position="left"><strong>{{ $t('llmProviderOpenAI') }}</strong></el-divider>
+                  <el-row :gutter="16">
+                    <el-col :span="7">
+                      <el-form-item :label="$t('llmModelName')">
+                        <el-input v-model="llmConfig.online_llm_model['openai-api'].model_name" placeholder="gpt-4o" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="7">
+                      <el-form-item :label="$t('llmApiBaseUrl')">
+                        <el-input v-model="llmConfig.online_llm_model['openai-api'].api_base_url" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-form-item :label="$t('llmApiKey')">
+                        <el-input v-model="llmConfig.online_llm_model['openai-api'].api_key" type="password" show-password placeholder="sk-..." clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="4">
+                      <el-form-item :label="$t('llmOpenAIProxy')">
+                        <el-input v-model="llmConfig.online_llm_model['openai-api'].openai_proxy" clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- Gemini -->
+                  <el-divider content-position="left"><strong>{{ $t('llmProviderGemini') }}</strong></el-divider>
+                  <el-row :gutter="16">
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmModelName')">
+                        <el-input v-model="llmConfig.online_llm_model['gemini-api'].model_name" placeholder="gemini-2.0-flash" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmApiBaseUrl')">
+                        <el-input v-model="llmConfig.online_llm_model['gemini-api'].api_base_url" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmApiKey')">
+                        <el-input v-model="llmConfig.online_llm_model['gemini-api'].api_key" type="password" show-password placeholder="AIza..." clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                  <!-- Custom / vLLM -->
+                  <el-divider content-position="left"><strong>{{ $t('llmProviderCustom') }}</strong></el-divider>
+                  <el-row :gutter="16">
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmModelName')">
+                        <el-input v-model="llmConfig.online_llm_model['qwen1.5-vllm'].model_name" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmApiBaseUrl')">
+                        <el-input v-model="llmConfig.online_llm_model['qwen1.5-vllm'].api_base_url" placeholder="http://127.0.0.1:8000/v1" clearable />
+                      </el-form-item>
+                    </el-col>
+                    <el-col :span="8">
+                      <el-form-item :label="$t('llmApiKey')">
+                        <el-input v-model="llmConfig.online_llm_model['qwen1.5-vllm'].api_key" clearable />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+
+                </div>
+              </Transition>
+            </div>
+
+            <!-- Save button -->
+            <div class="telegram-actions">
+              <el-button type="primary" :loading="savingLlmConfig" @click="onSaveLlmConfig">
+                <el-icon style="margin-right: 6px;"><Check /></el-icon>
+                {{ $t('save') }}
+              </el-button>
+            </div>
+
           </el-form>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- Tenant Management (admin only) -->
+    <div v-if="isAdmin" class="collapse-card" :class="{ open: sections.tenantMgmt }">
+      <div class="collapse-card-header" @click="toggleSection('tenantMgmt')">
+        <div class="collapse-card-title">
+          <div class="collapse-card-icon" style="background: linear-gradient(135deg,#11998e,#38ef7d);">
+            <el-icon size="20"><OfficeBuilding /></el-icon>
+          </div>
+          <div>
+            <h3>{{ $t('tenantManagement') }}</h3>
+          </div>
+        </div>
+        <div class="collapse-chevron" :class="{ rotated: sections.tenantMgmt }">
+          <el-icon><ArrowDown /></el-icon>
+        </div>
+      </div>
+      <Transition name="collapse">
+        <div v-show="sections.tenantMgmt" class="collapse-card-body">
+          <div class="section-row">
+            <el-button type="primary" size="small" @click="showTenantCreate = true">
+              + {{ $t('tenantCreate') }}
+            </el-button>
+          </div>
+          <el-table :data="tenants" border stripe size="small" style="margin-top:12px">
+            <el-table-column prop="name" :label="$t('tenantName')" />
+            <el-table-column prop="display_name" :label="$t('tenantDisplayName')" />
+            <el-table-column :label="$t('operations')" width="160">
+              <template #default="{ row }">
+                <el-button size="small" @click="openTenantUsers(row)">{{ $t('tenantUsers') }}</el-button>
+                <el-button size="small" type="danger"
+                  :disabled="row.id === '00000000-0000-0000-0000-000000000001'"
+                  @click="onDeleteTenant(row)">{{ $t('delete') }}</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- Create Tenant Dialog -->
+          <el-dialog v-model="showTenantCreate" :title="$t('tenantCreate')" width="400px" destroy-on-close>
+            <el-form :model="tenantForm" label-width="120px">
+              <el-form-item :label="$t('tenantName')">
+                <el-input v-model="tenantForm.name" />
+              </el-form-item>
+              <el-form-item :label="$t('tenantDisplayName')">
+                <el-input v-model="tenantForm.display_name" />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="showTenantCreate = false">{{ $t('cancel') }}</el-button>
+              <el-button type="primary" @click="onCreateTenant">{{ $t('save') }}</el-button>
+            </template>
+          </el-dialog>
+
+          <!-- Tenant Users Dialog -->
+          <el-dialog v-model="showTenantUsers" :title="$t('tenantUsers')" width="500px" destroy-on-close>
+            <div style="margin-bottom:12px">
+              <el-select v-model="tenantAssignUserId" :placeholder="$t('tenantSelectUser')" style="width:200px">
+                <el-option v-for="u in users" :key="u.id" :label="u.username" :value="u.id" />
+              </el-select>
+              <el-button type="primary" style="margin-left:8px" @click="onAssignUser">{{ $t('tenantAssignUser') }}</el-button>
+            </div>
+            <el-table :data="tenantUsers" border size="small">
+              <el-table-column prop="username" label="Username" />
+              <el-table-column prop="role" label="Role" width="80" />
+              <el-table-column prop="is_active" label="Active" width="70">
+                <template #default="{ row }">
+                  <el-tag :type="row.is_active ? 'success' : 'danger'" size="small">
+                    {{ row.is_active ? $t('autoIngestOn') : $t('autoIngestOff') }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-dialog>
         </div>
       </Transition>
     </div>
@@ -1685,11 +1902,11 @@
         </el-form-item>
         <el-form-item :label="$t('role')" prop="role">
           <el-select v-model="createForm.role" style="width: 100%">
-            <el-option label="User" value="user" />
-            <el-option label="Admin" value="admin" />
+            <el-option :label="$t('userRole')" value="user" />
+            <el-option :label="$t('admin')" value="admin" />
           </el-select>
         </el-form-item>
-        <el-form-item label="E-posta" prop="email">
+        <el-form-item :label="$t('email')" prop="email">
           <el-input v-model="createForm.email" type="email" :placeholder="$t('pleaseInputEmail')" />
         </el-form-item>
       </el-form>
@@ -1731,6 +1948,8 @@ import { getMailConfigReq, saveMailConfigReq, testMailReq } from '@/api/mail'
 import { getTelegramAlertConfigReq, saveTelegramAlertConfigReq, testTelegramAlertReq, telegramGetChatIdReq } from '@/api/telegram'
 import { listDbTargetsReq, addDbTargetReq, updateDbTargetReq, deleteDbTargetReq, testDbTargetReq, testSshTargetReq, setPrimaryDbTargetReq } from '@/api/dbTargets'
 import { getAutoIngestConfigReq, saveAutoIngestConfigReq, manualIngestReq, getAutoIngestStatsReq, getKbSettingsReq, saveKbSettingsReq } from '@/api/knowledge'
+import { getLlmConfigReq, saveLlmConfigReq } from '@/api/modelConfig'
+import { listTenantsReq, createTenantReq, deleteTenantReq, assignUserToTenantReq, listTenantUsersReq } from '@/api/tenant'
 import { useI18n } from 'vue-i18n'
 
 const { t: $t } = useI18n()
@@ -1750,7 +1969,8 @@ const sections = reactive({
   litellm: true,
   notifications: false,
   knowledgeBase: false,
-  myPassword: false,
+  llmProvider: false,
+  tenantMgmt: false,
 })
 const innerSections = reactive({
   models: true,
@@ -1773,6 +1993,8 @@ const innerSections = reactive({
   kbSettingsDocProcessing: true,
   kbSettingsSearchParams: false,
   kbSettingsGuide: false,
+  llmGlobal: true,
+  llmProviders: true,
 })
 const toggleSection = (key) => { sections[key] = !sections[key] }
 const toggleInner = (key) => { innerSections[key] = !innerSections[key] }
@@ -1805,6 +2027,8 @@ onMounted(() => {
     fetchAutoIngestConfig()
     fetchAutoIngestStats()
     fetchKbSettings()
+    fetchLlmConfig()
+    fetchTenants()
   }
 })
 
@@ -1962,10 +2186,10 @@ const onSaveLitellmSettings = async () => {
     if (res.code === 200) {
       ElMessage.success($t('saveSuccess'))
     } else {
-      ElMessage.error(res.msg || 'Error')
+      ElMessage.error(res.msg || $t('error'))
     }
   } catch (e) {
-    ElMessage.error('Error saving settings')
+    ElMessage.error($t('errorSavingSettings'))
   } finally {
     savingLitellm.value = false
   }
@@ -2045,10 +2269,10 @@ const onSaveMail = async () => {
       ElMessage.success($t('saveSuccess'))
       fetchMailConfig()
     } else {
-      ElMessage.error(res.msg || 'Error')
+      ElMessage.error(res.msg || $t('error'))
     }
   } catch (e) {
-    ElMessage.error(e?.msg || 'Error')
+    ElMessage.error(e?.msg || $t('error'))
   } finally {
     savingMail.value = false
   }
@@ -2161,10 +2385,10 @@ const onSaveTelegram = async () => {
       ElMessage.success($t('saveSuccess'))
       fetchTelegramConfig()
     } else {
-      ElMessage.error(res.msg || 'Error')
+      ElMessage.error(res.msg || $t('error'))
     }
   } catch (e) {
-    ElMessage.error(e?.msg || 'Error')
+    ElMessage.error(e?.msg || $t('error'))
   } finally {
     savingTelegram.value = false
   }
@@ -2197,7 +2421,7 @@ const onFindChatId = async () => {
         ElMessage.warning($t('telegramNoChatFound'))
       }
     } else {
-      ElMessage.error(res.msg || 'Error')
+      ElMessage.error(res.msg || $t('error'))
     }
   } catch (e) {
     ElMessage.error('Error finding chat ID')
@@ -2360,10 +2584,10 @@ const onAddDbTarget = async () => {
       newDbTarget.ssh_key_passphrase = ''
       fetchDbTargets()
     } else {
-      ElMessage.error(res.msg || 'Error')
+      ElMessage.error(res.msg || $t('error'))
     }
   } catch (e) {
-    ElMessage.error(e?.msg || 'Error')
+    ElMessage.error(e?.msg || $t('error'))
   } finally {
     addingDbTarget.value = false
   }
@@ -2384,7 +2608,7 @@ const onDeleteDbTarget = (row) => {
         ElMessage.error(res.msg)
       }
     } catch (e) {
-      ElMessage.error(e?.msg || 'Error')
+      ElMessage.error(e?.msg || $t('error'))
     }
   }).catch(() => {})
 }
@@ -2418,7 +2642,7 @@ const onSetPrimaryDb = async (id) => {
       ElMessage.error(res.msg)
     }
   } catch (e) {
-    ElMessage.error(e?.msg || 'Error')
+    ElMessage.error(e?.msg || $t('error'))
   }
 }
 
@@ -2511,10 +2735,10 @@ const onSaveEditDbTarget = async () => {
       showEditDbDialog.value = false
       fetchDbTargets()
     } else {
-      ElMessage.error(res.msg || 'Error')
+      ElMessage.error(res.msg || $t('error'))
     }
   } catch (e) {
-    ElMessage.error(e?.msg || 'Error')
+    ElMessage.error(e?.msg || $t('error'))
   } finally {
     savingEditDb.value = false
   }
@@ -2586,10 +2810,10 @@ const onSaveAutoIngest = async () => {
     if (res.code === 200) {
       ElMessage.success($t('saveSuccess'))
     } else {
-      ElMessage.error(res.msg || 'Error')
+      ElMessage.error(res.msg || $t('error'))
     }
   } catch (e) {
-    ElMessage.error(e?.msg || 'Error')
+    ElMessage.error(e?.msg || $t('error'))
   } finally {
     savingAutoIngest.value = false
   }
@@ -2778,7 +3002,7 @@ const onCreateUser = () => {
         ElMessage.error(res.msg)
       }
     } catch (e) {
-      ElMessage.error(e?.msg || 'Error')
+      ElMessage.error(e?.msg || $t('error'))
     } finally {
       createLoading.value = false
     }
@@ -2796,7 +3020,7 @@ const onToggleUser = async (row) => {
       ElMessage.error(res.msg)
     }
   } catch (e) {
-    ElMessage.error(e?.msg || 'Error')
+    ElMessage.error(e?.msg || $t('error'))
   }
 }
 
@@ -2816,7 +3040,7 @@ const onDeleteUser = (row) => {
         ElMessage.error(res.msg)
       }
     } catch (e) {
-      ElMessage.error(e?.msg || 'Error')
+      ElMessage.error(e?.msg || $t('error'))
     }
   }).catch(() => {})
 }
@@ -2870,7 +3094,7 @@ const onSubmitPassword = () => {
         ElMessage.error(res.msg)
       }
     } catch (e) {
-      ElMessage.error(e?.msg || 'Error')
+      ElMessage.error(e?.msg || $t('error'))
     } finally {
       passwordLoading.value = false
     }
@@ -2917,11 +3141,140 @@ const onSubmitMyPassword = () => {
         ElMessage.error(res.msg)
       }
     } catch (e) {
-      ElMessage.error(e?.msg || 'Error')
+      ElMessage.error(e?.msg || $t('error'))
     } finally {
       myPasswordLoading.value = false
     }
   })
+}
+
+// ========== LLM Provider Config ==========
+const llmConfigLoading = ref(false)
+const savingLlmConfig = ref(false)
+const llmConfig = reactive({
+  llm_models: ['groq-api'],
+  temperature: 0.7,
+  max_tokens: null,
+  history_len: 3,
+  online_llm_model: {
+    'groq-api': { model_name: '', api_base_url: '', api_key: '' },
+    'openai-api': { model_name: '', api_base_url: '', api_key: '', openai_proxy: '' },
+    'gemini-api': { model_name: '', api_base_url: '', api_key: '' },
+    'qwen1.5-vllm': { model_name: '', api_base_url: '', api_key: '' },
+  },
+})
+
+const fetchLlmConfig = async () => {
+  llmConfigLoading.value = true
+  try {
+    const res = await getLlmConfigReq()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      llmConfig.llm_models = d.llm_models || ['groq-api']
+      llmConfig.temperature = d.temperature ?? 0.7
+      llmConfig.max_tokens = d.max_tokens ?? null
+      llmConfig.history_len = d.history_len ?? 3
+      if (d.online_llm_model) {
+        for (const pname of Object.keys(llmConfig.online_llm_model)) {
+          if (d.online_llm_model[pname]) {
+            Object.assign(llmConfig.online_llm_model[pname], d.online_llm_model[pname])
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    llmConfigLoading.value = false
+  }
+}
+
+const onSaveLlmConfig = async () => {
+  savingLlmConfig.value = true
+  try {
+    const res = await saveLlmConfigReq({
+      llm_models: llmConfig.llm_models,
+      temperature: llmConfig.temperature,
+      max_tokens: llmConfig.max_tokens || null,
+      history_len: llmConfig.history_len,
+      online_llm_model: llmConfig.online_llm_model,
+    })
+    if (res.code === 200) {
+      ElMessage.success($t('llmSaveSuccess'))
+      // Refresh to get masked keys back
+      await fetchLlmConfig()
+    } else {
+      ElMessage.error(res.msg || $t('llmSaveFail'))
+    }
+  } catch (e) {
+    ElMessage.error(e?.msg || $t('llmSaveFail'))
+  } finally {
+    savingLlmConfig.value = false
+  }
+}
+
+// ========== Tenant Management ==========
+const tenants = ref([])
+const tenantForm = reactive({ name: '', display_name: '' })
+const showTenantCreate = ref(false)
+const showTenantUsers = ref(false)
+const tenantUsers = ref([])
+const tenantAssignUserId = ref(null)
+const selectedTenantId = ref(null)
+
+async function fetchTenants() {
+  try {
+    const res = await listTenantsReq()
+    tenants.value = res.data?.data || []
+  } catch (e) { /* silent */ }
+}
+
+async function onCreateTenant() {
+  if (!tenantForm.name) return
+  try {
+    await createTenantReq({ name: tenantForm.name, display_name: tenantForm.display_name })
+    ElMessage.success($t('tenantCreateSuccess'))
+    showTenantCreate.value = false
+    Object.assign(tenantForm, { name: '', display_name: '' })
+    fetchTenants()
+  } catch (e) {
+    ElMessage.error(e?.msg || $t('error'))
+  }
+}
+
+async function onDeleteTenant(row) {
+  await ElMessageBox.confirm($t('tenantDeleteConfirm'), $t('tenantDelete'), { type: 'warning' })
+  try {
+    await deleteTenantReq({ tenant_id: row.id })
+    ElMessage.success($t('tenantDeleteSuccess'))
+    fetchTenants()
+  } catch (e) {
+    ElMessage.error(e?.msg || $t('error'))
+  }
+}
+
+async function openTenantUsers(row) {
+  selectedTenantId.value = row.id
+  tenantAssignUserId.value = null
+  try {
+    const res = await listTenantUsersReq(row.id)
+    tenantUsers.value = res.data?.data || []
+    showTenantUsers.value = true
+  } catch (e) {
+    ElMessage.error(e?.msg || $t('error'))
+  }
+}
+
+async function onAssignUser() {
+  if (!tenantAssignUserId.value || !selectedTenantId.value) return
+  try {
+    await assignUserToTenantReq({ user_id: tenantAssignUserId.value, tenant_id: selectedTenantId.value })
+    ElMessage.success($t('tenantAssignSuccess'))
+    const res = await listTenantUsersReq(selectedTenantId.value)
+    tenantUsers.value = res.data?.data || []
+  } catch (e) {
+    ElMessage.error(e?.msg || $t('error'))
+  }
 }
 </script>
 

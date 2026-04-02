@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, func
+from sqlalchemy import Column, Integer, String, DateTime, JSON, func  # noqa: F401
 from server.db.base import Base
 
 
@@ -10,6 +10,7 @@ class ConversationModel(Base):
     name = Column(String(50), comment='Conversation name')
     chat_type = Column(String(50), comment='Chat type')
     user_id = Column(Integer, nullable=True, index=True, comment='Owner user ID')
+    tenant_id = Column(String(36), nullable=True, comment='Tenant UUID')
     create_time = Column(DateTime, default=func.now(), comment='Creation time')
 
     def __repr__(self):

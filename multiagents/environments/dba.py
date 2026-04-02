@@ -16,7 +16,7 @@ from multiagents.agents.conversation_agent import BaseAgent
 from multiagents.message import Message, SolverMessage
 from multiagents.tools.metrics import current_diag_time
 from multiagents.prompt_templates.diagnosis_summary_prompts import (
-    DIAGNOSIS_SUMMARY_PROMPT, DIAGNOSIS_SUMMARY_PROMPT_zh
+    DIAGNOSIS_SUMMARY_PROMPT, DIAGNOSIS_SUMMARY_PROMPT_zh, DIAGNOSIS_SUMMARY_PROMPT_tr
 )
 from multiagents.environments.decision_maker import (
     BaseDecisionMaker,
@@ -279,6 +279,8 @@ class DBAEnvironment(BaseModel):
         print(f'<flow>{{"title": "Expert Diagnosis", "content": "", "expertData": {json.dumps(expert_data)}, "isCompleted": 0, "isRuning": 1}}</flow>')
         if self.reporter.language == "zh":
             expert_select_desc = "Based on the task description above, I decided to select the following experts for diagnosis:\n"
+        elif self.reporter.language == "tr":
+            expert_select_desc = "Yukarıdaki görev açıklamasına dayanarak, sorunu tanılamak için aşağıdaki uzmanları seçmeye karar verdim:\n"
         else:
             expert_select_desc = "Based on the task description, I decide to select the following experts to diagnose the problem:\n"
         expert_select_desc += "\n".join([expert.name for expert in selected_experts])
@@ -337,15 +339,29 @@ class DBAEnvironment(BaseModel):
             self.reporter.report['solutions'] = self.reporter.report['solutions'].replace('# ', '')
             self.reporter.report['solutions'] = self.reporter.report['solutions'].replace('#', '')
 
+            if self.reporter.language == "tr":
+                lbl_date = "Anomali Tarihi"
+                lbl_desc = "Anomali Açıklaması"
+                lbl_cause = "Kök Neden"
+                lbl_sol = "Çözümler"
+                lbl_cite = "Atıflar"
+                lbl_proc = "Tanı Süreci"
+            else:
+                lbl_date = "Anomaly Date"
+                lbl_desc = "Anomaly Description"
+                lbl_cause = "Root Cause"
+                lbl_sol = "Solutions"
+                lbl_cite = "Citations"
+                lbl_proc = "Diagnosis Process"
             report_markdown = report_markdown + \
                 f"""|                     |       |
 |---------------------|-------|
-| Anomaly Date        | {self.reporter.report['anomaly date']}  |
-| Anomaly Description | {self.reporter.report['anomaly description']}  |
-| Root Cause          | {self.reporter.report['root cause']}  |
-| Solutions           | {self.reporter.report['solutions']}  |\n\n"""
-            report_markdown = report_markdown + f"## Citations\n" + self.reporter.report['citations'].strip() + '\n\n'
-            report_markdown = report_markdown + f"## Diagnosis Process\n" + \
+| {lbl_date:<19} | {self.reporter.report['anomaly date']}  |
+| {lbl_desc:<19} | {self.reporter.report['anomaly description']}  |
+| {lbl_cause:<19} | {self.reporter.report['root cause']}  |
+| {lbl_sol:<19} | {self.reporter.report['solutions']}  |\n\n"""
+            report_markdown = report_markdown + f"## {lbl_cite}\n" + self.reporter.report['citations'].strip() + '\n\n'
+            report_markdown = report_markdown + f"## {lbl_proc}\n" + \
                 self.reporter.report['diagnosis process'].strip()
             self.reporter.record["report"] = report_markdown
             add_report(report_markdown)
@@ -489,6 +505,8 @@ class DBAEnvironment(BaseModel):
 
             if self.reporter.language == "zh":
                 add_str = f"<br>Root cause identified by {diag['sender']}:<br>"
+            elif self.reporter.language == "tr":
+                add_str = f"<br>{diag['sender']} tarafından tespit edilen kök neden:<br>"
             else:
                 add_str = f"<br>The root causes identified by {diag['sender']}:<br>"
             self.reporter.report["root cause"] = str(
@@ -514,6 +532,8 @@ class DBAEnvironment(BaseModel):
 
             if self.reporter.language == "zh":
                 add_str = f"<br>Recommended solution by {diag['sender']}:<br>"
+            elif self.reporter.language == "tr":
+                add_str = f"<br>{diag['sender']} tarafından önerilen çözümler:<br>"
             else:
                 add_str = f"<br>The solutions recommended by {diag['sender']}:<br>"
             self.reporter.report["solutions"] = str(
@@ -521,6 +541,8 @@ class DBAEnvironment(BaseModel):
 
             if self.reporter.language == "zh":
                 add_str = f"<br>{i+1}. Diagnosis process by {diag['sender']}:<br>"
+            elif self.reporter.language == "tr":
+                add_str = f"<br>{i+1}. {diag['sender']} tarafından tanı süreci:<br>"
             else:
                 add_str = f"<br>{i+1}. The diagnosis process of {diag['sender']}:<br>"
             self.reporter.report["diagnosis process"] = str(
@@ -602,6 +624,8 @@ class DBAEnvironment(BaseModel):
         for i, diag in enumerate(initial_diags):
             if self.reporter.language == 'zh':
                 prompt = DIAGNOSIS_SUMMARY_PROMPT_zh
+            elif self.reporter.language == 'tr':
+                prompt = DIAGNOSIS_SUMMARY_PROMPT_tr
             else:
                 prompt = DIAGNOSIS_SUMMARY_PROMPT
 

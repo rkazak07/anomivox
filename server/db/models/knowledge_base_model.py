@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime, func, Index
 
 from server.db.base import Base
 
@@ -13,6 +13,7 @@ class KnowledgeBaseModel(Base):
     vs_type = Column(String(50), comment='Vector store type')
     embed_model = Column(String(50), comment='Embedding model name')
     file_count = Column(Integer, default=0, comment='File count')
+    tenant_id = Column(String(36), nullable=True, comment='Tenant UUID')
     create_time = Column(DateTime, default=func.now(), comment='Creation time')
 
     def __repr__(self):

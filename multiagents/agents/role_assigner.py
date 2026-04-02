@@ -46,11 +46,15 @@ class RoleAssignerAgent(BaseAgent):
             # print('='*25, flush=True)
             if self.language == "zh":
                 select_placeholder = 'Selected experts: ' + str(selected_names) + '\n\n' + 'If you are satisfied with the selected experts, click "continue". Otherwise, re-select your preferred experts.'
+            elif self.language == "tr":
+                select_placeholder = 'Seçilen uzmanlar: ' + str(selected_names) + '\n\n' + 'Seçilen uzmanlardan memnunsanız "devam et" seçeneğine tıklayın. Aksi hâlde tercih ettiğiniz uzmanları seçin.'
             else:
                 select_placeholder = 'Selected experts: ' + str(selected_names) + '\n\n' + 'If you are satisfied with the selected experts, please click \"continue\". Otherwise, please select the experts you prefer.'
         else:
             if self.language == "zh":
                 select_placeholder = 'Sorry, we cannot select suitable experts, please select manually.'
+            elif self.language == "tr":
+                select_placeholder = 'Üzgünüz, uygun uzman seçemedik. Lütfen uzmanları kendiniz seçin.'
             else:
                 select_placeholder = 'We are sorry that we cannot select proper experts. Please manually select the experts.'
 

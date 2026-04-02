@@ -17,7 +17,7 @@ from multiagents.reasoning_algorithms import base_env
 from multiagents.tools.retriever import api_matcher
 from multiagents.utils.interact import add_display_message, finish_expert_diagnosis
 from multiagents.llms.sentence_embedding import sentence_embedding
-from multiagents.prompt_templates.roundtable_prompts import ROUND_TABLE_PROMPT, ROUND_TABLE_PROMPT_zh
+from multiagents.prompt_templates.roundtable_prompts import ROUND_TABLE_PROMPT, ROUND_TABLE_PROMPT_zh, ROUND_TABLE_PROMPT_tr
 
 def cosine_similarity(v1, v2):
     # Normalize the vectors to unit vectors
@@ -183,12 +183,16 @@ class SolverAgent(BaseAgent):
             return {}
         if self.language == 'zh':
             prompt = "Based on the above content, analyze the root cause of the diagnosis in detail. Note that the analysis should only focus on root causes, do not mention any solutions. Return in markdown format."
+        elif self.language == 'tr':
+            prompt = "Yukarıdaki içeriğe dayanarak tanı kök nedenini detaylı olarak analiz et. Analiz yalnızca kök nedenlere odaklanmalı, çözümlerden bahsetme. Markdown formatında yanıt ver."
         else:
             prompt = "Analyze the diagnosed root causes based on above discussions in details. Note the analysis should be only about root causes in markdown format!!! And do not mention anything about the solutions!!!"
         diag_message = self.llm._construct_messages(prompt)
         diag_messages = [result_node.messages[-1]] + diag_message
         if self.language == 'zh':
             self.llm.change_messages("You are a database expert.", diag_messages)
+        elif self.language == 'tr':
+            self.llm.change_messages("Bir veritabanı uzmanısınız.", diag_messages)
         else:
             self.llm.change_messages("You are a database expert", diag_messages)
         if self.enable_feedback():
@@ -202,12 +206,16 @@ class SolverAgent(BaseAgent):
         # print(colored(f"\nDetected Root Causes: {root_causes}","blue"))
         if self.language == 'zh':
             prompt = "Based on the above content, provide solutions in detail. Note that only provide solutions, do not mention any root causes. Return in markdown format. If there is no solution in the above messages, answer \"No reliable solution\"."
+        elif self.language == 'tr':
+            prompt = "Yukarıdaki mesajlara dayanarak çözümleri detaylı olarak ver. **Kök nedenlerden** bahsetme! Çözümler markdown formatında olmalı. Yukarıdaki mesajlarda çözüm yoksa 'Güvenilir çözüm bulunamadı' yanıtını ver."
         else:
             prompt = "Give the solutions only based on above messages in details. Note do not mention anything about **root causes**!!! The solutions (not root causes) should be in markdown format. If there are no solutions in above messages, please answer 'No solution available'"
         solution_message = self.llm._construct_messages(prompt)
         solution_messages = [result_node.messages[-1]] + solution_message
         if self.language == 'zh':
             self.llm.change_messages("You are a database expert.", solution_messages)
+        elif self.language == 'tr':
+            self.llm.change_messages("Bir veritabanı uzmanısınız.", solution_messages)
         else:
             self.llm.change_messages("You are a database expert", solution_messages)
         if self.enable_feedback():
@@ -266,6 +274,8 @@ class SolverAgent(BaseAgent):
         """Asynchronous version of step"""
         if self.language == 'zh':
             prompt = ROUND_TABLE_PROMPT_zh
+        elif self.language == 'tr':
+            prompt = ROUND_TABLE_PROMPT_tr
         else:
             prompt = ROUND_TABLE_PROMPT
 

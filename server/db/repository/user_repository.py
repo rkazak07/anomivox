@@ -98,7 +98,8 @@ def authenticate_user(session, username: str, password: str) -> Optional[Dict]:
         "username": user.username,
         "role": user.role,
         "is_admin": user.is_admin,
-        "is_active": user.is_active
+        "is_active": user.is_active,
+        "tenant_id": user.tenant_id,
     }
 
 
@@ -122,6 +123,7 @@ def save_token(session, token: str, user_id: int) -> None:
             "role": user.role,
             "is_admin": user.is_admin,
             "is_active": user.is_active,
+            "tenant_id": user.tenant_id,
         }
         cache_token(token, user_data, ttl_seconds=TOKEN_EXPIRY_HOURS * 3600)
 
@@ -157,6 +159,7 @@ def get_user_by_token(session, token: str) -> Optional[Dict]:
         "role": user.role,
         "is_admin": user.is_admin,
         "is_active": user.is_active,
+        "tenant_id": user.tenant_id,
     }
     # Cache'e yaz (kalan TTL hesapla)
     remaining = int((t.expires_at - datetime.utcnow()).total_seconds())

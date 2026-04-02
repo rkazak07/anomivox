@@ -98,6 +98,7 @@ async def current_user_info(
         "username": user["username"],
         "role": user["role"],
         "is_admin": user["is_admin"],
+        "tenant_id": user.get("tenant_id"),
     })
 
 

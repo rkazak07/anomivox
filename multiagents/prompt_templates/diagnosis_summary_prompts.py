@@ -18,3 +18,17 @@ DIAGNOSIS_SUMMARY_PROMPT_zh = '''
 2. List key points one by one (e.g. 1. ...<br>2. ...<br>3. ...). Do not add any extra content!
 3. Key points must be separated by <br> (e.g. 1. ...<br>2. ...<br>3. ...). Do not use markdown format.
 '''
+
+DIAGNOSIS_SUMMARY_PROMPT_tr = '''
+Aşağıdaki tanı prosedürleri veya önerilen çözümlerin önemli bilgileri kaybetmeden aranabilir bir özetini Türkçe olarak ver:
+{diagnosis_messages}
+
+=============
+Not
+1. Uzman olarak önemli bilgileri atlama!
+2. Giriş tanı prosedürleri veya önerilen çözümlerin temel noktalarını liste hâlinde yanıtla (örn. "1. ...<br>2. ...<br>3. ..."). Ek içerik ekleme!
+3. Temel noktalar <br> ile kesinlikle ayrılmalı ("1. ...<br>2. ...<br>3. ...")! Markdown formatı ve # başlıkları kullanma!
+4. Grafiklere ilişkin hiçbir şey söyleme! Grafikleri yoksay!
+5. "Yapay Zeka olarak" gibi ifadeler kullanma!
+6. Yanıtını Türkçe yaz.
+'''

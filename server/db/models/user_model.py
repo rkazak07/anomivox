@@ -12,6 +12,7 @@ class UserModel(Base):
     email = Column(String(255), nullable=True, comment='Email address')
     role = Column(String(20), default='user', nullable=False, comment='Role: admin or user')
     is_active = Column(Boolean, default=True, comment='Active status')
+    tenant_id = Column(String(36), nullable=True, index=True, comment='Tenant UUID')
     create_time = Column(DateTime, default=func.now(), comment='Creation time')
     update_time = Column(DateTime, default=func.now(), onupdate=func.now(), comment='Update time')
 

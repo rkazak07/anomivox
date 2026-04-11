@@ -1,0 +1,217 @@
+{
+  "anomalyAnalysis": {
+    "RoleAssigner": {
+      "messages": [
+        {
+          "data": "10 Nisan 2026 saat 14:30'da PostgreSQL veritabanı sunucusunda CPU kullanımı %94'e ulaştı ve 'NodeCpuHigh' alarmı tetiklendi. Sistem yükü (load average) 12.3 ile normalin çok üzerinde seyrediyor. Bu durum aktif sorgu sayısının artmasıyla eş zamanlı gerçekleşti.",
+          "time": "14:31:05"
+        },
+        {
+          "data": "Görev tanımına göre aşağıdaki uzmanları tanı için seçiyorum:\nCpuExpert\nQueryExpert\nWorkloadExpert",
+          "time": "14:31:12"
+        }
+      ]
+    },
+    "Solver": {
+      "messages": []
+    },
+    "CpuExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Öncelikle CPU kullanım detaylarını incelemem gerekiyor. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_cpu_metrics()</span></div></details>",
+          "time": "14:31:25"
+        },
+        {
+          "data": "CPU metriklerini analiz ettim:\n- **usr**: %78 (kullanıcı alanı)\n- **sys**: %16 (kernel alanı)\n- **iowait**: %2\n- **idle**: %4\n\nKullanıcı alanı CPU tüketimi çok yüksek. Bu genellikle yoğun sorgu işleme veya karmaşık hesaplamalardan kaynaklanır.",
+          "time": "14:31:40"
+        },
+        {
+          "data": "Düşünce: Aktif bağlantı ve sorgu durumunu kontrol edeyim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_active_connections()</span></div></details>",
+          "time": "14:31:55"
+        },
+        {
+          "data": "Aktif bağlantı sayısı **247** (max_connections: 300). Bunların **89**'u 'active' durumda, **12**'si 5 saniyeden uzun süredir çalışıyor.\n\n**Tanı**: CPU yükü, eşzamanlı aktif sorgu sayısının aşırı artmasından kaynaklanıyor. Connection pooling yapılandırması gözden geçirilmeli.",
+          "time": "14:32:10"
+        },
+        {
+          "data": "**Özet**: CPU kullanımı %94 seviyesinde kritik. Ana neden: aşırı eşzamanlı sorgu yükü. Öneriler:\n1. `max_connections` parametresi PgBouncer ile sınırlandırılmalı\n2. Uzun süren sorgular optimize edilmeli\n3. Connection pooling devreye alınmalı",
+          "time": "14:32:25"
+        }
+      ]
+    },
+    "QueryExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Uzun süren sorguları inceleyeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_long_running_queries()</span></div></details>",
+          "time": "14:31:30"
+        },
+        {
+          "data": "**12 adet uzun süren sorgu** tespit edildi:\n\n| PID | Süre | Sorgu |\n|-----|------|-------|\n| 14523 | 45s | `SELECT * FROM logs WHERE created_at > ... ORDER BY id` |\n| 14601 | 38s | `SELECT COUNT(*) FROM events JOIN users ON ...` |\n| 14789 | 32s | `UPDATE metrics SET value = ... WHERE timestamp BETWEEN ...` |\n\nBu sorguların çoğu **index eksikliğinden** dolayı full table scan yapıyor.",
+          "time": "14:31:50"
+        },
+        {
+          "data": "Düşünce: Sorgu planlarını kontrol edeyim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 explain_query(pid=14523)</span></div></details>",
+          "time": "14:32:05"
+        },
+        {
+          "data": "EXPLAIN analizi:\n```\nSeq Scan on logs  (cost=0.00..458723.50 rows=2847562)\n  Filter: (created_at > '2026-04-09'::date)\n  Rows Removed by Filter: 12453821\nSort  (cost=892345.12..899458.23)\n  Sort Key: id\n```\n\n**logs** tablosunda `created_at` sütununda index yok! 15M+ satırlık tabloda sequential scan yapılıyor.",
+          "time": "14:32:20"
+        },
+        {
+          "data": "**Özet**: Performans darboğazı sorgu optimizasyonu eksikliğinden kaynaklanıyor:\n1. `logs.created_at` için B-tree index oluşturulmalı\n2. `events` ve `users` JOIN sorgusu için composite index gerekli\n3. `metrics` tablosunda partition pruning değerlendirilmeli",
+          "time": "14:32:35"
+        }
+      ]
+    },
+    "WorkloadExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: İş yükü profilini inceleyeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_workload_stats()</span></div></details>",
+          "time": "14:31:35"
+        },
+        {
+          "data": "Son 1 saatteki iş yükü profili:\n- **TPS (Transaction/s)**: 1,247 (normal: ~400)\n- **QPS (Query/s)**: 3,890 (normal: ~1,200)\n- **Aktif bağlantı**: 247/300\n- **Bekleme süresi ort.**: 2.3s (normal: <100ms)\n\nİş yükü normalin **3 katına** çıkmış durumda.",
+          "time": "14:31:55"
+        },
+        {
+          "data": "**Özet**: İş yükü anomalisi tespit edildi. Muhtemel sebepler:\n1. Uygulama tarafında retry storm (başarısız isteklerin tekrar denenmesi)\n2. Batch job'un yanlış zamanlama ile çalışması\n3. Connection leak nedeniyle bağlantı birikimi\n\nÖneri: Uygulama logları incelenmeli ve connection pool limitleri daraltılmalı.",
+          "time": "14:32:15"
+        }
+      ]
+    }
+  },
+  "brainstorming": {
+    "messages": [
+      {
+        "sender": "CpuExpert",
+        "data": "**Tanı Onayı**:\n\nCPU yükünün ana nedeni, index eksikliğinden kaynaklanan ağır sorgulardır. `logs` tablosundaki sequential scan tek başına CPU'nun %30'unu tüketiyor. Acil olarak index oluşturulmalı.",
+        "time": "14:33:00"
+      },
+      {
+        "sender": "QueryExpert",
+        "data": "CpuExpert'in tespitine katılıyorum. Ek olarak, connection sayısının 247'ye ulaşması da önemli bir faktör. Her aktif bağlantı ayrı bir backend process olarak CPU tüketiyor. PgBouncer devreye alınmalı.",
+        "time": "14:33:15"
+      },
+      {
+        "sender": "WorkloadExpert",
+        "data": "Her iki uzmanın tespitlerini destekliyorum. Ek gözlemim: TPS'in 3 katına çıkması, uygulama tarafında bir retry mekanizmasının tetiklenmiş olabileceğini gösteriyor. Sorgu timeout'ları ayarlanmalı:\n- `statement_timeout = 30s`\n- `idle_in_transaction_session_timeout = 60s`",
+        "time": "14:33:30"
+      },
+      {
+        "sender": "CpuExpert",
+        "data": "**Sonuç**: Üç uzman olarak ortak kararımız:\n1. **Acil**: `CREATE INDEX idx_logs_created_at ON logs(created_at)` çalıştırılmalı\n2. **Kısa vadeli**: PgBouncer connection pooling kurulmalı\n3. **Orta vadeli**: Uygulama retry stratejisi exponential backoff'a çevrilmeli\n4. **İzleme**: `statement_timeout` ve `idle_in_transaction_session_timeout` parametreleri ayarlanmalı",
+        "time": "14:33:45"
+      }
+    ]
+  },
+  "report": "# CPU Yüksek Yük Alarmı: PostgreSQL Veritabanı Analizi\n\n| | |\n|---------------------|------|\n| Anomali Tarihi | 2026-04-10 14:30:00 |\n| Anomali Açıklaması | CPU kullanımı %94'e ulaştı, sistem yükü 12.3 |\n| Alarm Seviyesi | KRİTİK (CRIT) |\n| Etkilenen Servis | PostgreSQL 12.11 - anomivox veritabanı |\n\n## Kök Neden Analizi\n\nVeritabanı sunucusunda CPU kullanımı kritik seviyeye ulaşmıştır. Yapılan multi-agent tanı sonucunda **üç temel neden** tespit edilmiştir:\n\n### 1. Index Eksikliği (Ana Neden)\n`logs` tablosunda `created_at` sütununda index bulunmaması nedeniyle 15M+ satırlık tabloda sequential scan yapılmaktadır. Bu tek başına CPU'nun %30'unu tüketmektedir.\n\n### 2. Aşırı Bağlantı Sayısı\nAktif bağlantı sayısı 247/300 seviyesine ulaşmıştır. Connection pooling mekanizması bulunmamaktadır.\n\n### 3. Retry Storm\nUygulama tarafında başarısız sorguların agresif şekilde tekrar denenmesi, TPS'i normalin 3 katına çıkarmıştır.\n\n## Çözüm Önerileri\n\n| Öncelik | Aksiyon | Etki |\n|---------|---------|------|\n| 🔴 Acil | `CREATE INDEX idx_logs_created_at ON logs(created_at)` | CPU %30 düşüş beklenir |\n| 🟡 Kısa vadeli | PgBouncer connection pooling kurulumu | Bağlantı yönetimi iyileşir |\n| 🟢 Orta vadeli | Exponential backoff retry stratejisi | TPS normalize olur |\n| 🟢 Orta vadeli | `statement_timeout = 30s` ayarı | Uzun sorgular otomatik sonlandırılır |\n\n## Metrik Özeti\n\n- **CPU Kullanımı**: %94 (usr: %78, sys: %16)\n- **Aktif Bağlantı**: 247/300\n- **TPS**: 1,247 (normal: ~400)\n- **Uzun Süren Sorgu**: 12 adet (>5s)\n",
+  "title": "CPU Yüksek Yük - Index Eksikliği ve Bağlantı Birikimi",
+  "time": 1775998200,
+  "topMetrics": [
+    {
+      "title": "CPU Kullanımı (%)",
+      "values": [
+        45,
+        48,
+        52,
+        55,
+        61,
+        68,
+        72,
+        78,
+        82,
+        85,
+        88,
+        91,
+        94,
+        92,
+        89,
+        85,
+        78,
+        72,
+        65,
+        58,
+        52,
+        48,
+        45,
+        42
+      ],
+      "type": "line"
+    },
+    {
+      "title": "Aktif Bağlantı Sayısı",
+      "values": [
+        85,
+        92,
+        98,
+        110,
+        125,
+        145,
+        168,
+        189,
+        210,
+        228,
+        240,
+        247,
+        245,
+        238,
+        220,
+        195,
+        170,
+        148,
+        125,
+        108,
+        95,
+        88,
+        82,
+        78
+      ],
+      "type": "line"
+    },
+    {
+      "title": "TPS (Transaction/s)",
+      "values": [
+        380,
+        420,
+        465,
+        520,
+        610,
+        720,
+        850,
+        980,
+        1100,
+        1180,
+        1220,
+        1247,
+        1230,
+        1180,
+        1050,
+        920,
+        780,
+        650,
+        520,
+        440,
+        400,
+        385,
+        370,
+        365
+      ],
+      "type": "line"
+    }
+  ],
+  "severity": "CRIT",
+  "status": "resolved",
+  "alerts": [
+    {
+      "alert_name": "NodeCpuHigh",
+      "alert_status": "resolved",
+      "alert_level": "CRIT"
+    },
+    {
+      "alert_name": "PostgresActiveConnHigh",
+      "alert_status": "resolved",
+      "alert_level": "WARN"
+    }
+  ],
+  "report_generate_time": "2026-04-10 14:34:00"
+}

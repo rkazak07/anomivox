@@ -1,0 +1,140 @@
+{
+  "anomalyAnalysis": {
+    "RoleAssigner": {
+      "messages": [
+        {
+          "data": "8 Nisan 2026 saat 11:00'da PostgreSQL'de yavaş sorgu uyarısı tetiklendi. Son 1 saatte 23 adet sorgu 5 saniyeyi aşmış durumda. Ortalama sorgu süresi 340ms'den 2.8 saniyeye yükseldi.",
+          "time": "11:00:15"
+        },
+        {
+          "data": "Görev tanımına göre aşağıdaki uzmanları tanı için seçiyorum:\nQueryExpert\nIndexExpert",
+          "time": "11:00:22"
+        }
+      ]
+    },
+    "Solver": {
+      "messages": []
+    },
+    "QueryExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: En yavaş sorguları tespit edeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_slow_queries(threshold=5000)</span></div></details>",
+          "time": "11:00:35"
+        },
+        {
+          "data": "En yavaş 5 sorgu:\n\n| # | Süre | Tablo | İşlem |\n|---|------|-------|-------|\n| 1 | 12.3s | `events` | SELECT + JOIN |\n| 2 | 9.8s | `metrics` | Aggregate |\n| 3 | 8.1s | `audit_log` | Range scan |\n| 4 | 6.5s | `events` | Subquery |\n| 5 | 5.7s | `sessions` | COUNT |\n\nOrtak pattern: Büyük tablolarda index olmadan full table scan.",
+          "time": "11:00:55"
+        },
+        {
+          "data": "**Özet**: Yavaş sorguların %80'i `events` ve `metrics` tablolarında yoğunlaşıyor. Her iki tabloda da `timestamp` sütununda index eksik. Ek olarak, `audit_log` tablosu partitioning'den faydalanabilir.",
+          "time": "11:01:15"
+        }
+      ]
+    },
+    "IndexExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Eksik index analizi yapacağım. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_missing_indexes()</span></div></details>",
+          "time": "11:00:40"
+        },
+        {
+          "data": "Eksik index önerileri:\n\n```sql\n-- events tablosu (8.2M satır)\nCREATE INDEX CONCURRENTLY idx_events_timestamp ON events(created_at);\nCREATE INDEX CONCURRENTLY idx_events_user_ts ON events(user_id, created_at);\n\n-- metrics tablosu (25M satır)\nCREATE INDEX CONCURRENTLY idx_metrics_ts ON metrics(timestamp);\n\n-- audit_log tablosu (45M satır)\nCREATE INDEX CONCURRENTLY idx_audit_ts ON audit_log(created_at);\n```",
+          "time": "11:01:00"
+        },
+        {
+          "data": "**Özet**: 4 adet kritik index eksikliği tespit edildi. `CONCURRENTLY` ile production'da downtime olmadan oluşturulabilir. Beklenen iyileşme: ortalama sorgu süresi %70-85 düşüş.",
+          "time": "11:01:20"
+        }
+      ]
+    }
+  },
+  "brainstorming": {
+    "messages": [
+      {
+        "sender": "QueryExpert",
+        "data": "Yavaş sorguların kök nedeni index eksikliği. IndexExpert'in önerdiği 4 index ile sorun büyük ölçüde çözülecektir. Ek olarak, `audit_log` tablosu için aylık partitioning öneririm.",
+        "time": "11:01:45"
+      },
+      {
+        "sender": "IndexExpert",
+        "data": "Katılıyorum. Aksiyon planı:\n1. **Acil**: 4 index'i `CONCURRENTLY` ile oluştur\n2. **Kısa vadeli**: `pg_stat_statements` ile sürekli izleme kur\n3. **Orta vadeli**: `audit_log` için range partitioning uygula\n4. **İzleme**: Auto-explain ile yavaş sorgu planlarını logla",
+        "time": "11:02:00"
+      }
+    ]
+  },
+  "report": "# Yavaş Sorgu Uyarısı: Index Eksikliği Analizi\n\n| | |\n|---------------------|------|\n| Anomali Tarihi | 2026-04-08 11:00:00 |\n| Anomali Açıklaması | 23 adet sorgu >5s, ortalama süre 340ms → 2.8s |\n| Alarm Seviyesi | BİLGİ (INFO) |\n| Etkilenen Servis | PostgreSQL 12.11 - anomivox veritabanı |\n\n## Kök Neden Analizi\n\nYavaş sorguların **%80'i** `events`, `metrics` ve `audit_log` tablolarında yoğunlaşmaktadır. Bu tablolarda `timestamp/created_at` sütunlarında index bulunmamaktadır.\n\n### Eksik Index'ler\n\n| Tablo | Satır Sayısı | Önerilen Index |\n|-------|-------------|----------------|\n| events | 8.2M | `idx_events_timestamp`, `idx_events_user_ts` |\n| metrics | 25M | `idx_metrics_ts` |\n| audit_log | 45M | `idx_audit_ts` |\n\n## Çözüm Önerileri\n\n| Öncelik | Aksiyon | Beklenen Etki |\n|---------|---------|---------------|\n| 🔴 Acil | 4 index CONCURRENTLY oluştur | Sorgu süresi %70-85 düşer |\n| 🟡 Kısa vadeli | pg_stat_statements izleme | Proaktif optimizasyon |\n| 🟢 Orta vadeli | audit_log range partitioning | Büyük tablo yönetimi |\n",
+  "title": "Yavaş Sorgu - Index Eksikliği",
+  "time": 1775811600,
+  "topMetrics": [
+    {
+      "title": "Ortalama Sorgu Süresi (ms)",
+      "values": [
+        340,
+        380,
+        450,
+        580,
+        720,
+        980,
+        1200,
+        1600,
+        2000,
+        2400,
+        2600,
+        2800,
+        2750,
+        2500,
+        2100,
+        1600,
+        1100,
+        750,
+        500,
+        400,
+        360,
+        345,
+        340,
+        335
+      ],
+      "type": "line"
+    },
+    {
+      "title": "5s Üzeri Sorgu Sayısı",
+      "values": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        8,
+        10,
+        14,
+        17,
+        19,
+        21,
+        23,
+        22,
+        18,
+        14,
+        9,
+        5,
+        2,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "type": "line"
+    }
+  ],
+  "severity": "INFO",
+  "status": "resolved",
+  "alerts": [
+    {
+      "alert_name": "PostgresSlowQueries",
+      "alert_status": "resolved",
+      "alert_level": "INFO"
+    }
+  ],
+  "report_generate_time": "2026-04-08 11:03:00"
+}

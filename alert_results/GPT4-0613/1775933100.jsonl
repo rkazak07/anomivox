@@ -1,0 +1,205 @@
+{
+  "anomalyAnalysis": {
+    "RoleAssigner": {
+      "messages": [
+        {
+          "data": "9 Nisan 2026 saat 20:45'te veritabanında ciddi lock contention tespit edildi. 'PostgresLocksHigh' alarmı tetiklendi. 47 adet blocked sorgu ve 3 adet deadlock kaydı var. Uygulama yanıt süreleri 15 saniyenin üzerine çıktı.",
+          "time": "20:45:15"
+        },
+        {
+          "data": "Görev tanımına göre aşağıdaki uzmanları tanı için seçiyorum:\nQueryExpert\nWorkloadExpert\nIndexExpert",
+          "time": "20:45:22"
+        }
+      ]
+    },
+    "Solver": {
+      "messages": []
+    },
+    "QueryExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Bloklanan sorguları ve lock zincirini inceleyeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_blocked_locks()</span></div></details>",
+          "time": "20:45:35"
+        },
+        {
+          "data": "Lock zinciri analizi:\n\n**Bloklayan işlem (PID: 8934)**:\n```sql\nBEGIN;\nUPDATE orders SET status = 'processing' WHERE id IN (SELECT id FROM orders WHERE status = 'pending' LIMIT 1000 FOR UPDATE);\n-- Transaction 12 dakikadır açık!\n```\n\nBu tek transaction **47 sorguyu** blokluyor. `FOR UPDATE` ile 1000 satır kilitlenmiş durumda.",
+          "time": "20:45:55"
+        },
+        {
+          "data": "Deadlock logları:\n```\n2026-04-09 20:42:13 ERROR: deadlock detected\nProcess 8934 waits for ShareLock on transaction 1847523\nProcess 9012 waits for ShareLock on transaction 1847519\n```\n\n**Deadlock nedeni**: İki farklı session aynı `orders` tablosunda çakışan sıralarda `FOR UPDATE` kilidi alıyor.",
+          "time": "20:46:10"
+        },
+        {
+          "data": "**Özet**: Lock contention'ın kök nedeni:\n1. Batch UPDATE sorgusu `FOR UPDATE` ile 1000 satırı aynı anda kilitliyor\n2. Transaction 12 dakikadır açık (timeout yok)\n3. Aynı tabloya birden fazla batch job eşzamanlı erişiyor\n\nÖneri: Batch boyutu küçültülmeli, `lock_timeout` ayarlanmalı.",
+          "time": "20:46:25"
+        }
+      ]
+    },
+    "WorkloadExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: İş yükü ve bekleme istatistiklerini kontrol edeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_wait_events()</span></div></details>",
+          "time": "20:45:40"
+        },
+        {
+          "data": "Wait event dağılımı:\n- **Lock:transactionid**: %68\n- **Lock:tuple**: %15\n- **LWLock:buffer_content**: %8\n- **IO:DataFileRead**: %5\n- **Diğer**: %4\n\nBekleme süresinin %83'ü lock kaynaklı. Veritabanı neredeyse tamamen lock contention nedeniyle durma noktasında.",
+          "time": "20:46:00"
+        },
+        {
+          "data": "**Özet**: Sistem lock bekleme modunda. Uygulama timeout'ları devreye girmiş, kullanıcılar 504 hatası alıyor. Acil müdahale:\n1. PID 8934'teki transaction terminate edilmeli\n2. `lock_timeout = 5s` ayarlanmalı\n3. `deadlock_timeout = 3s` ayarlanmalı",
+          "time": "20:46:20"
+        }
+      ]
+    },
+    "IndexExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: `orders` tablosu index yapısını kontrol edeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_table_indexes('orders')</span></div></details>",
+          "time": "20:45:45"
+        },
+        {
+          "data": "**orders** tablosu index durumu:\n- `orders_pkey` (id) - B-tree ✅\n- `idx_orders_user_id` (user_id) - B-tree ✅\n- ❌ `status` sütununda index **YOK**!\n\n`WHERE status = 'pending'` filtresi sequential scan yapıyor. Bu, lock süresini uzatan ek bir faktör.",
+          "time": "20:46:05"
+        },
+        {
+          "data": "**Özet**: `orders.status` sütununda partial index oluşturulmalı:\n```sql\nCREATE INDEX CONCURRENTLY idx_orders_status_pending \nON orders(status) WHERE status = 'pending';\n```\nBu index ile batch UPDATE sorgusunun kilit süresi %80 kısalacaktır.",
+          "time": "20:46:30"
+        }
+      ]
+    }
+  },
+  "brainstorming": {
+    "messages": [
+      {
+        "sender": "QueryExpert",
+        "data": "**Kritik Durum**: PID 8934 acil terminate edilmeli. 12 dakikadır açık transaction 47 sorguyu blokluyor. `SELECT pg_terminate_backend(8934);` çalıştırılmalı.",
+        "time": "20:47:00"
+      },
+      {
+        "sender": "WorkloadExpert",
+        "data": "Katılıyorum. Terminate sonrası kalıcı çözümler:\n1. Batch boyutu 1000'den 50'ye düşürülmeli\n2. `FOR UPDATE SKIP LOCKED` kullanılmalı\n3. `lock_timeout = 5s` ve `statement_timeout = 30s` ayarlanmalı",
+        "time": "20:47:15"
+      },
+      {
+        "sender": "IndexExpert",
+        "data": "Partial index önerim batch sorgu performansını dramatik şekilde iyileştirecek. Ayrıca `FOR UPDATE SKIP LOCKED` ile birlikte kullanıldığında deadlock riski tamamen ortadan kalkar.",
+        "time": "20:47:30"
+      },
+      {
+        "sender": "QueryExpert",
+        "data": "**Ortak Aksiyon Planı**:\n1. **Acil**: `pg_terminate_backend(8934)` ile bloklayan transaction'ı sonlandır\n2. **Acil**: `lock_timeout = 5s`, `deadlock_timeout = 3s` ayarla\n3. **Kısa vadeli**: `orders.status` partial index oluştur\n4. **Kısa vadeli**: Batch boyutu 50'ye düşür, `FOR UPDATE SKIP LOCKED` kullan\n5. **Orta vadeli**: Uygulama seviyesinde queue-based batch processing'e geç",
+        "time": "20:47:45"
+      }
+    ]
+  },
+  "report": "# Lock Contention Alarmı: Deadlock ve Blocked Queries Analizi\n\n| | |\n|---------------------|------|\n| Anomali Tarihi | 2026-04-09 20:45:00 |\n| Anomali Açıklaması | 47 blocked sorgu, 3 deadlock, yanıt süresi >15s |\n| Alarm Seviyesi | KRİTİK (CRIT) |\n| Etkilenen Servis | PostgreSQL 12.11 - anomivox veritabanı |\n\n## Kök Neden Analizi\n\nVeritabanında ciddi lock contention tespit edilmiştir. **Tek bir açık transaction** (PID: 8934) 47 sorguyu bloklamaktadır.\n\n### Ana Neden: Agresif Batch UPDATE\n```sql\nUPDATE orders SET status = 'processing' \nWHERE id IN (SELECT id FROM orders WHERE status = 'pending' LIMIT 1000 FOR UPDATE);\n```\n\nBu sorgu:\n- 1000 satırı aynı anda `FOR UPDATE` ile kilitliyor\n- 12 dakikadır açık transaction içinde çalışıyor\n- `status` sütununda index olmadığı için sequential scan yapıyor\n- Diğer batch job'larla deadlock oluşturuyor\n\n## Etki Analizi\n\n| Metrik | Değer | Normal |\n|--------|-------|--------|\n| Blocked sorgular | 47 | 0 |\n| Deadlock sayısı | 3 | 0 |\n| Yanıt süresi | >15s | <200ms |\n| Lock bekleme oranı | %83 | <%5 |\n\n## Çözüm Önerileri\n\n| Öncelik | Aksiyon | Etki |\n|---------|---------|------|\n| 🔴 Acil | `pg_terminate_backend(8934)` | 47 sorgu serbest kalır |\n| 🔴 Acil | `lock_timeout = 5s` ayarla | Uzun lock bekleme önlenir |\n| 🟡 Kısa vadeli | `orders.status` partial index | Sorgu %80 hızlanır |\n| 🟡 Kısa vadeli | Batch boyutu: 1000 → 50, `SKIP LOCKED` | Deadlock riski sıfırlanır |\n| 🟢 Orta vadeli | Queue-based batch processing | Kalıcı mimari çözüm |\n",
+  "title": "Lock Contention - Deadlock ve Batch UPDATE Sorunu",
+  "time": 1775933100,
+  "topMetrics": [
+    {
+      "title": "Blocked Sorgu Sayısı",
+      "values": [
+        0,
+        0,
+        1,
+        2,
+        5,
+        8,
+        12,
+        18,
+        25,
+        32,
+        38,
+        42,
+        45,
+        47,
+        46,
+        40,
+        28,
+        15,
+        5,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "type": "line"
+    },
+    {
+      "title": "Ortalama Yanıt Süresi (ms)",
+      "values": [
+        120,
+        150,
+        280,
+        520,
+        1200,
+        2800,
+        4500,
+        7200,
+        9800,
+        12000,
+        13500,
+        14800,
+        15200,
+        15500,
+        14000,
+        10000,
+        5500,
+        2000,
+        500,
+        200,
+        150,
+        130,
+        120,
+        115
+      ],
+      "type": "line"
+    },
+    {
+      "title": "Lock Bekleme Süresi (ms)",
+      "values": [
+        5,
+        8,
+        50,
+        120,
+        350,
+        800,
+        1500,
+        2800,
+        4200,
+        5800,
+        7200,
+        8500,
+        9000,
+        9200,
+        8000,
+        5500,
+        3000,
+        1200,
+        200,
+        30,
+        10,
+        5,
+        5,
+        5
+      ],
+      "type": "line"
+    }
+  ],
+  "severity": "CRIT",
+  "status": "resolved",
+  "alerts": [
+    {
+      "alert_name": "PostgresLocksHigh",
+      "alert_status": "resolved",
+      "alert_level": "CRIT"
+    },
+    {
+      "alert_name": "PostgresDeadlocks",
+      "alert_status": "resolved",
+      "alert_level": "CRIT"
+    }
+  ],
+  "report_generate_time": "2026-04-09 20:48:00"
+}

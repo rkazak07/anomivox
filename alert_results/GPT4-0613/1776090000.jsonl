@@ -1,0 +1,196 @@
+{
+  "anomalyAnalysis": {
+    "RoleAssigner": {
+      "messages": [
+        {
+          "data": "11 Nisan 2026 saat 16:00'da PostgreSQL sunucusunda bellek kullanımı %91'e ulaştı. 'NodeMemoryHigh' uyarısı tetiklendi. shared_buffers kullanımı dolu, OS swap kullanımı başlamış durumda.",
+          "time": "16:00:20"
+        },
+        {
+          "data": "Görev tanımına göre aşağıdaki uzmanları tanı için seçiyorum:\nMemoryExpert\nConfigurationExpert\nQueryExpert",
+          "time": "16:00:28"
+        }
+      ]
+    },
+    "Solver": {
+      "messages": []
+    },
+    "MemoryExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Bellek kullanım dağılımını inceleyeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_memory_stats()</span></div></details>",
+          "time": "16:00:40"
+        },
+        {
+          "data": "Bellek durumu:\n- **Toplam RAM**: 16 GB\n- **Kullanılan**: 14.6 GB (%91)\n- **shared_buffers**: 4 GB (dolu)\n- **effective_cache_size**: 12 GB\n- **work_mem**: 256 MB × 89 aktif sorgu = 22.7 GB (teorik max!)\n- **Swap kullanımı**: 1.2 GB\n\n⚠️ `work_mem = 256MB` çok yüksek! 89 aktif sorgu ile teorik bellek ihtiyacı 22.7 GB.",
+          "time": "16:01:00"
+        },
+        {
+          "data": "**Özet**: Bellek sorununun ana nedeni `work_mem = 256MB` ayarı. Her sorting/hashing operasyonu bu kadar bellek tüketebilir. 89 eşzamanlı sorgu ile toplam ihtiyaç RAM'i çok aşıyor.\n\nÖneri: `work_mem = 32MB` olarak düşürülmeli. Büyük sorgular için session bazlı ayarlanmalı.",
+          "time": "16:01:20"
+        }
+      ]
+    },
+    "ConfigurationExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Bellek ile ilgili PostgreSQL ayarlarını kontrol edeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_pg_settings('memory')</span></div></details>",
+          "time": "16:00:45"
+        },
+        {
+          "data": "Bellek yapılandırması:\n- `shared_buffers`: 4GB (%25 RAM - uygun)\n- `work_mem`: 256MB ⚠️ (çok yüksek!)\n- `maintenance_work_mem`: 1GB\n- `effective_cache_size`: 12GB\n- `temp_buffers`: 32MB\n- `huge_pages`: off\n\n16 GB RAM'li bir sunucu için `work_mem = 256MB` tehlikeli derecede yüksek.",
+          "time": "16:01:05"
+        },
+        {
+          "data": "**Özet**: Yapılandırma önerileri:\n1. `work_mem = 32MB` (8x düşürme)\n2. `maintenance_work_mem = 512MB` (VACUUM/CREATE INDEX için yeterli)\n3. `huge_pages = try` (THP desteği varsa bellek verimliliği artar)\n4. OS seviyesinde `vm.swappiness = 1` ayarlanmalı",
+          "time": "16:01:25"
+        }
+      ]
+    },
+    "QueryExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Bellek yoğun sorguları tespit edeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_memory_intensive_queries()</span></div></details>",
+          "time": "16:00:50"
+        },
+        {
+          "data": "Yüksek bellek tüketen sorgular:\n\n| PID | Bellek | Sorgu Tipi |\n|-----|--------|------------|\n| 12340 | ~512MB | `ORDER BY random()` (sorting) |\n| 12455 | ~380MB | `GROUP BY ... HAVING COUNT(*)` (hash aggregate) |\n| 12567 | ~290MB | `DISTINCT ON (...)` (sorting) |\n\nBu 3 sorgu tek başına ~1.2 GB bellek tüketiyor.",
+          "time": "16:01:10"
+        },
+        {
+          "data": "**Özet**: Bellek yoğun sorgular optimize edilmeli:\n1. `ORDER BY random()` yerine `TABLESAMPLE` kullanılmalı\n2. Hash aggregate sorgularında `enable_hashagg = off` denenebilir\n3. DISTINCT sorgularında index-only scan sağlanmalı",
+          "time": "16:01:30"
+        }
+      ]
+    }
+  },
+  "brainstorming": {
+    "messages": [
+      {
+        "sender": "MemoryExpert",
+        "data": "**Ana Sorun**: `work_mem = 256MB` ayarı 16 GB RAM'li sunucu için çok yüksek. Her aktif sorgu potansiyel olarak bu kadar bellek tüketebilir. 89 eşzamanlı sorgu ile swap kullanımı kaçınılmaz.",
+        "time": "16:02:00"
+      },
+      {
+        "sender": "ConfigurationExpert",
+        "data": "Katılıyorum. `work_mem` düşürülmeli. Ek olarak, swap kullanımının başlaması PostgreSQL performansını ciddi şekilde etkiler. `vm.swappiness = 1` ile OS'un swap tercihini minimize etmeliyiz.",
+        "time": "16:02:15"
+      },
+      {
+        "sender": "QueryExpert",
+        "data": "`ORDER BY random()` gibi paternler production'da kullanılmamalı. Session bazlı `SET work_mem = '256MB'` ile sadece ihtiyaç duyan sorgulara yüksek bellek verilebilir.\n\n**Ortak Plan**:\n1. **Acil**: `work_mem = 32MB` olarak değiştir, reload\n2. **Acil**: `vm.swappiness = 1` ayarla\n3. **Kısa vadeli**: Bellek yoğun sorguları optimize et\n4. **Orta vadeli**: Connection pooling ile eşzamanlı sorgu sayısını sınırla",
+        "time": "16:02:30"
+      }
+    ]
+  },
+  "report": "# Bellek Yetersizliği Uyarısı: work_mem Yapılandırma Analizi\n\n| | |\n|---------------------|------|\n| Anomali Tarihi | 2026-04-11 16:00:00 |\n| Anomali Açıklaması | Bellek kullanımı %91, swap aktif (1.2 GB) |\n| Alarm Seviyesi | UYARI (WARN) |\n| Etkilenen Servis | PostgreSQL 12.11 - anomivox veritabanı |\n\n## Kök Neden Analizi\n\n`work_mem = 256MB` ayarı 16 GB RAM'li sunucu için aşırı yüksektir. 89 eşzamanlı aktif sorgu ile teorik bellek ihtiyacı **22.7 GB**'a ulaşmakta, bu da OS swap kullanımını tetiklemektedir.\n\n### Bellek Dağılımı\n\n| Bileşen | Boyut | Durum |\n|---------|-------|-------|\n| shared_buffers | 4 GB | ✅ Normal |\n| work_mem (teorik max) | 22.7 GB | ⚠️ RAM'i aşıyor |\n| Swap kullanımı | 1.2 GB | ⚠️ Aktif |\n| Toplam RAM | 16 GB | %91 dolu |\n\n## Çözüm Önerileri\n\n| Öncelik | Aksiyon | Etki |\n|---------|---------|------|\n| 🔴 Acil | `work_mem = 32MB` (reload) | Bellek tüketimi %70 azalır |\n| 🔴 Acil | `vm.swappiness = 1` | Swap kullanımı minimize olur |\n| 🟡 Kısa vadeli | Bellek yoğun sorgu optimizasyonu | Bireysel sorgu bellek ihtiyacı düşer |\n| 🟢 Orta vadeli | Connection pooling (max 50 aktif) | Eşzamanlı bellek baskısı azalır |\n",
+  "title": "Bellek Yetersizliği - work_mem Yapılandırma Hatası",
+  "time": 1776090000,
+  "topMetrics": [
+    {
+      "title": "Bellek Kullanımı (%)",
+      "values": [
+        68,
+        70,
+        72,
+        74,
+        76,
+        78,
+        80,
+        82,
+        84,
+        86,
+        88,
+        90,
+        91,
+        91,
+        90,
+        88,
+        84,
+        78,
+        74,
+        72,
+        70,
+        69,
+        68,
+        67
+      ],
+      "type": "line"
+    },
+    {
+      "title": "Swap Kullanımı (MB)",
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        50,
+        120,
+        280,
+        450,
+        680,
+        850,
+        1050,
+        1200,
+        1180,
+        1000,
+        750,
+        400,
+        150,
+        30,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "type": "line"
+    },
+    {
+      "title": "Aktif Sorgu Sayısı",
+      "values": [
+        32,
+        38,
+        42,
+        48,
+        55,
+        62,
+        68,
+        74,
+        78,
+        82,
+        85,
+        88,
+        89,
+        87,
+        82,
+        75,
+        65,
+        55,
+        45,
+        38,
+        34,
+        32,
+        30,
+        28
+      ],
+      "type": "line"
+    }
+  ],
+  "severity": "WARN",
+  "status": "resolved",
+  "alerts": [
+    {
+      "alert_name": "NodeMemoryHigh",
+      "alert_status": "resolved",
+      "alert_level": "WARN"
+    },
+    {
+      "alert_name": "PostgresSwapActive",
+      "alert_status": "resolved",
+      "alert_level": "INFO"
+    }
+  ],
+  "report_generate_time": "2026-04-11 16:03:00"
+}

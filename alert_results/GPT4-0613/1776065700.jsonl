@@ -1,0 +1,153 @@
+{
+  "anomalyAnalysis": {
+    "RoleAssigner": {
+      "messages": [
+        {
+          "data": "11 Nisan 2026 saat 09:15'te disk kullanım oranı %87'ye ulaştı ve 'NodeDiskSpaceHigh' uyarısı tetiklendi. WAL dosyaları ve pg_log dizini hızla büyüyor. Tahmini doluluk süresi: ~6 saat.",
+          "time": "09:15:30"
+        },
+        {
+          "data": "Görev tanımına göre aşağıdaki uzmanları tanı için seçiyorum:\nDiskExpert\nConfigurationExpert",
+          "time": "09:15:38"
+        }
+      ]
+    },
+    "Solver": {
+      "messages": []
+    },
+    "DiskExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: Disk kullanım dağılımını kontrol edeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_disk_usage()</span></div></details>",
+          "time": "09:15:50"
+        },
+        {
+          "data": "Disk kullanım analizi:\n\n| Dizin | Boyut | Oran |\n|-------|-------|------|\n| `/var/lib/postgresql/data` | 142 GB | %71 |\n| `pg_wal/` | 28 GB | %14 |\n| `pg_log/` | 8.5 GB | %4.2 |\n| Diğer | 21.5 GB | %10.8 |\n| **Toplam** | **200 GB / 230 GB** | **%87** |\n\nWAL dosyaları normalin 4 katı büyüklüğünde!",
+          "time": "09:16:10"
+        },
+        {
+          "data": "Düşünce: WAL retention ayarlarını kontrol edeyim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_pg_settings('wal')</span></div></details>",
+          "time": "09:16:25"
+        },
+        {
+          "data": "WAL yapılandırması:\n- `wal_keep_segments`: 256 (çok yüksek!)\n- `max_wal_size`: 4GB\n- `checkpoint_timeout`: 30min\n- `archive_mode`: off\n\n**Sorun**: `wal_keep_segments` çok yüksek ayarlanmış. Replication slave olmadığı halde WAL dosyaları birikmiş.",
+          "time": "09:16:40"
+        },
+        {
+          "data": "**Özet**: Disk doluluğu WAL birikimi kaynaklı:\n1. `wal_keep_segments` 256'dan 32'ye düşürülmeli\n2. Eski WAL dosyaları temizlenmeli (`pg_archivecleanup`)\n3. `pg_log` rotasyonu kontrol edilmeli (8.5 GB çok fazla)\n4. `log_rotation_age` ve `log_rotation_size` ayarlanmalı",
+          "time": "09:17:00"
+        }
+      ]
+    },
+    "ConfigurationExpert": {
+      "messages": [
+        {
+          "data": "Düşünce: PostgreSQL log ayarlarını inceleyeceğim. <br><details open><summary><span style=\"font-size: 14px; font-weight: bold; color: #333333\">Araç Kullanımı:</span></summary><div style=\"display: flex; flex-direction: column; line-height: 36px\"><span>🔧 get_pg_settings('log')</span></div></details>",
+          "time": "09:16:00"
+        },
+        {
+          "data": "Log yapılandırması:\n- `log_statement`: 'all' ⚠️ (tüm sorgular loglanıyor!)\n- `log_min_duration_statement`: -1 (devre dışı)\n- `log_rotation_age`: 0 (rotasyon yok!)\n- `log_rotation_size`: 0 (boyut limiti yok!)\n\n**Ciddi yapılandırma hatası**: Tüm sorgular loglanıyor ve log rotasyonu kapalı!",
+          "time": "09:16:20"
+        },
+        {
+          "data": "**Özet**: Yapılandırma sorunları:\n1. `log_statement = 'all'` → `'ddl'` olarak değiştirilmeli\n2. `log_min_duration_statement = 1000` (1s üzeri sorgular loglanmalı)\n3. `log_rotation_age = 1440` (günlük rotasyon)\n4. `log_rotation_size = 100MB`\n\nBu değişikliklerle günlük log büyümesi ~%90 azalacaktır.",
+          "time": "09:16:45"
+        }
+      ]
+    }
+  },
+  "brainstorming": {
+    "messages": [
+      {
+        "sender": "DiskExpert",
+        "data": "**Tanı Özeti**:\n\nDisk doluluğunun iki ana nedeni var:\n1. WAL birikimi (28 GB) - `wal_keep_segments` çok yüksek\n2. Log birikimi (8.5 GB) - rotasyon kapalı ve tüm sorgular loglanıyor\n\nAcil müdahale gerekiyor, tahmini 6 saat içinde disk dolacak.",
+        "time": "09:17:15"
+      },
+      {
+        "sender": "ConfigurationExpert",
+        "data": "DiskExpert'in tespitine katılıyorum. Log yapılandırması ciddi şekilde hatalı. `log_statement = 'all'` production ortamında asla kullanılmamalı. Ek olarak, `pg_stat_statements` extension'ı yeterli sorgu izleme sağlar.\n\nAcil adımlar:\n1. `pg_archivecleanup` ile eski WAL'ları temizle\n2. Log ayarlarını düzelt ve PostgreSQL reload yap\n3. Eski log dosyalarını sıkıştır/sil",
+        "time": "09:17:30"
+      },
+      {
+        "sender": "DiskExpert",
+        "data": "**Ortak Karar**:\n1. **Acil**: Eski WAL dosyalarını temizle → ~20 GB alan kazanımı\n2. **Acil**: `log_statement = 'ddl'` ayarla, reload yap\n3. **Kısa vadeli**: Log rotasyonu yapılandır\n4. **Orta vadeli**: Disk izleme alert eşiğini %80'e düşür\n5. **Uzun vadeli**: WAL archiving ve backup stratejisi oluştur",
+        "time": "09:17:45"
+      }
+    ]
+  },
+  "report": "# Disk Alanı Uyarısı: WAL ve Log Birikimi Analizi\n\n| | |\n|---------------------|------|\n| Anomali Tarihi | 2026-04-11 09:15:00 |\n| Anomali Açıklaması | Disk kullanımı %87'ye ulaştı, tahmini doluluk: 6 saat |\n| Alarm Seviyesi | UYARI (WARN) |\n| Etkilenen Servis | PostgreSQL 12.11 - anomivox veritabanı |\n\n## Kök Neden Analizi\n\nDisk alanı uyarısının **iki temel nedeni** tespit edilmiştir:\n\n### 1. WAL Dosya Birikimi (28 GB)\n`wal_keep_segments = 256` olarak yapılandırılmış ancak replication slave bulunmuyor. Gereksiz WAL dosyaları disk alanını tüketiyor.\n\n### 2. Log Dosya Birikimi (8.5 GB)\n`log_statement = 'all'` ayarı ile tüm SQL sorguları loglanıyor. Log rotasyonu (`log_rotation_age`, `log_rotation_size`) tamamen kapalı.\n\n## Disk Kullanım Dağılımı\n\n| Dizin | Boyut | Durum |\n|-------|-------|-------|\n| Data dizini | 142 GB | Normal |\n| pg_wal/ | 28 GB | ⚠️ 4x normal |\n| pg_log/ | 8.5 GB | ⚠️ Rotasyon yok |\n| Toplam | 200 / 230 GB | %87 dolu |\n\n## Çözüm Önerileri\n\n| Öncelik | Aksiyon | Beklenen Etki |\n|---------|---------|---------------|\n| 🔴 Acil | WAL temizliği (`pg_archivecleanup`) | ~20 GB alan kazanımı |\n| 🔴 Acil | `log_statement = 'ddl'` + reload | Log büyümesi %90 azalır |\n| 🟡 Kısa vadeli | Log rotasyonu yapılandırması | Otomatik log yönetimi |\n| 🟢 Orta vadeli | Disk alert eşiği %80'e düşürme | Erken uyarı |\n| 🟢 Uzun vadeli | WAL archiving + backup stratejisi | Veri güvenliği |\n",
+  "title": "Disk Alanı Uyarısı - WAL ve Log Birikimi",
+  "time": 1776065700,
+  "topMetrics": [
+    {
+      "title": "Disk Kullanımı (%)",
+      "values": [
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        86,
+        82,
+        78,
+        74,
+        72,
+        71,
+        70,
+        70
+      ],
+      "type": "line"
+    },
+    {
+      "title": "WAL Dosya Boyutu (GB)",
+      "values": [
+        8,
+        9,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20,
+        22,
+        24,
+        25,
+        26,
+        27,
+        28,
+        28,
+        27,
+        18,
+        10,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "type": "line"
+    }
+  ],
+  "severity": "WARN",
+  "status": "resolved",
+  "alerts": [
+    {
+      "alert_name": "NodeDiskSpaceHigh",
+      "alert_status": "resolved",
+      "alert_level": "WARN"
+    }
+  ],
+  "report_generate_time": "2026-04-11 09:18:00"
+}
